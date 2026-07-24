@@ -188,3 +188,54 @@ HTML2VRC는 현재 아키텍처, UDOM 범위와 첫 번째 수직 프로토타�
 3. 실제로 동작하는 VRChat UI를 생성합니다.
 4. Node.js가 필요하지 않은지 확인합니다.
 5. 그 위에 React 저작 환경과 AI 포팅을 추가합니다.
+
+## 첫 번째 기술 검증 프로토타입
+
+`prototype` 브랜치에는 UDOM 0.1 JSON을 Unity 네이티브 UI로 만드는 수직 프로토타입이 포함되어 있습니다.
+
+### 요구 환경
+
+- Unity `2022.3.22f1`
+- TextMeshPro `3.0.6`
+- Unity UI `1.0.0`
+- Node.js 불필요
+
+이 저장소 자체에는 VRChat Worlds SDK와 UdonSharp를 설치하지 않았습니다. SDK가 없는 상태에서도 구조를 검증할 수 있도록 안전 동작은 현재 Unity `MonoBehaviour`로 실행됩니다.
+
+### 1분 사용법
+
+1. Unity Hub에서 이 저장소 폴더를 Unity `2022.3.22f1` 프로젝트로 엽니다.
+2. Unity가 패키지 가져오기와 컴파일을 끝낼 때까지 기다립니다.
+3. `Assets/Html2Vrc/Samples/WorldSettings.udom.json`을 선택합니다.
+4. `Tools > HTML2VRC > UDOM Importer`를 엽니다.
+5. `Validate`를 누른 뒤 `Generate / Regenerate`를 누릅니다.
+6. 생성된 Canvas의 `UdomGeneratedRoot > External References`에서 `world-light` 슬롯에 원하는 Light GameObject를 드래그합니다.
+7. Play Mode에서 `Toggle World Light`와 `Close Panel` 버튼을 누릅니다.
+
+완성된 예제를 바로 보려면 `Tools > HTML2VRC > Build Sample World Settings Scene`을 실행합니다. `Assets/Html2Vrc/Samples/WorldSettingsSample.unity`에 Camera, Light, 외부 연결과 생성 UI가 포함된 샘플 Scene이 저장됩니다.
+
+### 재생성 확인
+
+1. 샘플 JSON의 `title.text` 또는 `settings-panel.style.backgroundColor`를 바꿉니다.
+2. Importer에서 같은 파일로 `Generate / Regenerate`를 다시 실행합니다.
+3. 기존 안정 ID의 GameObject가 갱신되고 `world-light` 외부 참조는 유지되는지 확인합니다.
+4. Hierarchy에서 생성 마커가 없는 사용자 GameObject를 Canvas 아래 추가해도 재생성 시 삭제되지 않습니다.
+
+### 문서와 코드
+
+- 최소 규격: `Assets/Html2Vrc/Documentation/UDOM_SPEC.md`
+- 샘플 JSON: `Assets/Html2Vrc/Samples/WorldSettings.udom.json`
+- Importer: `Assets/Html2Vrc/Editor/UdomImporterWindow.cs`
+- 재생성 빌더: `Assets/Html2Vrc/Editor/UdomBuilder.cs`
+- 안전 동작: `Assets/Html2Vrc/Runtime/UdomSafeAction.cs`
+- UdonSharp 경계: `Assets/Html2Vrc/Documentation/UDONSHARP_BOUNDARY.md`
+- 실제 테스트 결과: `Assets/Html2Vrc/Documentation/TEST_RESULTS.md`
+- EditMode 테스트: `Assets/Html2Vrc/Tests/Editor/UdomPrototypeTests.cs`
+
+### 현재 한계
+
+- HTML/CSS/React/JavaScript를 읽지 않습니다.
+- UDOM 0.1의 제한된 요소와 스타일만 지원합니다.
+- Sprite는 Unity 프로젝트의 `Assets/` 경로만 참조합니다.
+- 사용자 오브젝트는 보존하지만, 생성 마커가 붙은 오브젝트에서 생성기가 소유하는 UI 컴포넌트를 다른 타입으로 바꾸면 다음 재생성 때 원래 타입에 맞게 복구됩니다.
+- VRChat Build & Test, UdonSharp 컴파일, ClientSim, 네트워크 동기화는 이 저장소에 SDK가 없어 아직 검증 대상이 아닙니다.

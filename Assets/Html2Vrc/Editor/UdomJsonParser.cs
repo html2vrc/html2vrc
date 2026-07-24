@@ -1,0 +1,518 @@
+using System;
+using System.Collections.Generic;
+using System.Globalization;
+using System.Text;
+
+namespace Html2Vrc.Editor
+{
+    internal static class UdomJsonParser
+    {
+        public static UdomDocument Parse(string json)
+        {
+            var reader = new Reader(json);
+            var root = reader.ParseValue() as Dictionary<string, object>
+                       ?? throw new FormatException("최상위 JSON 값은 객체여야 한다.");
+            reader.EnsureEnd();
+            return MapDocument(root);
+        }
+
+        private static UdomDocument MapDocument(Dictionary<string, object> value)
+        {
+            return new UdomDocument
+            {
+                schemaVersion = GetString(value, "schemaVersion"),
+                id = GetString(value, "id"),
+                name = GetString(value, "name"),
+                canvas = value.TryGetValue("canvas", out var canvasValue)
+                    ? MapCanvas(RequireObject(canvasValue, "canvas"))
+                    : null,
+                root = value.TryGetValue("root", out var rootValue)
+                    ? MapNode(RequireObject(rootValue, "root"), "$.root", 0)
+                    : null
+            };
+        }
+
+        private static UdomCanvas MapCanvas(Dictionary<string, object> value)
+        {
+            var canvas = new UdomCanvas();
+            if (value.TryGetValue("renderMode", out _))
+            {
+                canvas.renderMode = GetString(value, "renderMode");
+            }
+
+            if (value.TryGetValue("size", out var size))
+            {
+                canvas.size = GetFloatArray(size, "canvas.size");
+            }
+
+            if (value.TryGetValue("scale", out var scale))
+            {
+                canvas.scale = GetFloat(scale, "canvas.scale");
+            }
+
+            return canvas;
+        }
+
+        private static UdomNode MapNode(Dictionary<string, object> value, string path, int depth)
+        {
+            if (depth > 64)
+            {
+                throw new FormatException($"{path}: 노드 중첩은 64단계를 넘을 수 없다.");
+            }
+
+            var node = new UdomNode
+            {
+                id = GetString(value, "id"),
+                type = GetString(value, "type"),
+                name = GetString(value, "name"),
+                text = GetString(value, "text"),
+                sprite = GetString(value, "sprite")
+            };
+
+            if (value.TryGetValue("style", out var styleValue))
+            {
+                node.style = MapStyle(RequireObject(styleValue, path + ".style"), path + ".style");
+            }
+
+            if (value.TryGetValue("binding", out var bindingValue))
+            {
+                var bindingObject = RequireObject(bindingValue, path + ".binding");
+                node.binding = new UdomBinding
+                {
+                    action = GetString(bindingObject, "action"),
+                    targetSlot = GetString(bindingObject, "targetSlot")
+                };
+            }
+
+            if (value.TryGetValue("embed", out var embedValue))
+            {
+                var embedObject = RequireObject(embedValue, path + ".embed");
+                node.embed = new UdomEmbed
+                {
+                    targetSlot = GetString(embedObject, "targetSlot")
+                };
+            }
+
+            if (value.TryGetValue("children", out var childrenValue))
+            {
+                var children = RequireArray(childrenValue, path + ".children");
+                node.children = new UdomNode[children.Count];
+                for (var index = 0; index < children.Count; index++)
+                {
+                    node.children[index] = MapNode(
+                        RequireObject(children[index], $"{path}.children[{index}]"),
+                        $"{path}.children[{index}]",
+                        depth + 1);
+                }
+            }
+
+            return node;
+        }
+
+        private static UdomStyle MapStyle(Dictionary<string, object> value, string path)
+        {
+            var style = new UdomStyle();
+            if (value.TryGetValue("position", out var position))
+            {
+                style.position = GetFloatArray(position, path + ".position");
+            }
+
+            if (value.TryGetValue("size", out var size))
+            {
+                style.size = GetFloatArray(size, path + ".size");
+            }
+
+            if (value.TryGetValue("layout", out _))
+            {
+                style.layout = GetString(value, "layout");
+            }
+
+            if (value.TryGetValue("padding", out var padding))
+            {
+                style.padding = GetFloatArray(padding, path + ".padding");
+            }
+
+            if (value.TryGetValue("margin", out var margin))
+            {
+                style.margin = GetFloatArray(margin, path + ".margin");
+            }
+
+            if (value.TryGetValue("spacing", out var spacing))
+            {
+                style.spacing = GetFloat(spacing, path + ".spacing");
+            }
+
+            if (value.TryGetValue("backgroundColor", out _))
+            {
+                style.backgroundColor = GetString(value, "backgroundColor");
+            }
+
+            if (value.TryGetValue("textColor", out _))
+            {
+                style.textColor = GetString(value, "textColor");
+            }
+
+            if (value.TryGetValue("fontSize", out var fontSize))
+            {
+                style.fontSize = GetFloat(fontSize, path + ".fontSize");
+            }
+
+            if (value.TryGetValue("alignment", out _))
+            {
+                style.alignment = GetString(value, "alignment");
+            }
+
+            if (value.TryGetValue("flexibleWidth", out var flexibleWidth))
+            {
+                style.flexibleWidth = GetFloat(flexibleWidth, path + ".flexibleWidth");
+            }
+
+            if (value.TryGetValue("flexibleHeight", out var flexibleHeight))
+            {
+                style.flexibleHeight = GetFloat(flexibleHeight, path + ".flexibleHeight");
+            }
+
+            return style;
+        }
+
+        private static string GetString(Dictionary<string, object> value, string key)
+        {
+            if (!value.TryGetValue(key, out var raw) || raw == null)
+            {
+                return null;
+            }
+
+            return raw as string
+                   ?? throw new FormatException($"'{key}' 값은 문자열이어야 한다.");
+        }
+
+        private static float[] GetFloatArray(object value, string path)
+        {
+            var array = RequireArray(value, path);
+            var result = new float[array.Count];
+            for (var index = 0; index < array.Count; index++)
+            {
+                result[index] = GetFloat(array[index], $"{path}[{index}]");
+            }
+
+            return result;
+        }
+
+        private static float GetFloat(object value, string path)
+        {
+            if (value is double number)
+            {
+                return (float)number;
+            }
+
+            throw new FormatException($"{path}: 숫자가 필요하다.");
+        }
+
+        private static Dictionary<string, object> RequireObject(object value, string path)
+        {
+            return value as Dictionary<string, object>
+                   ?? throw new FormatException($"{path}: JSON 객체가 필요하다.");
+        }
+
+        private static List<object> RequireArray(object value, string path)
+        {
+            return value as List<object>
+                   ?? throw new FormatException($"{path}: JSON 배열이 필요하다.");
+        }
+
+        private sealed class Reader
+        {
+            private readonly string source;
+            private int position;
+
+            public Reader(string json)
+            {
+                source = json ?? string.Empty;
+            }
+
+            public object ParseValue(int depth = 0)
+            {
+                if (depth > 128)
+                {
+                    throw Error("JSON 중첩은 128단계를 넘을 수 없다.");
+                }
+
+                SkipWhitespace();
+                if (position >= source.Length)
+                {
+                    throw Error("값이 필요한 위치에서 JSON이 끝났다.");
+                }
+
+                switch (source[position])
+                {
+                    case '{':
+                        return ParseObject(depth + 1);
+                    case '[':
+                        return ParseArray(depth + 1);
+                    case '"':
+                        return ParseString();
+                    case 't':
+                        ExpectLiteral("true");
+                        return true;
+                    case 'f':
+                        ExpectLiteral("false");
+                        return false;
+                    case 'n':
+                        ExpectLiteral("null");
+                        return null;
+                    default:
+                        if (source[position] == '-' || char.IsDigit(source[position]))
+                        {
+                            return ParseNumber();
+                        }
+
+                        throw Error($"예상하지 못한 문자 '{source[position]}'.");
+                }
+            }
+
+            public void EnsureEnd()
+            {
+                SkipWhitespace();
+                if (position != source.Length)
+                {
+                    throw Error("최상위 JSON 값 뒤에 불필요한 내용이 있다.");
+                }
+            }
+
+            private Dictionary<string, object> ParseObject(int depth)
+            {
+                var result = new Dictionary<string, object>(StringComparer.Ordinal);
+                position++;
+                SkipWhitespace();
+                if (TryConsume('}'))
+                {
+                    return result;
+                }
+
+                while (true)
+                {
+                    SkipWhitespace();
+                    if (position >= source.Length || source[position] != '"')
+                    {
+                        throw Error("객체 속성 이름은 문자열이어야 한다.");
+                    }
+
+                    var key = ParseString();
+                    SkipWhitespace();
+                    Expect(':');
+                    if (result.ContainsKey(key))
+                    {
+                        throw Error($"중복 JSON 속성 '{key}'.");
+                    }
+
+                    result.Add(key, ParseValue(depth));
+                    SkipWhitespace();
+                    if (TryConsume('}'))
+                    {
+                        return result;
+                    }
+
+                    Expect(',');
+                }
+            }
+
+            private List<object> ParseArray(int depth)
+            {
+                var result = new List<object>();
+                position++;
+                SkipWhitespace();
+                if (TryConsume(']'))
+                {
+                    return result;
+                }
+
+                while (true)
+                {
+                    result.Add(ParseValue(depth));
+                    SkipWhitespace();
+                    if (TryConsume(']'))
+                    {
+                        return result;
+                    }
+
+                    Expect(',');
+                }
+            }
+
+            private string ParseString()
+            {
+                Expect('"');
+                var builder = new StringBuilder();
+                while (position < source.Length)
+                {
+                    var character = source[position++];
+                    if (character == '"')
+                    {
+                        return builder.ToString();
+                    }
+
+                    if (character != '\\')
+                    {
+                        if (character < 0x20)
+                        {
+                            throw Error("문자열에 제어 문자를 직접 넣을 수 없다.");
+                        }
+
+                        builder.Append(character);
+                        continue;
+                    }
+
+                    if (position >= source.Length)
+                    {
+                        throw Error("문자열 escape가 끝나지 않았다.");
+                    }
+
+                    var escaped = source[position++];
+                    switch (escaped)
+                    {
+                        case '"':
+                        case '\\':
+                        case '/':
+                            builder.Append(escaped);
+                            break;
+                        case 'b':
+                            builder.Append('\b');
+                            break;
+                        case 'f':
+                            builder.Append('\f');
+                            break;
+                        case 'n':
+                            builder.Append('\n');
+                            break;
+                        case 'r':
+                            builder.Append('\r');
+                            break;
+                        case 't':
+                            builder.Append('\t');
+                            break;
+                        case 'u':
+                            builder.Append(ParseUnicodeEscape());
+                            break;
+                        default:
+                            throw Error($"지원하지 않는 escape '\\{escaped}'.");
+                    }
+                }
+
+                throw Error("문자열이 끝나지 않았다.");
+            }
+
+            private char ParseUnicodeEscape()
+            {
+                if (position + 4 > source.Length)
+                {
+                    throw Error("유니코드 escape는 4자리여야 한다.");
+                }
+
+                var hex = source.Substring(position, 4);
+                position += 4;
+                if (!ushort.TryParse(hex, NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture, out var value))
+                {
+                    throw Error($"잘못된 유니코드 escape '\\u{hex}'.");
+                }
+
+                return (char)value;
+            }
+
+            private double ParseNumber()
+            {
+                var start = position;
+                if (source[position] == '-')
+                {
+                    position++;
+                }
+
+                ConsumeDigits();
+                if (position < source.Length && source[position] == '.')
+                {
+                    position++;
+                    ConsumeDigits();
+                }
+
+                if (position < source.Length && (source[position] == 'e' || source[position] == 'E'))
+                {
+                    position++;
+                    if (position < source.Length && (source[position] == '+' || source[position] == '-'))
+                    {
+                        position++;
+                    }
+
+                    ConsumeDigits();
+                }
+
+                var text = source.Substring(start, position - start);
+                if (!double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var value))
+                {
+                    throw Error($"잘못된 숫자 '{text}'.");
+                }
+
+                return value;
+            }
+
+            private void ConsumeDigits()
+            {
+                var start = position;
+                while (position < source.Length && char.IsDigit(source[position]))
+                {
+                    position++;
+                }
+
+                if (position == start)
+                {
+                    throw Error("숫자 자릿수가 필요하다.");
+                }
+            }
+
+            private void ExpectLiteral(string literal)
+            {
+                if (position + literal.Length > source.Length
+                    || !string.Equals(
+                        source.Substring(position, literal.Length),
+                        literal,
+                        StringComparison.Ordinal))
+                {
+                    throw Error($"'{literal}'이 필요하다.");
+                }
+
+                position += literal.Length;
+            }
+
+            private void Expect(char expected)
+            {
+                SkipWhitespace();
+                if (!TryConsume(expected))
+                {
+                    throw Error($"'{expected}' 문자가 필요하다.");
+                }
+            }
+
+            private bool TryConsume(char expected)
+            {
+                if (position < source.Length && source[position] == expected)
+                {
+                    position++;
+                    return true;
+                }
+
+                return false;
+            }
+
+            private void SkipWhitespace()
+            {
+                while (position < source.Length && char.IsWhiteSpace(source[position]))
+                {
+                    position++;
+                }
+            }
+
+            private FormatException Error(string message)
+            {
+                return new FormatException($"JSON 위치 {position}: {message}");
+            }
+        }
+    }
+}

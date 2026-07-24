@@ -1,0 +1,26 @@
+{
+  "name": "Html2Vrc.Editor.Tests",
+  "rootNamespace": "Html2Vrc.Tests",
+  "references": [
+    "Html2Vrc.Runtime",
+    "Html2Vrc.Editor",
+    "Unity.TextMeshPro",
+    "Unity.ugui"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": false,
+  "defineConstraints": [
+    "UNITY_INCLUDE_TESTS"
+  ],
+  "versionDefines": [],
+  "noEngineReferences": false,
+  "optionalUnityReferences": [
+    "TestAssemblies"
+  ]
+}

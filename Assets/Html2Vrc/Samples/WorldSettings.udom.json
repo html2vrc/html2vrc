@@ -1,0 +1,246 @@
+{
+  "schemaVersion": "0.1",
+  "id": "world-settings",
+  "name": "World Settings",
+  "canvas": {
+    "renderMode": "WorldSpace",
+    "size": [1200, 800],
+    "scale": 0.01
+  },
+  "root": {
+    "id": "settings-panel",
+    "type": "Panel",
+    "name": "World Settings Panel",
+    "style": {
+      "position": [0, 0],
+      "size": [1040, 720],
+      "layout": "Vertical",
+      "padding": [40, 36, 40, 36],
+      "spacing": 16,
+      "backgroundColor": "#182033F2"
+    },
+    "children": [
+      {
+        "id": "accent",
+        "type": "Image",
+        "name": "Accent",
+        "style": {
+          "size": [960, 8],
+          "backgroundColor": "#58C8FFFF"
+        }
+      },
+      {
+        "id": "title",
+        "type": "Text",
+        "name": "Title",
+        "text": "World Settings",
+        "style": {
+          "size": [960, 64],
+          "fontSize": 44,
+          "textColor": "#FFFFFFFF",
+          "alignment": "MiddleLeft"
+        }
+      },
+      {
+        "id": "description",
+        "type": "Text",
+        "name": "Description",
+        "text": "Adjust local world options. These controls are generated from a readable UDOM file.",
+        "style": {
+          "size": [960, 58],
+          "fontSize": 24,
+          "textColor": "#B8C4D9FF",
+          "alignment": "MiddleLeft"
+        }
+      },
+      {
+        "id": "button-row",
+        "type": "Panel",
+        "name": "Actions",
+        "style": {
+          "size": [960, 76],
+          "layout": "Horizontal",
+          "spacing": 16,
+          "backgroundColor": "#00000000"
+        },
+        "children": [
+          {
+            "id": "toggle-light",
+            "type": "Button",
+            "name": "Toggle Light",
+            "style": {
+              "size": [472, 72],
+              "backgroundColor": "#276B8FFF"
+            },
+            "binding": {
+              "action": "ToggleLight",
+              "targetSlot": "world-light"
+            },
+            "children": [
+              {
+                "id": "toggle-light-label",
+                "type": "Text",
+                "text": "Toggle World Light",
+                "style": {
+                  "size": [440, 64],
+                  "fontSize": 26,
+                  "textColor": "#FFFFFFFF",
+                  "alignment": "Center"
+                }
+              }
+            ]
+          },
+          {
+            "id": "close-panel",
+            "type": "Button",
+            "name": "Close Panel",
+            "style": {
+              "size": [472, 72],
+              "backgroundColor": "#3A465CFF"
+            },
+            "binding": {
+              "action": "ClosePanel"
+            },
+            "children": [
+              {
+                "id": "close-panel-label",
+                "type": "Text",
+                "text": "Close Panel",
+                "style": {
+                  "size": [440, 64],
+                  "fontSize": 26,
+                  "textColor": "#FFFFFFFF",
+                  "alignment": "Center"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "list-heading",
+        "type": "Text",
+        "text": "Available options",
+        "style": {
+          "size": [960, 42],
+          "fontSize": 25,
+          "textColor": "#E5ECF7FF",
+          "alignment": "MiddleLeft"
+        }
+      },
+      {
+        "id": "settings-list",
+        "type": "ScrollView",
+        "name": "Settings List",
+        "style": {
+          "size": [960, 300],
+          "layout": "Vertical",
+          "padding": [16, 16, 16, 16],
+          "spacing": 10,
+          "backgroundColor": "#0E1422D9"
+        },
+        "children": [
+          {
+            "id": "item-lighting",
+            "type": "Panel",
+            "style": {
+              "size": [900, 64],
+              "backgroundColor": "#253047FF",
+              "padding": [18, 8, 18, 8]
+            },
+            "children": [
+              {
+                "id": "item-lighting-text",
+                "type": "Text",
+                "text": "Lighting — Local preview",
+                "style": {
+                  "size": [850, 48],
+                  "fontSize": 22,
+                  "textColor": "#FFFFFFFF",
+                  "alignment": "MiddleLeft"
+                }
+              }
+            ]
+          },
+          {
+            "id": "item-audio",
+            "type": "Panel",
+            "style": {
+              "size": [900, 64],
+              "backgroundColor": "#253047FF",
+              "padding": [18, 8, 18, 8]
+            },
+            "children": [
+              {
+                "id": "item-audio-text",
+                "type": "Text",
+                "text": "Audio — Extension point",
+                "style": {
+                  "size": [850, 48],
+                  "fontSize": 22,
+                  "textColor": "#FFFFFFFF",
+                  "alignment": "MiddleLeft"
+                }
+              }
+            ]
+          },
+          {
+            "id": "item-accessibility",
+            "type": "Panel",
+            "style": {
+              "size": [900, 64],
+              "backgroundColor": "#253047FF",
+              "padding": [18, 8, 18, 8]
+            },
+            "children": [
+              {
+                "id": "item-accessibility-text",
+                "type": "Text",
+                "text": "Accessibility — Extension point",
+                "style": {
+                  "size": [850, 48],
+                  "fontSize": 22,
+                  "textColor": "#FFFFFFFF",
+                  "alignment": "MiddleLeft"
+                }
+              }
+            ]
+          },
+          {
+            "id": "item-performance",
+            "type": "Panel",
+            "style": {
+              "size": [900, 64],
+              "backgroundColor": "#253047FF",
+              "padding": [18, 8, 18, 8]
+            },
+            "children": [
+              {
+                "id": "item-performance-text",
+                "type": "Text",
+                "text": "Performance — Extension point",
+                "style": {
+                  "size": [850, 48],
+                  "fontSize": 22,
+                  "textColor": "#FFFFFFFF",
+                  "alignment": "MiddleLeft"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "world-light-embed",
+        "type": "Embed",
+        "name": "World Light Embed",
+        "style": {
+          "size": [960, 28]
+        },
+        "embed": {
+          "targetSlot": "world-light"
+        }
+      }
+    ]
+  }
+}
