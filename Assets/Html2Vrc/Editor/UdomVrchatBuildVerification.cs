@@ -14,7 +14,9 @@ namespace Html2Vrc.Editor
         {
             try
             {
-                var builder = PrepareBuilder();
+                var builder = PrepareBuilder(
+                    UdomSampleSceneBuilder.BuildSampleScene,
+                    UdomSampleSceneBuilder.SampleScenePath);
                 var bundlePath = await builder.Build();
                 Debug.Log($"HTML2VRC_VRCHAT_BUILD_SUCCESS: {bundlePath}");
                 ExitBatchMode(0);
@@ -32,7 +34,9 @@ namespace Html2Vrc.Editor
         {
             try
             {
-                var builder = PrepareBuilder();
+                var builder = PrepareBuilder(
+                    UdomSampleSceneBuilder.BuildSampleScene,
+                    UdomSampleSceneBuilder.SampleScenePath);
                 await builder.BuildAndTest();
                 Debug.Log("HTML2VRC_VRCHAT_BUILD_AND_TEST_LAUNCHED");
                 ExitBatchMode(0);
@@ -45,11 +49,53 @@ namespace Html2Vrc.Editor
             }
         }
 
-        private static IVRCSdkWorldBuilderApi PrepareBuilder()
+        [MenuItem("Tools/HTML2VRC/VRChat/Build HTML Sample World Bundle")]
+        public static async void BuildHtmlSampleWorldBundle()
         {
-            UdomSampleSceneBuilder.BuildSampleScene();
+            try
+            {
+                var builder = PrepareBuilder(
+                    UdomHtmlSampleSceneBuilder.BuildSampleScene,
+                    UdomHtmlSampleSceneBuilder.SampleScenePath);
+                var bundlePath = await builder.Build();
+                Debug.Log($"HTML2VRC_HTML_VRCHAT_BUILD_SUCCESS: {bundlePath}");
+                ExitBatchMode(0);
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(exception);
+                Debug.LogError($"HTML2VRC_HTML_VRCHAT_BUILD_FAILED: {exception.Message}");
+                ExitBatchMode(1);
+            }
+        }
+
+        [MenuItem("Tools/HTML2VRC/VRChat/Build & Test HTML Sample World")]
+        public static async void BuildAndTestHtmlSampleWorld()
+        {
+            try
+            {
+                var builder = PrepareBuilder(
+                    UdomHtmlSampleSceneBuilder.BuildSampleScene,
+                    UdomHtmlSampleSceneBuilder.SampleScenePath);
+                await builder.BuildAndTest();
+                Debug.Log("HTML2VRC_HTML_VRCHAT_BUILD_AND_TEST_LAUNCHED");
+                ExitBatchMode(0);
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(exception);
+                Debug.LogError($"HTML2VRC_HTML_VRCHAT_BUILD_AND_TEST_FAILED: {exception.Message}");
+                ExitBatchMode(1);
+            }
+        }
+
+        private static IVRCSdkWorldBuilderApi PrepareBuilder(
+            Func<UdomGeneratedRoot> buildScene,
+            string scenePath)
+        {
+            buildScene();
             EditorSceneManager.OpenScene(
-                UdomSampleSceneBuilder.SampleScenePath,
+                scenePath,
                 OpenSceneMode.Single);
 
             if (!UpdateLayers.AreLayersSetup())

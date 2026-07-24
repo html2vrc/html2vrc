@@ -226,6 +226,8 @@ VRChat 패키지는 VPM manifest에 고정되어 있습니다. UDOM 파서와 Un
 
 지원 범위는 `div`, 제목과 문단, `img`, `button`, 목록, ScrollView, Embed와 일부 인라인 CSS입니다. `script`, `onclick`, 외부 CSS와 임의 JavaScript는 실행하지 않고 오류로 표시합니다. 자세한 계약은 `Assets/Html2Vrc/Documentation/HTML_SUBSET.md`에 있습니다.
 
+HTML 입력부터 독립된 샘플 Scene까지 한 번에 확인하려면 `Tools > HTML2VRC > Build HTML World Settings Scene`을 실행합니다. 결과는 `Assets/Html2Vrc/Samples/WorldSettingsHtmlSample.unity`에 저장됩니다. VRChat에서 바로 확인하려면 `Tools > HTML2VRC > VRChat > Build & Test HTML Sample World`를 실행합니다.
+
 완성된 예제를 바로 보려면 `Tools > HTML2VRC > Build Sample World Settings Scene`을 실행합니다. `Assets/Html2Vrc/Samples/WorldSettingsSample.unity`에 Camera, Light, VRC Scene Descriptor, player spawn, 20×20m BoxCollider 바닥, 외부 연결과 생성 UI가 포함된 샘플 Scene이 저장됩니다. VRChat SDK가 있는 프로젝트에서는 월드 공간 Canvas에 클릭 입력을 전달하는 `VRCUiShape`도 자동으로 추가됩니다. 바닥은 UDOM 자동 생성 영역 밖의 사용자 소유 오브젝트이므로 패널을 Regenerate해도 삭제되지 않습니다.
 
 VRChat용 로컬 월드 번들을 만들려면 `Tools > HTML2VRC > VRChat > Build Sample World Bundle`을 실행합니다. 첫 실행에서 프로젝트가 Unity 기본 레이어만 사용하는 경우 VRChat 공식 레이어와 충돌 규칙도 함께 설정합니다. 업로드는 하지 않습니다.
@@ -245,6 +247,7 @@ VRChat용 로컬 월드 번들을 만들려면 `Tools > HTML2VRC > VRChat > Buil
 - 샘플 JSON: `Assets/Html2Vrc/Samples/WorldSettings.udom.json`
 - HTML Importer: `Assets/Html2Vrc/Editor/HtmlImporterWindow.cs`
 - HTML 변환기: `Assets/Html2Vrc/Editor/HtmlToUdomConverter.cs`
+- HTML 샘플 Scene 빌더: `Assets/Html2Vrc/Editor/UdomHtmlSampleSceneBuilder.cs`
 - Importer: `Assets/Html2Vrc/Editor/UdomImporterWindow.cs`
 - 재생성 빌더: `Assets/Html2Vrc/Editor/UdomBuilder.cs`
 - Unity 폴백 동작: `Assets/Html2Vrc/Runtime/UdomSafeAction.cs`
