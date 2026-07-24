@@ -3,8 +3,17 @@
   "rootNamespace": "Html2Vrc.Editor",
   "references": [
     "Html2Vrc.Runtime",
+    "Html2Vrc.VRChat.Runtime",
     "Unity.TextMeshPro",
-    "Unity.ugui"
+    "Unity.ugui",
+    "UdonSharp.Runtime",
+    "UdonSharp.Editor",
+    "VRC.SDK3",
+    "VRC.SDK3.Editor",
+    "VRC.SDKBase",
+    "VRC.SDKBase.Editor",
+    "VRC.Udon",
+    "VRC.Udon.Editor"
   ],
   "includePlatforms": [
     "Editor"

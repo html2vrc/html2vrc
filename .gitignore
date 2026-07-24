@@ -9,6 +9,7 @@
 [Mm]emoryCaptures/
 [Rr]ecordings/
 Artifacts/
+ClientSimStorage/
 
 # IDE and operating-system files
 .vs/

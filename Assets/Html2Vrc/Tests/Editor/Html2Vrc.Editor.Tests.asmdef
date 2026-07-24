@@ -4,8 +4,10 @@
   "references": [
     "Html2Vrc.Runtime",
     "Html2Vrc.Editor",
+    "Html2Vrc.VRChat.Runtime",
     "Unity.TextMeshPro",
-    "Unity.ugui"
+    "Unity.ugui",
+    "UdonSharp.Runtime"
   ],
   "includePlatforms": [
     "Editor"

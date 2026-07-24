@@ -7,7 +7,7 @@ HTML2VRC는 웹 기술로 제작한 인터페이스를 수정 가능한 VRChat �
 웹은 AI 친화적인 디자인 환경으로만 사용하며 런타임으로 포함하지 않습니다. 최종 결과물은 Unity UI, TextMeshPro, 에셋과 Udon으로 구성되며, 월드 안에는 브라우저, WebView, React 또는 Node.js가 들어가지 않습니다.
 
 > [!IMPORTANT]
-> HTML2VRC는 현재 설계 및 프로토타입 단계입니다. 아직 사용할 수 있는 릴리스가 없습니다.
+> HTML2VRC는 현재 기술 검증 프로토타입 단계입니다. UDOM에서 VRChat 월드 번들까지의 첫 수직 경로는 동작하지만, 아직 사용할 수 있는 제품 릴리스는 없습니다.
 
 ## 왜 HTML2VRC인가요?
 
@@ -198,9 +198,11 @@ HTML2VRC는 현재 아키텍처, UDOM 범위와 첫 번째 수직 프로토타�
 - Unity `2022.3.22f1`
 - TextMeshPro `3.0.6`
 - Unity UI `1.0.0`
+- VRChat Worlds SDK `3.10.1`
+- Worlds SDK에 통합된 UdonSharp와 ClientSim
 - Node.js 불필요
 
-이 저장소 자체에는 VRChat Worlds SDK와 UdonSharp를 설치하지 않았습니다. SDK가 없는 상태에서도 구조를 검증할 수 있도록 안전 동작은 현재 Unity `MonoBehaviour`로 실행됩니다.
+VRChat 패키지는 VPM manifest에 고정되어 있습니다. UDOM 파서와 Unity UI 생성 코어는 SDK와 분리되어 있고, VRChat 프로젝트에서는 미리 정의된 안전 동작이 `UdomUdonSafeAction : UdonSharpBehaviour`로 생성됩니다. 임의 JavaScript나 매번 새로 만든 Udon 코드는 사용하지 않습니다.
 
 ### 1분 사용법
 
@@ -212,7 +214,9 @@ HTML2VRC는 현재 아키텍처, UDOM 범위와 첫 번째 수직 프로토타�
 6. 생성된 Canvas의 `UdomGeneratedRoot > External References`에서 `world-light` 슬롯에 원하는 Light GameObject를 드래그합니다.
 7. Play Mode에서 `Toggle World Light`와 `Close Panel` 버튼을 누릅니다.
 
-완성된 예제를 바로 보려면 `Tools > HTML2VRC > Build Sample World Settings Scene`을 실행합니다. `Assets/Html2Vrc/Samples/WorldSettingsSample.unity`에 Camera, Light, 외부 연결과 생성 UI가 포함된 샘플 Scene이 저장됩니다.
+완성된 예제를 바로 보려면 `Tools > HTML2VRC > Build Sample World Settings Scene`을 실행합니다. `Assets/Html2Vrc/Samples/WorldSettingsSample.unity`에 Camera, Light, VRC Scene Descriptor, player spawn, 20×20m BoxCollider 바닥, 외부 연결과 생성 UI가 포함된 샘플 Scene이 저장됩니다. VRChat SDK가 있는 프로젝트에서는 월드 공간 Canvas에 클릭 입력을 전달하는 `VRCUiShape`도 자동으로 추가됩니다. 바닥은 UDOM 자동 생성 영역 밖의 사용자 소유 오브젝트이므로 패널을 Regenerate해도 삭제되지 않습니다.
+
+VRChat용 로컬 월드 번들을 만들려면 `Tools > HTML2VRC > VRChat > Build Sample World Bundle`을 실행합니다. 첫 실행에서 프로젝트가 Unity 기본 레이어만 사용하는 경우 VRChat 공식 레이어와 충돌 규칙도 함께 설정합니다. 업로드는 하지 않습니다.
 
 ### 재생성 확인
 
@@ -227,8 +231,9 @@ HTML2VRC는 현재 아키텍처, UDOM 범위와 첫 번째 수직 프로토타�
 - 샘플 JSON: `Assets/Html2Vrc/Samples/WorldSettings.udom.json`
 - Importer: `Assets/Html2Vrc/Editor/UdomImporterWindow.cs`
 - 재생성 빌더: `Assets/Html2Vrc/Editor/UdomBuilder.cs`
-- 안전 동작: `Assets/Html2Vrc/Runtime/UdomSafeAction.cs`
-- UdonSharp 경계: `Assets/Html2Vrc/Documentation/UDONSHARP_BOUNDARY.md`
+- Unity 폴백 동작: `Assets/Html2Vrc/Runtime/UdomSafeAction.cs`
+- VRChat UdonSharp 동작: `Assets/Html2Vrc/VRChat/Runtime/UdomUdonSafeAction.cs`
+- UdonSharp 연결 설명: `Assets/Html2Vrc/Documentation/UDONSHARP_BOUNDARY.md`
 - 실제 테스트 결과: `Assets/Html2Vrc/Documentation/TEST_RESULTS.md`
 - EditMode 테스트: `Assets/Html2Vrc/Tests/Editor/UdomPrototypeTests.cs`
 
@@ -238,4 +243,8 @@ HTML2VRC는 현재 아키텍처, UDOM 범위와 첫 번째 수직 프로토타�
 - UDOM 0.1의 제한된 요소와 스타일만 지원합니다.
 - Sprite는 Unity 프로젝트의 `Assets/` 경로만 참조합니다.
 - 사용자 오브젝트는 보존하지만, 생성 마커가 붙은 오브젝트에서 생성기가 소유하는 UI 컴포넌트를 다른 타입으로 바꾸면 다음 재생성 때 원래 타입에 맞게 복구됩니다.
-- VRChat Build & Test, UdonSharp 컴파일, ClientSim, 네트워크 동기화는 이 저장소에 SDK가 없어 아직 검증 대상이 아닙니다.
+- PC용 VRChat 월드 번들 빌드는 통과했지만 Quest 빌드와 업로드는 확인하지 않았습니다.
+- ClientSim 3.10.1은 자동 실행에서 시작과 초기화까지 진행되지만, Unity Batch Mode에는 입력 장치가 없어 SDK 내부 `ClientSimPlayerController`가 예외를 냅니다. 일반 Editor Play Mode 수동 확인이 더 필요합니다.
+- 바닥을 포함한 새 월드를 Build & Test로 다시 열고 로컬 번들 로딩과 Udon 구성까지 확인했습니다. BoxCollider가 Scene과 빌드에 포함된 것은 확인했지만, 실제 캐릭터가 바닥 위에 멈추는 장면과 버튼 클릭은 사람이 클라이언트에서 확인해야 합니다.
+- VR 헤드셋 확인은 아직 하지 않았습니다.
+- 네트워크 동기화는 이번 프로토타입 범위가 아닙니다.

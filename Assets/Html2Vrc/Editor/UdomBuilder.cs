@@ -8,6 +8,13 @@ using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
+#if UDONSHARP
+using Html2Vrc.VRChat;
+using UdonSharpEditor;
+using VRC.SDK3.Components;
+using VRC.Udon;
+#endif
+
 namespace Html2Vrc.Editor
 {
     public sealed class UdomBuildResult
@@ -95,6 +102,9 @@ namespace Html2Vrc.Editor
             typeof(LayoutElement),
             typeof(TextMeshProUGUI),
             typeof(UdomSafeAction),
+#if UDONSHARP
+            typeof(UdomUdonSafeAction),
+#endif
             typeof(UdomEmbedAnchor)
         };
 
@@ -127,6 +137,9 @@ namespace Html2Vrc.Editor
             UdomGeneratedRoot existingRoot = null,
             TextAsset sourceAsset = null)
         {
+#if UDONSHARP
+            UdomVrchatSetup.EnsureReady();
+#endif
             if (document == null || document.root == null)
             {
                 throw new ArgumentNullException(nameof(document));
@@ -156,6 +169,9 @@ namespace Html2Vrc.Editor
             CollectExternalSlots(document.root, root);
             BuildNode(document.root, root.transform, null, 0, context);
             PruneStaleGeneratedNodes(context);
+#if UDONSHARP
+            UdomVrchatSetup.RefreshBindingTargets(root);
+#endif
 
             EditorUtility.SetDirty(root);
             PrefabUtility.RecordPrefabInstancePropertyModifications(root);
@@ -240,6 +256,13 @@ namespace Html2Vrc.Editor
             rect.localScale = isOverlay
                 ? Vector3.one
                 : Vector3.one * Mathf.Max(0.0001f, canvasSettings != null ? canvasSettings.scale : 0.01f);
+
+#if UDONSHARP
+            if (!isOverlay && rootObject.GetComponent<VRCUiShape>() == null)
+            {
+                Undo.AddComponent<VRCUiShape>(rootObject);
+            }
+#endif
         }
 
         private static void EnsureEventSystem()
@@ -428,6 +451,13 @@ namespace Html2Vrc.Editor
                 var components = target.GetComponents(ManagedComponentTypes[index]);
                 for (var componentIndex = 0; componentIndex < components.Length; componentIndex++)
                 {
+#if UDONSHARP
+                    if (components[componentIndex] is UdomUdonSafeAction udonAction)
+                    {
+                        UdonSharpUndo.DestroyImmediate(udonAction);
+                        continue;
+                    }
+#endif
                     Undo.DestroyObjectImmediate(components[componentIndex]);
                 }
             }
@@ -586,7 +616,11 @@ namespace Html2Vrc.Editor
         {
             var image = GetOrAdd<Image>(target);
             var button = GetOrAdd<Button>(target);
-            var action = GetOrAdd<UdomSafeAction>(target);
+#if UDONSHARP
+            var action = GetOrAddUdonSafeAction(target);
+#else
+            var action = GetOrAddSafeAction(target);
+#endif
             Undo.RecordObjects(new UnityEngine.Object[] { image, button, action }, "Configure UDOM Button");
 
             image.color = UdomBuilderUtility.ParseColor(style.backgroundColor, Color.gray);
@@ -602,6 +636,39 @@ namespace Html2Vrc.Editor
                 slot = node.binding.targetSlot;
             }
 
+#if UDONSHARP
+            action.Configure((int)actionType, slot, root.Resolve(slot), documentPanel);
+
+            var oldUnityAction = target.GetComponent<UdomSafeAction>();
+            var backingBehaviour = UdonSharpEditorUtility.GetBackingUdonBehaviour(action);
+            if (backingBehaviour == null)
+            {
+                throw new InvalidOperationException(
+                    $"UdonSharp backing UdonBehaviour를 만들 수 없다: {target.name}");
+            }
+
+            for (var index = button.onClick.GetPersistentEventCount() - 1; index >= 0; index--)
+            {
+                var listenerTarget = button.onClick.GetPersistentTarget(index);
+                if (listenerTarget == action
+                    || listenerTarget == backingBehaviour
+                    || listenerTarget == oldUnityAction)
+                {
+                    UnityEventTools.RemovePersistentListener(button.onClick, index);
+                }
+            }
+
+            if (oldUnityAction != null)
+            {
+                Undo.DestroyObjectImmediate(oldUnityAction);
+            }
+
+            UdonSharpEditorUtility.CopyProxyToUdon(action);
+            UnityEventTools.AddStringPersistentListener(
+                button.onClick,
+                backingBehaviour.SendCustomEvent,
+                nameof(UdomUdonSafeAction.Execute));
+#else
             action.Configure(root, actionType, slot, documentPanel);
 
             for (var index = button.onClick.GetPersistentEventCount() - 1; index >= 0; index--)
@@ -613,6 +680,7 @@ namespace Html2Vrc.Editor
             }
 
             UnityEventTools.AddPersistentListener(button.onClick, action.Execute);
+#endif
             button.onClick.SetPersistentListenerState(
                 button.onClick.GetPersistentEventCount() - 1,
                 UnityEngine.Events.UnityEventCallState.EditorAndRuntime);
@@ -767,6 +835,29 @@ namespace Html2Vrc.Editor
             var component = target.GetComponent<T>();
             return component != null ? component : Undo.AddComponent<T>(target);
         }
+
+        private static UdomSafeAction GetOrAddSafeAction(GameObject target)
+        {
+            var action = target.GetComponent<UdomSafeAction>();
+            if (action != null)
+            {
+                return action;
+            }
+
+            return Undo.AddComponent<UdomSafeAction>(target);
+        }
+
+#if UDONSHARP
+        private static UdomUdonSafeAction GetOrAddUdonSafeAction(GameObject target)
+        {
+            var action = target.GetComponent<UdomUdonSafeAction>();
+            return action != null
+                ? action
+                : (UdomUdonSafeAction)UdonSharpUndo.AddComponent(
+                    target,
+                    typeof(UdomUdonSafeAction));
+        }
+#endif
 
         private static void RemoveIfPresent<T>(GameObject target) where T : Component
         {

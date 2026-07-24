@@ -48,6 +48,10 @@ namespace Html2Vrc.Editor
             var camera = CreateCamera();
             CreateDirectionalLight();
             var externalLight = CreateExternalLight();
+            CreateTestFloor();
+#if UDONSHARP
+            UdomVrchatSetup.EnsureSceneDescriptor();
+#endif
 
             var build = UdomBuilder.GenerateOrRegenerate(validation.Document, null, source);
             build.Root.transform.position = Vector3.zero;
@@ -149,7 +153,7 @@ namespace Html2Vrc.Editor
             lightObject.transform.rotation = Quaternion.Euler(50f, -30f, 0f);
             var light = lightObject.GetComponent<Light>();
             light.type = LightType.Directional;
-            light.intensity = 0.7f;
+            light.intensity = 0.2f;
         }
 
         private static Light CreateExternalLight()
@@ -159,9 +163,19 @@ namespace Html2Vrc.Editor
             var light = lightObject.GetComponent<Light>();
             light.type = LightType.Point;
             light.range = 12f;
-            light.intensity = 2f;
+            light.intensity = 6f;
             light.color = new Color(0.35f, 0.78f, 1f);
             return light;
+        }
+
+        private static void CreateTestFloor()
+        {
+            var floor = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            floor.name = "Test Floor (User-Owned Collider)";
+            // The sample panel is 720 px high at a 0.01 world scale (7.2 m).
+            // Keep the floor top 0.2 m below its -3.6 m lower edge.
+            floor.transform.position = new Vector3(0f, -3.85f, 0f);
+            floor.transform.localScale = new Vector3(20f, 0.1f, 20f);
         }
     }
 }

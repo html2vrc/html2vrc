@@ -11,6 +11,10 @@ using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
 using UnityEngine.UI;
 
+#if UDONSHARP
+using Html2Vrc.VRChat;
+#endif
+
 namespace Html2Vrc.Tests
 {
     public sealed class UdomPrototypeTests
@@ -137,13 +141,14 @@ namespace Html2Vrc.Tests
             Assert.That(lightObject.transform.parent, Is.Null, "External Embed target must remain user-owned.");
 
             var toggleButton = UdomBuilder.FindNode(root, "toggle-light").GetComponent<Button>();
-            toggleButton.onClick.Invoke();
+            AssertGeneratedBinding(toggleButton, lightObject);
+            InvokeGeneratedActionInEditMode(toggleButton);
             Assert.That(light.enabled, Is.False, "Generated Button must toggle the referenced Light.");
 
             var closeButton = UdomBuilder.FindNode(root, "close-panel").GetComponent<Button>();
             var panel = UdomBuilder.FindNode(root, "settings-panel").gameObject;
             Assert.That(panel.activeSelf, Is.True);
-            closeButton.onClick.Invoke();
+            InvokeGeneratedActionInEditMode(closeButton);
             Assert.That(panel.activeSelf, Is.False, "ClosePanel must close the document panel.");
         }
 
@@ -157,7 +162,8 @@ namespace Html2Vrc.Tests
 
             var button = UdomBuilder.FindNode(build.Root, "toggle-light").GetComponent<Button>();
             Assert.That(externalObject.activeSelf, Is.True);
-            button.onClick.Invoke();
+            AssertGeneratedBinding(button, externalObject);
+            InvokeGeneratedActionInEditMode(button);
             Assert.That(externalObject.activeSelf, Is.False);
         }
 
@@ -201,8 +207,10 @@ namespace Html2Vrc.Tests
             Assert.That(second.Created, Is.Zero, "Regeneration of the same schema must not create new nodes.");
 
             updatedButton.onClick.Invoke();
-            Assert.That(light.enabled, Is.False);
             Assert.That(additionalListenerCalls, Is.EqualTo(1), "User-added listener must survive regeneration.");
+            AssertGeneratedBinding(updatedButton, lightObject);
+            InvokeGeneratedActionInEditMode(updatedButton);
+            Assert.That(light.enabled, Is.False);
 
             var third = UdomBuilder.GenerateOrRegenerate(changedJson, root);
             var markers = root.GetComponentsInChildren<UdomGeneratedNode>(true);
@@ -230,14 +238,39 @@ namespace Html2Vrc.Tests
             var root = Object.FindObjectOfType<UdomGeneratedRoot>(true);
             Assert.That(root, Is.Not.Null);
             Assert.That(root.SourceAsset, Is.SameAs(sample));
+#if UDONSHARP
+            Assert.That(
+                root.GetComponents<Component>().Any(component =>
+                    component != null
+                    && component.GetType().FullName == "VRC.SDK3.Components.VRCUiShape"),
+                Is.True,
+                "A VRChat world-space Canvas must include VRCUiShape to receive pointer clicks.");
+#endif
             Assert.That(root.Resolve("world-light"), Is.Not.Null);
             Assert.That(root.Resolve("world-light").name, Is.EqualTo("World Light (External User Object)"));
             Assert.That(root.Resolve("world-light").transform.parent, Is.Null);
+            var floor = GameObject.Find("Test Floor (User-Owned Collider)");
+            Assert.That(floor, Is.Not.Null);
+            Assert.That(floor.GetComponent<BoxCollider>(), Is.Not.Null,
+                "Saved VRChat sample scene must contain a floor collider.");
+            Assert.That(floor.GetComponent<MeshRenderer>(), Is.Not.Null,
+                "The sample floor must be visible so the external Light has a lit surface.");
+            var panelRect = UdomBuilder.FindNode(root, "settings-panel").GetComponent<RectTransform>();
+            var panelBottom = panelRect.TransformPoint(new Vector3(0f, panelRect.rect.yMin, 0f)).y;
+            var floorTop = floor.GetComponent<BoxCollider>().bounds.max.y;
+            Assert.That(floorTop, Is.LessThan(panelBottom),
+                "The visible floor must sit below the panel instead of crossing through it.");
             Assert.That(UdomBuilder.FindNode(root, "title").GetComponent<TextMeshProUGUI>(), Is.Not.Null);
             Assert.That(UdomBuilder.FindNode(root, "toggle-light").GetComponent<Button>(), Is.Not.Null);
             Assert.That(UdomBuilder.FindNode(root, "settings-list").GetComponent<ScrollRect>(), Is.Not.Null);
             Assert.That(root.GetComponentsInChildren<Component>(true).Any(component => component == null), Is.False,
                 "Saved sample scene must not contain missing scripts.");
+#if UDONSHARP
+            Assert.That(UdomVrchatSetup.HasValidSceneDescriptor(), Is.True,
+                "Saved VRChat sample scene must contain a scene descriptor and spawn.");
+            var toggleButton = UdomBuilder.FindNode(root, "toggle-light").GetComponent<Button>();
+            AssertGeneratedBinding(toggleButton, root.Resolve("world-light"));
+#endif
         }
 
         [UnityTest]
@@ -271,6 +304,34 @@ namespace Html2Vrc.Tests
             yield return new ExitPlayMode();
         }
 
+        private static void InvokeGeneratedActionInEditMode(Button button)
+        {
+#if UDONSHARP
+            var action = button.GetComponent<UdomUdonSafeAction>();
+            Assert.That(action, Is.Not.Null, "VRChat project must generate an UdonSharp action proxy.");
+            action.Execute();
+#else
+            button.onClick.Invoke();
+#endif
+        }
+
+        private static void AssertGeneratedBinding(Button button, GameObject expectedTarget)
+        {
+#if UDONSHARP
+            var action = button.GetComponent<UdomUdonSafeAction>();
+            Assert.That(action, Is.Not.Null, "VRChat project must generate an UdonSharp action proxy.");
+            Assert.That(action.Target, Is.SameAs(expectedTarget));
+
+            Assert.That(button.onClick.GetPersistentEventCount(), Is.EqualTo(1));
+            var listenerTarget = button.onClick.GetPersistentTarget(0);
+            Assert.That(listenerTarget, Is.Not.Null);
+            Assert.That(listenerTarget.GetType().FullName, Is.EqualTo("VRC.Udon.UdonBehaviour"));
+            Assert.That(button.onClick.GetPersistentMethodName(0), Is.EqualTo("SendCustomEvent"));
+#else
+            Assert.That(button.GetComponent<UdomSafeAction>(), Is.Not.Null);
+#endif
+        }
+
         private sealed class ColorComparer : IEqualityComparer<Color>
         {
             public static readonly ColorComparer Instance = new ColorComparer();
@@ -289,4 +350,5 @@ namespace Html2Vrc.Tests
             }
         }
     }
+
 }

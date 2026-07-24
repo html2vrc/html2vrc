@@ -14,6 +14,8 @@ namespace Html2Vrc
     [DisallowMultipleComponent]
     public sealed class UdomGeneratedRoot : MonoBehaviour
     {
+        public static event Action<UdomGeneratedRoot> ExternalReferencesChanged;
+
         [SerializeField] private TextAsset sourceAsset;
         [SerializeField] private string documentId;
         [SerializeField] private string schemaVersion;
@@ -78,9 +80,17 @@ namespace Html2Vrc
                 if (entry != null && string.Equals(entry.slot, slot, StringComparison.Ordinal))
                 {
                     entry.target = target;
+                    ExternalReferencesChanged?.Invoke(this);
                     return;
                 }
             }
         }
+
+#if UNITY_EDITOR
+        private void OnValidate()
+        {
+            ExternalReferencesChanged?.Invoke(this);
+        }
+#endif
     }
 }
