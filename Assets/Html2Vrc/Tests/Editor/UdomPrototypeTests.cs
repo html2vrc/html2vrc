@@ -19,6 +19,7 @@ namespace Html2Vrc.Tests
 {
     public sealed class UdomPrototypeTests
     {
+        private const string SampleHtmlPath = "Assets/Html2Vrc/Samples/WorldSettings.html";
         private TextAsset sample;
 
         [SetUp]
@@ -49,6 +50,79 @@ namespace Html2Vrc.Tests
 
             Assert.That(validation.IsValid, Is.True, validation.Format());
             Assert.That(validation.Issues, Is.Empty, validation.Format());
+        }
+
+        [Test]
+        public void SampleHtml_ConvertsToValidUdom()
+        {
+            var html = AssetDatabase.LoadAssetAtPath<TextAsset>(SampleHtmlPath);
+            Assert.That(html, Is.Not.Null, "Sample HTML must import as TextAsset.");
+
+            var conversion = HtmlToUdomConverter.Convert(html.text);
+
+            Assert.That(conversion.IsValid, Is.True, conversion.Format());
+            Assert.That(conversion.Document, Is.Not.Null);
+            Assert.That(conversion.Document.id, Is.EqualTo("world-settings-html"));
+            Assert.That(conversion.Document.root.type, Is.EqualTo("Panel"));
+            Assert.That(conversion.Document.root.style.layout, Is.EqualTo("Vertical"));
+            Assert.That(conversion.Json, Does.Contain("\"ToggleLight\""));
+            Assert.That(conversion.Json, Does.Contain("\"ScrollView\""));
+
+            var validation = UdomValidator.Validate(conversion.Json);
+            Assert.That(validation.IsValid, Is.True, validation.Format());
+        }
+
+        [Test]
+        public void HtmlConverter_GeneratesNativeUiAndRegeneratesWithoutDuplicates()
+        {
+            var html = AssetDatabase.LoadAssetAtPath<TextAsset>(SampleHtmlPath);
+            var conversion = HtmlToUdomConverter.Convert(html.text);
+            Assert.That(conversion.IsValid, Is.True, conversion.Format());
+
+            var externalLight = new GameObject("HTML External Light", typeof(Light));
+            var first = UdomBuilder.GenerateOrRegenerate(conversion.Document, null, html);
+            first.Root.SetExternalReference("world-light", externalLight);
+            var originalButton = UdomBuilder.FindNode(first.Root, "html-toggle-light");
+            var markerCount = first.Root.GetComponentsInChildren<UdomGeneratedNode>(true).Length;
+
+            Assert.That(first.Root.SourceAsset, Is.SameAs(html));
+            Assert.That(UdomBuilder.FindNode(first.Root, "html-title").GetComponent<TextMeshProUGUI>(), Is.Not.Null);
+            Assert.That(originalButton.GetComponent<Button>(), Is.Not.Null);
+            Assert.That(UdomBuilder.FindNode(first.Root, "html-settings-list").GetComponent<ScrollRect>(), Is.Not.Null);
+            Assert.That(
+                UdomBuilder.FindNode(first.Root, "html-world-light-embed").GetComponent<UdomEmbedAnchor>().Target,
+                Is.SameAs(externalLight));
+
+            var changed = HtmlToUdomConverter.Convert(
+                html.text
+                    .Replace("World Settings\n    </h1>", "World Settings — HTML Regenerated\n    </h1>")
+                    .Replace("#182033F2", "#4A1538F2"));
+            Assert.That(changed.IsValid, Is.True, changed.Format());
+
+            var second = UdomBuilder.GenerateOrRegenerate(changed.Document, first.Root, html);
+            Assert.That(second.Created, Is.Zero);
+            Assert.That(UdomBuilder.FindNode(first.Root, "html-toggle-light"), Is.SameAs(originalButton));
+            Assert.That(
+                UdomBuilder.FindNode(first.Root, "html-title").GetComponent<TextMeshProUGUI>().text,
+                Is.EqualTo("World Settings — HTML Regenerated"));
+            Assert.That(first.Root.Resolve("world-light"), Is.SameAs(externalLight));
+            Assert.That(
+                first.Root.GetComponentsInChildren<UdomGeneratedNode>(true).Length,
+                Is.EqualTo(markerCount));
+        }
+
+        [Test]
+        public void HtmlConverter_RejectsJavaScriptAndMissingStableId()
+        {
+            const string scriptHtml = "<main id=\"root\"><button id=\"go\" onclick=\"run()\">Go</button></main>";
+            var scriptResult = HtmlToUdomConverter.Convert(scriptHtml);
+            Assert.That(scriptResult.IsValid, Is.False);
+            Assert.That(scriptResult.Format(), Does.Contain("인라인 JavaScript"));
+
+            const string missingIdHtml = "<main id=\"root\"><p>No stable id</p></main>";
+            var missingIdResult = HtmlToUdomConverter.Convert(missingIdHtml);
+            Assert.That(missingIdResult.IsValid, Is.False);
+            Assert.That(missingIdResult.Format(), Does.Contain("id 속성이 필요"));
         }
 
         [Test]

@@ -214,6 +214,18 @@ VRChat 패키지는 VPM manifest에 고정되어 있습니다. UDOM 파서와 Un
 6. 생성된 Canvas의 `UdomGeneratedRoot > External References`에서 `world-light` 슬롯에 원하는 Light GameObject를 드래그합니다.
 7. Play Mode에서 `Toggle World Light`와 `Close Panel` 버튼을 누릅니다.
 
+### 제한형 HTML 입력 사용법
+
+이제 작은 정적 HTML 파일을 UDOM으로 먼저 번역한 뒤 같은 Unity UI 생성 경로로 보낼 수 있습니다.
+
+1. `Assets/Html2Vrc/Samples/WorldSettings.html`을 선택합니다.
+2. `Tools > HTML2VRC > HTML Importer (Preview)`를 엽니다.
+3. `HTML 검증 / 변환`을 눌러 생성될 UDOM을 확인합니다.
+4. `Generate / Regenerate`를 누릅니다.
+5. 생성 루트의 `External References`에서 `world-light` 슬롯을 연결합니다.
+
+지원 범위는 `div`, 제목과 문단, `img`, `button`, 목록, ScrollView, Embed와 일부 인라인 CSS입니다. `script`, `onclick`, 외부 CSS와 임의 JavaScript는 실행하지 않고 오류로 표시합니다. 자세한 계약은 `Assets/Html2Vrc/Documentation/HTML_SUBSET.md`에 있습니다.
+
 완성된 예제를 바로 보려면 `Tools > HTML2VRC > Build Sample World Settings Scene`을 실행합니다. `Assets/Html2Vrc/Samples/WorldSettingsSample.unity`에 Camera, Light, VRC Scene Descriptor, player spawn, 20×20m BoxCollider 바닥, 외부 연결과 생성 UI가 포함된 샘플 Scene이 저장됩니다. VRChat SDK가 있는 프로젝트에서는 월드 공간 Canvas에 클릭 입력을 전달하는 `VRCUiShape`도 자동으로 추가됩니다. 바닥은 UDOM 자동 생성 영역 밖의 사용자 소유 오브젝트이므로 패널을 Regenerate해도 삭제되지 않습니다.
 
 VRChat용 로컬 월드 번들을 만들려면 `Tools > HTML2VRC > VRChat > Build Sample World Bundle`을 실행합니다. 첫 실행에서 프로젝트가 Unity 기본 레이어만 사용하는 경우 VRChat 공식 레이어와 충돌 규칙도 함께 설정합니다. 업로드는 하지 않습니다.
@@ -228,7 +240,11 @@ VRChat용 로컬 월드 번들을 만들려면 `Tools > HTML2VRC > VRChat > Buil
 ### 문서와 코드
 
 - 최소 규격: `Assets/Html2Vrc/Documentation/UDOM_SPEC.md`
+- HTML 입력 범위: `Assets/Html2Vrc/Documentation/HTML_SUBSET.md`
+- 샘플 HTML: `Assets/Html2Vrc/Samples/WorldSettings.html`
 - 샘플 JSON: `Assets/Html2Vrc/Samples/WorldSettings.udom.json`
+- HTML Importer: `Assets/Html2Vrc/Editor/HtmlImporterWindow.cs`
+- HTML 변환기: `Assets/Html2Vrc/Editor/HtmlToUdomConverter.cs`
 - Importer: `Assets/Html2Vrc/Editor/UdomImporterWindow.cs`
 - 재생성 빌더: `Assets/Html2Vrc/Editor/UdomBuilder.cs`
 - Unity 폴백 동작: `Assets/Html2Vrc/Runtime/UdomSafeAction.cs`
@@ -239,7 +255,7 @@ VRChat용 로컬 월드 번들을 만들려면 `Tools > HTML2VRC > VRChat > Buil
 
 ### 현재 한계
 
-- HTML/CSS/React/JavaScript를 읽지 않습니다.
+- 제한된 정적 HTML과 일부 인라인 CSS만 읽습니다. 일반 웹사이트, React, JavaScript와 CSS 전체 호환은 지원하지 않습니다.
 - UDOM 0.1의 제한된 요소와 스타일만 지원합니다.
 - Sprite는 Unity 프로젝트의 `Assets/` 경로만 참조합니다.
 - 사용자 오브젝트는 보존하지만, 생성 마커가 붙은 오브젝트에서 생성기가 소유하는 UI 컴포넌트를 다른 타입으로 바꾸면 다음 재생성 때 원래 타입에 맞게 복구됩니다.

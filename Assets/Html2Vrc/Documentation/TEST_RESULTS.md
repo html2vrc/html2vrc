@@ -4,6 +4,27 @@
 
 검증 환경: Windows 11, Unity 2022.3.22f1, TextMeshPro 3.0.6, Unity UI 1.0.0, VRChat Worlds SDK 3.10.1, 통합 UdonSharp/ClientSim
 
+## 제한형 HTML 입력 0.1 추가 검증
+
+- 실행 명령: Unity Batch Mode, `EditMode`, `Html2Vrc.Tests.UdomPrototypeTests`
+- 결과: **10개 중 10개 통과, 실패 0**
+- 결과 파일: `Artifacts/html-editmode-results-2.xml` (Git 제외 폴더)
+
+새로 확인한 항목:
+
+1. 샘플 `WorldSettings.html`이 오류 없이 UDOM 0.1로 변환된다.
+2. 변환 결과에 Panel, TextMeshPro용 Text, Button Binding, ScrollView와 Embed가 포함된다.
+3. HTML에서 생성한 UI도 안정 ID로 재생성되고 중복 노드가 생기지 않는다.
+4. 재생성 후 `world-light` 외부 GameObject 참조가 유지된다.
+5. `onclick` 같은 JavaScript 이벤트와 ID가 없는 요소는 명확한 오류로 거부된다.
+6. 기존 UDOM 생성, 버튼 동작, 저장 Scene과 바닥 검증도 함께 통과했다.
+
+주의:
+
+- HTML 샘플을 실제 VRChat 클라이언트에서 새로 클릭한 수동 검증은 아직 하지 않았다.
+- 기존 UDOM 샘플의 `Toggle World Light`와 `Close Panel`은 사용자가 VRChat에서 직접 정상 동작을 확인했다.
+- 첫 Batch 실행 중 SDK 임베디드 폴더가 비어 UdonSharp를 찾지 못했지만, Creator Companion 로컬 캐시의 공식 3.10.1 패키지를 복구한 뒤 컴파일과 테스트가 통과했다.
+
 ## 자동 회귀 검증
 
 HTML2VRC 전용 Unity Test Framework 테스트 7개를 실행한다. 검증 범위는 다음과 같다.

@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html>
+<body
+  data-document-id="world-settings-html"
+  data-document-name="World Settings from HTML"
+  data-canvas-size="1200 800"
+  data-canvas-scale="0.01">
+  <main
+    id="html-settings-panel"
+    aria-label="World Settings Panel"
+    style="width: 1040px; height: 720px; display: flex; flex-direction: column; padding: 40px 36px; gap: 16px; background-color: #182033F2">
+    <img
+      id="html-accent"
+      alt="Accent"
+      style="width: 960px; height: 8px; background-color: #58C8FFFF" />
+
+    <h1
+      id="html-title"
+      style="width: 960px; height: 64px; font-size: 44px; color: #FFFFFFFF">
+      World Settings
+    </h1>
+
+    <p
+      id="html-description"
+      style="width: 960px; height: 58px; font-size: 24px; color: #B8C4D9FF">
+      This native VRChat panel was translated from a small, readable HTML file.
+    </p>
+
+    <div
+      id="html-button-row"
+      aria-label="Actions"
+      style="width: 960px; height: 76px; display: flex; flex-direction: row; gap: 16px">
+      <button
+        id="html-toggle-light"
+        data-action="ToggleLight"
+        data-target-slot="world-light"
+        style="width: 472px; height: 72px; background-color: #276B8FFF; color: #FFFFFFFF; font-size: 26px">
+        Toggle World Light
+      </button>
+
+      <button
+        id="html-close-panel"
+        data-action="ClosePanel"
+        style="width: 472px; height: 72px; background-color: #3A465CFF; color: #FFFFFFFF; font-size: 26px">
+        Close Panel
+      </button>
+    </div>
+
+    <h2
+      id="html-list-heading"
+      style="width: 960px; height: 42px; font-size: 25px; color: #E5ECF7FF">
+      Available options
+    </h2>
+
+    <ul
+      id="html-settings-list"
+      data-scroll="true"
+      style="width: 960px; height: 300px; display: flex; flex-direction: column; padding: 16px; gap: 10px; background-color: #0E1422D9">
+      <li id="html-item-lighting" style="width: 900px; height: 64px; background-color: #253047FF; color: #FFFFFFFF; font-size: 22px">
+        Lighting — Local preview
+      </li>
+      <li id="html-item-audio" style="width: 900px; height: 64px; background-color: #253047FF; color: #FFFFFFFF; font-size: 22px">
+        Audio — Extension point
+      </li>
+      <li id="html-item-accessibility" style="width: 900px; height: 64px; background-color: #253047FF; color: #FFFFFFFF; font-size: 22px">
+        Accessibility — Extension point
+      </li>
+      <li id="html-item-performance" style="width: 900px; height: 64px; background-color: #253047FF; color: #FFFFFFFF; font-size: 22px">
+        Performance — Extension point
+      </li>
+    </ul>
+
+    <embed
+      id="html-world-light-embed"
+      data-embed-slot="world-light"
+      style="width: 960px; height: 28px" />
+  </main>
+</body>
+</html>
