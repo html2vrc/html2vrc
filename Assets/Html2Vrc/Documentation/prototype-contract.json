@@ -1,0 +1,38 @@
+{
+  "prototype": "html2vrc-udom-to-unity-v0",
+  "coordinateFrame": {
+    "canvas": "Unity RectTransform, origin at canvas center, +x right, +y up",
+    "worldScale": 0.01,
+    "sampleCanvasPixels": [1200, 800]
+  },
+  "ownership": {
+    "generated": "Only GameObjects carrying UdomGeneratedNode are reconciled or removed.",
+    "user": "Unmarked GameObjects and external slot targets are never deleted or reparented.",
+    "references": "UdomGeneratedRoot.externalReferences is preserved across regeneration."
+  },
+  "passes": [
+    "schema-validation",
+    "stable-id-reconciliation",
+    "native-component-configuration",
+    "binding-wiring",
+    "stale-generated-node-pruning"
+  ],
+  "interaction": {
+    "allowedActions": ["ToggleActive", "SetActive", "SetInactive", "ClosePanel", "ToggleLight"],
+    "arbitraryCode": false,
+    "networkSync": false
+  },
+  "budgets": {
+    "sampleGeneratedNodesMax": 40,
+    "materials": 1,
+    "textures": 0,
+    "drawCalls": "not performance-gated in this prototype"
+  },
+  "criticalFailureModes": [
+    "duplicate stable IDs",
+    "unknown node types or properties",
+    "deleting unmarked user objects",
+    "losing external slot references",
+    "duplicating generated Button listeners"
+  ]
+}
