@@ -1,0 +1,50 @@
+[
+  {
+    "file": "valid/minimal.udom.json",
+    "valid": true
+  },
+  {
+    "file": "valid/settings.udom.json",
+    "valid": true
+  },
+  {
+    "file": "invalid/duplicate-node-id.udom.json",
+    "valid": false,
+    "code": "H2VRC-NODE-001"
+  },
+  {
+    "file": "invalid/decreasing-gradient-stops.udom.json",
+    "valid": false,
+    "code": "H2VRC-PAINT-001"
+  },
+  {
+    "file": "invalid/missing-style-reference.udom.json",
+    "valid": false,
+    "code": "H2VRC-STYLE-002"
+  },
+  {
+    "file": "invalid/missing-resource-reference.udom.json",
+    "valid": false,
+    "code": "H2VRC-RESOURCE-002"
+  },
+  {
+    "file": "invalid/required-extension-not-used.udom.json",
+    "valid": false,
+    "code": "H2VRC-EXTENSION-001"
+  },
+  {
+    "file": "invalid/invalid-binding-slot.udom.json",
+    "valid": false,
+    "code": "H2VRC-BINDING-001"
+  },
+  {
+    "file": "invalid/slider-range.udom.json",
+    "valid": false,
+    "code": "H2VRC-CONTROL-001"
+  },
+  {
+    "file": "invalid/schema-unknown-property.udom.json",
+    "valid": false,
+    "code": "H2VRC-SCHEMA-001"
+  }
+]

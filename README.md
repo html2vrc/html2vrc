@@ -50,11 +50,44 @@ UDOM은 렌더링 방법을 지정하지 않는다. `gradient`가 Shader, Vertex
 
 AI의 추론 정책은 `html2vrc/skill`, Unity 구현은 `html2vrc/renderer`, React 제작 환경은 `html2vrc/react`가 담당한다.
 
-## 문서
+## 문서와 구현
 
 - [UDOM 0.1 초기 명세](./SPECIFICATION.md)
+- [UDOM 0.1 JSON Schema](./schemas/udom-0.1.schema.json)
+- [Conformance fixture](./fixtures)
+- [Conformance 규칙과 진단 코드](./CONFORMANCE.md)
+- [Reference validator](./src/validator.mjs)
 
-향후 JSON Schema와 fixture가 추가되면 명세 문서와 함께 버전을 관리한다.
+JSON Schema는 구조와 값 형식을 검사한다. Reference validator는 여기에 다음 의미 검사를 추가한다.
+
+- Node, Style과 Resource ID의 유일성
+- `styleRefs`, 이미지와 Font Resource 참조
+- `extensionsRequired`와 `extensionsUsed` 관계
+- Gradient stop 순서
+- Binding slot과 event 유효성
+- Slider 범위와 UDOM 버전 호환성
+
+Schema와 fixture는 구현 언어에 독립적인 공통 계약이다. Node.js CLI는 명세 개발과 CI를 위한 reference tooling이며, Renderer가 UDOM을 읽기 위해 Node.js를 설치해야 한다는 뜻이 아니다.
+
+### 검증 실행
+
+```bash
+npm install
+npm test
+npm run validate -- fixtures/valid/settings.udom.json
+```
+
+다른 도구에서는 validator를 직접 가져올 수 있다.
+
+```js
+import { validateUdom } from "@html2vrc/udom";
+
+const result = validateUdom(document, {
+  supportedExtensions: ["H2VRC_example"]
+});
+```
+
+진단은 안정적인 오류 코드, JSON Pointer, 가능한 경우 Node ID를 포함한다.
 
 ## 최소 예시
 
@@ -124,4 +157,4 @@ AI의 추론 정책은 `html2vrc/skill`, Unity 구현은 `html2vrc/renderer`, Re
 
 ## 라이선스
 
-라이선스는 저장소 공개 전에 확정한다.
+MIT

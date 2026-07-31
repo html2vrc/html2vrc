@@ -860,6 +860,13 @@ Validator는 가능하면 다음 문맥을 진단에 포함해야 한다.
 - 해결 제안
 - UDOM과 Renderer 버전
 
+UDOM 0.1의 구조적 계약은
+[`schemas/udom-0.1.schema.json`](./schemas/udom-0.1.schema.json)에,
+언어 독립적인 적합성 예제는 [`fixtures`](./fixtures)에 함께 관리한다.
+JSON Schema를 통과한 문서만 ID, 참조, 확장, Binding과 값 범위 같은
+의미 검사를 수행한다. 공통 검증 순서와 진단 코드 규칙은
+[`CONFORMANCE.md`](./CONFORMANCE.md)를 따른다.
+
 ## 20. 버전 호환성
 
 UDOM 문서 버전은 `major.minor` 형식이다.
