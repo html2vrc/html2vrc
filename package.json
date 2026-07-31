@@ -1,0 +1,39 @@
+{
+  "name": "@html2vrc/react",
+  "version": "0.1.0",
+  "description": "Static React primitives and exporter for UDOM",
+  "type": "module",
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "node --import tsx --test test/*.test.tsx",
+    "check": "npm run typecheck && npm test && npm run build",
+    "prepack": "npm run check"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "peerDependencies": {
+    "react": "^19.2.0"
+  },
+  "dependencies": {
+    "@html2vrc/udom": "https://github.com/html2vrc/udom/archive/f6dfec02dc3beb9a92037563cdc6e47b80a6ec9e.tar.gz"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@types/react": "^19.2.0",
+    "react": "^19.2.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.3"
+  },
+  "license": "MIT"
+}
