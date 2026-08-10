@@ -81,5 +81,6 @@ namespace Html2Vrc
     public sealed class UdomEmbed
     {
         public string targetSlot;
+        public string fallbackLabel;
     }
 }

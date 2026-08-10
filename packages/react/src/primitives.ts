@@ -1,14 +1,28 @@
 import type { ComponentType } from "react";
 import type {
   ButtonProps,
+  EmbedProps,
   ImageProps,
+  ScrollProps,
+  SliderProps,
   TextProps,
+  TextInputProps,
+  ToggleProps,
   ViewProps
 } from "./types.js";
 
 export const primitiveMarker = Symbol.for("@html2vrc/react.primitive");
 
-export type PrimitiveName = "view" | "text" | "image" | "button";
+export type PrimitiveName =
+  | "view"
+  | "text"
+  | "image"
+  | "button"
+  | "toggle"
+  | "slider"
+  | "text-input"
+  | "scroll"
+  | "embed";
 
 export type PrimitiveComponent<Props> = ComponentType<Props> & {
   readonly [primitiveMarker]: PrimitiveName;
@@ -40,6 +54,14 @@ export const View = createPrimitive<ViewProps>("view", "View");
 export const Text = createPrimitive<TextProps>("text", "Text");
 export const Image = createPrimitive<ImageProps>("image", "Image");
 export const Button = createPrimitive<ButtonProps>("button", "Button");
+export const Toggle = createPrimitive<ToggleProps>("toggle", "Toggle");
+export const Slider = createPrimitive<SliderProps>("slider", "Slider");
+export const TextInput = createPrimitive<TextInputProps>(
+  "text-input",
+  "TextInput"
+);
+export const Scroll = createPrimitive<ScrollProps>("scroll", "Scroll");
+export const Embed = createPrimitive<EmbedProps>("embed", "Embed");
 
 export function getPrimitiveName(value: unknown): PrimitiveName | undefined {
   if (

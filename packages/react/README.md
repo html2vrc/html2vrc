@@ -16,6 +16,11 @@
 - `Text`
 - `Image`
 - `Button`
+- `Toggle`
+- `Slider`
+- `TextInput`
+- `Scroll`
+- `Embed`
 - React Fragment
 - inline `style`과 `styleRefs`
 - 이미지 Resource 참조
@@ -30,7 +35,6 @@
 - 브라우저 DOM, HTML과 CSS
 - 함수 event handler
 - Unity와 VRChat 출력
-- Toggle, Slider, TextInput, Scroll과 Embed
 
 ## 사용
 
@@ -83,6 +87,33 @@ const document = renderToUDOM(
 ```
 
 `on`은 JavaScript 함수를 받지 않는다. 값은 Renderer가 별도 Binding manifest에서 해석할 상징적인 ID다.
+
+### 컨트롤
+
+컨트롤 prop은 canonical UDOM 속성과 같은 의미를 가진다. `false`, `0`, 빈 문자열도 생략하지 않고 출력한다. 컨트롤 자식은 사용자 정의 시각 구조가 되며 `Image`와 `Embed`는 자식을 받지 않는다.
+
+```tsx
+<Toggle
+  id="music"
+  checked={false}
+  bind={{ checked: "settings.music" }}
+  on={{ change: "settings.setMusic" }}
+>
+  <Text>Music</Text>
+</Toggle>
+<Slider id="volume" min={0} max={100} value={50} step={1} />
+<TextInput id="name" value="" placeholder="Name" />
+<Scroll id="gallery" axis="both" initialOffset={{ x: 0, y: 24 }}>
+  <View>{/* scroll content */}</View>
+</Scroll>
+<Embed
+  id="avatar"
+  object="world.avatar"
+  fallbackLabel="Avatar unavailable"
+/>
+```
+
+`object`, `bind`와 `on` 값은 실행 코드나 GameObject 경로가 아니라 별도 manifest가 해석할 상징적 ID다.
 
 ## ID
 

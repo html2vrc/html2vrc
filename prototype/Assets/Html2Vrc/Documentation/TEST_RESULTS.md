@@ -22,11 +22,12 @@
 - canonical text-input의 value/placeholder/multiline/readOnly/disabled와 `bind.value`, change/submit/focus/blur 진단을 정규화하고 native TMP_InputField, viewport, text, placeholder를 생성했다.
 - canonical scroll의 vertical/horizontal/both, design-unit initialOffset, `bind.offset`, scroll/focus/blur 진단을 정규화하고 양축 native ScrollRect 콘텐츠 크기와 좌표 변환을 확인했다. 기존 legacy Horizontal layout의 축 추론도 유지한다.
 - canonical viewport의 pixelRatio와 contain/cover/stretch/none을 보존하고, Renderer 목표 Canvas override에 따른 uniform/non-uniform scale, cover/none clipping, override 해제와 안정 wrapper 재생성을 확인했다.
+- React exporter가 Toggle, Slider, TextInput, Scroll과 Embed를 canonical 속성·binding·event로 출력하고, 같은 fixture를 Unity가 네이티브 컨트롤로 생성하는 것을 확인했다. 빈 문자열과 0/false 값, Button/Toggle의 focus·blur, 연결 상태에 반응하는 Embed fallbackLabel도 포함한다.
 
 자동 검증 결과:
 
-- `npm run check`: UDOM conformance 19/19, React 4/4, TypeScript typecheck와 build 통과
-- Unity EditMode `Html2Vrc.Tests.UdomPrototypeTests`: **19/19 통과, 실패 0**
+- `npm run check`: UDOM conformance 19/19, React 5/5, TypeScript typecheck와 build 통과
+- Unity EditMode `Html2Vrc.Tests.UdomPrototypeTests`: **20/20 통과, 실패 0**
 - Unity 종료 코드 0, C# 컴파일 오류 0
 - Windows CRLF에서 기존 HTML 재생성 테스트가 문자열을 교체하지 못하던 문제도 함께 수정했다.
 
@@ -56,7 +57,7 @@
 
 ## 자동 회귀 검증
 
-HTML2VRC 전용 Unity Test Framework 테스트 19개를 실행한다. 검증 범위는 다음과 같다.
+HTML2VRC 전용 Unity Test Framework 테스트 20개를 실행한다. 검증 범위는 다음과 같다.
 
 1. 샘플 UDOM Validation 성공과 잘못된 속성/중복 ID 거부
 2. Canvas, TextMeshProUGUI, Image, Button, ScrollRect, LayoutGroup과 VRChat용 `VRCUiShape` 생성
@@ -77,11 +78,12 @@ HTML2VRC 전용 Unity Test Framework 테스트 19개를 실행한다. 검증 범
 17. canonical text-input의 단일행/다중행·읽기전용·비활성 상태와 native TMP_InputField 내부 구조, symbolic binding/event 비실행 보장
 18. canonical scroll의 vertical/horizontal/both 축, 양축 콘텐츠 크기, initialOffset 좌표 변환, legacy horizontal 호환과 symbolic binding/event 비실행 보장
 19. canonical viewport의 pixelRatio 보존과 contain/cover/stretch/none target Canvas scale, clipping, override 해제 및 안정 wrapper 재생성
+20. React control fixture의 Toggle, Slider, TextInput, Scroll, Embed 네이티브 생성과 빈 값 보존, focus/blur 진단, 동적 Embed fallback 표시
 
 최종 자동 테스트 결과:
 
-- 전체 19개
-- 통과 19개
+- 전체 20개
+- 통과 20개
 - 실패 0개
 - 건너뜀 0개
 - Unity 종료 코드 0

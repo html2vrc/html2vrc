@@ -92,7 +92,7 @@ UDOM은 VRChat 월드에서 UI를 재현하는 데 필요한 정보를 표현합
 
 UDOM 안에는 임의의 JavaScript를 저장하지 않습니다. 웹 로직은 Udon 또는 UdonSharp로 변환하고, UDOM은 생성된 동작과 UI 요소 사이의 연결을 표현합니다.
 
-Unity Importer는 `packages/udom`의 canonical UDOM 0.1과 기존 Unity 프로토타입 JSON 프로필을 모두 자동 감지합니다. `@html2vrc/react`의 기본 fixture와 공식 UDOM settings fixture는 별도 변환 스크립트 없이 동일한 Unity 생성 경로로 들어갑니다. 현재 view, text, image, button, toggle, slider, text-input, scroll과 embed, shared style 병합을 연결했습니다. 지원하지 않는 canonical 표현은 묵시하지 않고 검증 오류나 손실 내용이 들어 있는 안전한 폴백 경고로 반환합니다.
+Unity Importer는 `packages/udom`의 canonical UDOM 0.1과 기존 Unity 프로토타입 JSON 프로필을 모두 자동 감지합니다. `@html2vrc/react`의 기본·컨트롤 fixture와 공식 UDOM settings fixture는 별도 변환 스크립트 없이 동일한 Unity 생성 경로로 들어갑니다. React exporter와 Unity importer 모두 view, text, image, button, toggle, slider, text-input, scroll과 embed를 연결했습니다. 지원하지 않는 canonical 표현은 묵시하지 않고 검증 오류나 손실 내용이 들어 있는 안전한 폴백 경고로 반환합니다.
 
 Canonical resource URI는 UDOM TextAsset 폴더를 기준으로 안전하게 해석합니다. image resource는 Texture2D/RawImage, sprite resource는 Sprite/Image로 매핑하며, 정규화된 경로가 Unity `Assets/` 밖으로 나가면 참조를 거부합니다.
 
@@ -107,6 +107,8 @@ Embed는 HTML2VRC 레이아웃에 기존 Unity GameObject나 VRChat 프리팹을
 예를 들어 웹의 비디오 iframe은 VizVid나 YAMA Player 같은 VRChat 네이티브 비디오 플레이어와 연결할 수 있습니다.
 
 HTML2VRC는 배치와 Binding을 관리하며, 외부 에셋은 독립적으로 수정할 수 있고 UI를 재생성해도 유지되어야 합니다.
+
+Canonical Embed의 `fallbackLabel`은 외부 슬롯이 비어 있을 때 TextMeshPro로 표시되고, 참조가 연결되면 자동으로 숨겨집니다.
 
 ## 프로젝트 범위
 

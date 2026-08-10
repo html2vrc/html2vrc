@@ -26,7 +26,7 @@ Canonical viewport 크기는 디자인 좌표계를 유지한다. UDOM Importer�
 
 Resource URI는 canonical 명세대로 UDOM TextAsset이 있는 폴더를 기준으로 해석한다. `Assets/`로 시작하는 절대 Unity 에셋 경로도 지원한다. `..`로 정규화하더라도 결과가 `Assets/` 밖으로 나가면 참조하지 않고 경고를 남긴다.
 
-아직 지원하지 않는 canonical 기능은 묵시하지 않고 검증 오류나 명시적 폴백 경고로 반환한다. 현재 변환·테두리·그림자는 오류로 거부한다. gradient는 첫 color stop, radius는 square corner, font resource는 프로젝트 기본 TMP font로 폴백하고 각각 경고를 남긴다. source asset 경로가 없는 raw JSON 검증에서는 상대 resource URI를 추측하지 않고 빈 Image와 경고를 사용한다. `bind`와 `on`의 symbolic ID는 임의 로직으로 실행하지 않고, 안전한 Unity/Udon binding manifest가 없다는 경고로 남는다. Slider의 step은 정수 범위의 `1`일 때 Unity `wholeNumbers`로 적용하고 그 외의 step은 아직 경고와 연속 Slider 폴백을 사용한다. Text input은 value, placeholder, multiline, readOnly, disabled를 native `TMP_InputField`로 적용한다.
+아직 지원하지 않는 canonical 기능은 묵시하지 않고 검증 오류나 명시적 폴백 경고로 반환한다. 현재 변환·테두리·그림자는 오류로 거부한다. gradient는 첫 color stop, radius는 square corner, font resource는 프로젝트 기본 TMP font로 폴백하고 각각 경고를 남긴다. source asset 경로가 없는 raw JSON 검증에서는 상대 resource URI를 추측하지 않고 빈 Image와 경고를 사용한다. `bind`와 `on`의 symbolic ID는 임의 로직으로 실행하지 않고, 안전한 Unity/Udon binding manifest가 없다는 경고로 남는다. Button, Toggle, Slider, Text input과 Scroll의 canonical focus/blur도 같은 방식으로 보존·진단한다. Slider의 step은 정수 범위의 `1`일 때 Unity `wholeNumbers`로 적용하고 그 외의 step은 아직 경고와 연속 Slider 폴백을 사용한다. Text input은 빈 문자열을 포함한 value와 placeholder, multiline, readOnly, disabled를 native `TMP_InputField`로 적용한다.
 
 ## 최상위 구조
 
@@ -137,12 +137,13 @@ Panel은 배경 Image와 선택적 Vertical/Horizontal Layout Group을 만든다
   "id": "light-embed",
   "type": "Embed",
   "embed": {
-    "targetSlot": "world-light"
+    "targetSlot": "world-light",
+    "fallbackLabel": "World light unavailable"
   }
 }
 ```
 
-Embed는 외부 오브젝트를 소유하거나 자식으로 옮기지 않는다. 생성된 Anchor가 슬롯 참조를 표시하며, 외부 오브젝트는 사용자가 계속 소유한다. 그러므로 UDOM을 재생성해도 외부 오브젝트와 참조가 유지된다.
+Embed는 외부 오브젝트를 소유하거나 자식으로 옮기지 않는다. 생성된 Anchor가 슬롯 참조를 표시하며, 외부 오브젝트는 사용자가 계속 소유한다. 그러므로 UDOM을 재생성해도 외부 오브젝트와 참조가 유지된다. Canonical `fallbackLabel`은 생성기 소유 TextMeshPro 자식으로 보존되며, 슬롯 참조가 없을 때만 활성화된다.
 
 ## 재생성 규칙
 

@@ -89,15 +89,26 @@ namespace Html2Vrc
                 if (entry != null && string.Equals(entry.slot, slot, StringComparison.Ordinal))
                 {
                     entry.target = target;
+                    RefreshEmbedFallbacks();
                     ExternalReferencesChanged?.Invoke(this);
                     return;
                 }
             }
         }
 
+        private void RefreshEmbedFallbacks()
+        {
+            var anchors = GetComponentsInChildren<UdomEmbedAnchor>(true);
+            for (var index = 0; index < anchors.Length; index++)
+            {
+                anchors[index].RefreshFallback();
+            }
+        }
+
 #if UNITY_EDITOR
         private void OnValidate()
         {
+            RefreshEmbedFallbacks();
             ExternalReferencesChanged?.Invoke(this);
         }
 #endif

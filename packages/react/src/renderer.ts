@@ -5,9 +5,14 @@ import { getPrimitiveName } from "./primitives.js";
 import type {
   ButtonProps,
   CommonPrimitiveProps,
+  EmbedProps,
   ImageProps,
   RenderToUdomOptions,
+  ScrollProps,
+  SliderProps,
   TextProps,
+  TextInputProps,
+  ToggleProps,
   UdomDiagnostic,
   UdomDocument,
   UdomElementNode,
@@ -16,6 +21,7 @@ import type {
   UdomTextNode,
   ViewProps
 } from "./types.js";
+import type { PrimitiveName } from "./primitives.js";
 
 const GENERATOR = "@html2vrc/react 0.1.0";
 
@@ -108,9 +114,48 @@ function textValue(props: TextProps): string {
   return value;
 }
 
+function definedProperties(
+  entries: ReadonlyArray<readonly [string, unknown]>
+): Record<string, unknown> | undefined {
+  const properties: Record<string, unknown> = {};
+  for (const [key, value] of entries) {
+    if (value !== undefined) {
+      properties[key] = value;
+    }
+  }
+  return Object.keys(properties).length > 0 ? properties : undefined;
+}
+
+function assertNoChildren(
+  name: "Image" | "Embed",
+  children: ReactNode
+): void {
+  if (childArray(children).length > 0) {
+    throw new UdomRenderError(`${name} does not accept children in UDOM 0.1.`);
+  }
+}
+
+function renderControl(
+  props: CommonPrimitiveProps & { children?: ReactNode },
+  name: "button" | "toggle" | "slider" | "text-input" | "scroll",
+  path: readonly string[],
+  properties?: Record<string, unknown>,
+  on?: Record<string, string>
+): UdomElementNode {
+  const children = renderChildren(props.children, path);
+  return {
+    type: "element",
+    ...commonNodeProps(props, name, path),
+    name,
+    ...(properties ? { properties } : {}),
+    ...(on ? { on } : {}),
+    ...(children.length > 0 ? { children } : {})
+  };
+}
+
 function renderPrimitive(
   element: ReactElement,
-  name: "view" | "text" | "image" | "button",
+  name: PrimitiveName,
   path: readonly string[]
 ): UdomNode {
   if (name === "text") {
@@ -125,6 +170,10 @@ function renderPrimitive(
 
   if (name === "image") {
     const props = element.props as ImageProps;
+    assertNoChildren(
+      "Image",
+      (element.props as ImageProps & { children?: ReactNode }).children
+    );
     const node: UdomElementNode = {
       type: "element",
       ...commonNodeProps(props, name, path),
@@ -140,18 +189,94 @@ function renderPrimitive(
 
   if (name === "button") {
     const props = element.props as ButtonProps;
-    const children = renderChildren(props.children, path);
-    const node: UdomElementNode = {
+    return renderControl(
+      props,
+      name,
+      path,
+      definedProperties([["disabled", props.disabled]]),
+      props.on as Record<string, string> | undefined
+    );
+  }
+
+  if (name === "toggle") {
+    const props = element.props as ToggleProps;
+    return renderControl(
+      props,
+      name,
+      path,
+      definedProperties([
+        ["checked", props.checked],
+        ["disabled", props.disabled]
+      ]),
+      props.on as Record<string, string> | undefined
+    );
+  }
+
+  if (name === "slider") {
+    const props = element.props as SliderProps;
+    return renderControl(
+      props,
+      name,
+      path,
+      definedProperties([
+        ["value", props.value],
+        ["min", props.min],
+        ["max", props.max],
+        ["step", props.step],
+        ["disabled", props.disabled]
+      ]),
+      props.on as Record<string, string> | undefined
+    );
+  }
+
+  if (name === "text-input") {
+    const props = element.props as TextInputProps;
+    return renderControl(
+      props,
+      name,
+      path,
+      definedProperties([
+        ["value", props.value],
+        ["placeholder", props.placeholder],
+        ["multiline", props.multiline],
+        ["readOnly", props.readOnly],
+        ["disabled", props.disabled]
+      ]),
+      props.on as Record<string, string> | undefined
+    );
+  }
+
+  if (name === "scroll") {
+    const props = element.props as ScrollProps;
+    return renderControl(
+      props,
+      name,
+      path,
+      definedProperties([
+        ["axis", props.axis],
+        ["initialOffset", props.initialOffset]
+      ]),
+      props.on as Record<string, string> | undefined
+    );
+  }
+
+  if (name === "embed") {
+    const props = element.props as EmbedProps;
+    assertNoChildren(
+      "Embed",
+      (element.props as EmbedProps & { children?: ReactNode }).children
+    );
+    return {
       type: "element",
       ...commonNodeProps(props, name, path),
-      name: "button",
-      ...(props.disabled !== undefined
-        ? { properties: { disabled: props.disabled } }
-        : {}),
-      ...(props.on ? { on: props.on } : {}),
-      ...(children.length > 0 ? { children } : {})
+      name,
+      properties: {
+        object: props.object,
+        ...(props.fallbackLabel !== undefined
+          ? { fallbackLabel: props.fallbackLabel }
+          : {})
+      }
     };
-    return node;
   }
 
   const props = element.props as ViewProps;
@@ -199,7 +324,7 @@ function renderReactNode(
           (input.type as { name?: string }).name ??
           "unknown component";
     throw new UdomRenderError(
-      `Unsupported React element ${label}. The 0.1 exporter accepts only View, Text, Image, Button, and Fragment.`
+      `Unsupported React element ${label}. The 0.1 exporter accepts only @html2vrc/react primitives and Fragment.`
     );
   }
 

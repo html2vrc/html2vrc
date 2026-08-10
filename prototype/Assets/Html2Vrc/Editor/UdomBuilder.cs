@@ -104,6 +104,7 @@ namespace Html2Vrc.Editor
         private const string InputViewportSuffix = "::__input-viewport";
         private const string InputTextSuffix = "::__input-text";
         private const string InputPlaceholderSuffix = "::__input-placeholder";
+        private const string EmbedFallbackSuffix = "::__embed-fallback";
         private const string ViewportFitSuffix = "::__viewport-fit";
 
         private static readonly Type[] ManagedComponentTypes =
@@ -507,7 +508,7 @@ namespace Html2Vrc.Editor
                     ConfigureScrollView(nodeObject, node, style, panelForChildren, context);
                     break;
                 case "embed":
-                    ConfigureEmbed(nodeObject, node, context.Root);
+                    ConfigureEmbed(nodeObject, node, context);
                     break;
                 default:
                     throw new InvalidOperationException($"Validated node type unexpectedly unsupported: {node.type}");
@@ -1118,11 +1119,36 @@ namespace Html2Vrc.Editor
                 vertical ? initialOffset.y : 0f);
         }
 
-        private static void ConfigureEmbed(GameObject target, UdomNode node, UdomGeneratedRoot root)
+        private static void ConfigureEmbed(GameObject target, UdomNode node, BuildContext context)
         {
             var anchor = GetOrAdd<UdomEmbedAnchor>(target);
             Undo.RecordObject(anchor, "Configure UDOM Embed");
-            anchor.Configure(root, node.embed != null ? node.embed.targetSlot : string.Empty);
+            GameObject fallback = null;
+            if (node.embed != null && !string.IsNullOrEmpty(node.embed.fallbackLabel))
+            {
+                var fallbackId = node.id + EmbedFallbackSuffix;
+                fallback = UpsertGeneratedObject(
+                    fallbackId,
+                    "EmbedFallback",
+                    true,
+                    target.transform,
+                    context);
+                context.DesiredIds.Add(fallbackId);
+                fallback.name = "Fallback Label";
+                fallback.transform.SetSiblingIndex(0);
+                ConfigureStretch(fallback.GetComponent<RectTransform>());
+                RemoveIfPresent<LayoutElement>(fallback);
+                ConfigureText(
+                    fallback,
+                    new UdomNode { text = node.embed.fallbackLabel },
+                    node.style ?? new UdomStyle(),
+                    context.Font);
+            }
+
+            anchor.Configure(
+                context.Root,
+                node.embed != null ? node.embed.targetSlot : string.Empty,
+                fallback);
         }
 
         private static void ConfigureStretch(RectTransform rect)

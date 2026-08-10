@@ -112,7 +112,8 @@ namespace Html2Vrc.Editor
                 var embedObject = RequireObject(embedValue, path + ".embed");
                 node.embed = new UdomEmbed
                 {
-                    targetSlot = GetString(embedObject, "targetSlot")
+                    targetSlot = GetString(embedObject, "targetSlot"),
+                    fallbackLabel = GetString(embedObject, "fallbackLabel")
                 };
             }
 

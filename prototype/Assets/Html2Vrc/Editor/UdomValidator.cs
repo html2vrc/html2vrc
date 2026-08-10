@@ -88,7 +88,7 @@ namespace Html2Vrc.Editor
             "style", "binding", "embed", "children",
             "position", "layout", "padding", "margin", "spacing", "backgroundColor", "textColor",
             "fontSize", "alignment", "flexibleWidth", "flexibleHeight",
-            "action", "targetSlot"
+            "action", "targetSlot", "fallbackLabel"
         };
 
         private static readonly Regex StableIdPattern = new Regex(

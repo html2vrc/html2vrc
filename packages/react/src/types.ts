@@ -306,6 +306,46 @@ export interface ButtonProps extends CommonPrimitiveProps {
   children?: ReactNode;
 }
 
+export interface ToggleProps extends CommonPrimitiveProps {
+  checked?: boolean;
+  disabled?: boolean;
+  on?: Partial<Record<"change" | "focus" | "blur", string>>;
+  children?: ReactNode;
+}
+
+export interface SliderProps extends CommonPrimitiveProps {
+  value?: number;
+  min?: number;
+  max?: number;
+  step?: number;
+  disabled?: boolean;
+  on?: Partial<Record<"change" | "focus" | "blur", string>>;
+  children?: ReactNode;
+}
+
+export interface TextInputProps extends CommonPrimitiveProps {
+  value?: string;
+  placeholder?: string;
+  multiline?: boolean;
+  readOnly?: boolean;
+  disabled?: boolean;
+  on?: Partial<Record<"change" | "submit" | "focus" | "blur", string>>;
+  children?: ReactNode;
+}
+
+export interface ScrollProps extends CommonPrimitiveProps {
+  axis?: "vertical" | "horizontal" | "both";
+  initialOffset?: UdomPoint<number>;
+  on?: Partial<Record<"scroll" | "focus" | "blur", string>>;
+  children?: ReactNode;
+}
+
+export interface EmbedProps extends CommonPrimitiveProps {
+  object: string;
+  fallbackLabel?: string;
+  children?: never;
+}
+
 export interface UdomDiagnostic {
   code: string;
   severity: "error";

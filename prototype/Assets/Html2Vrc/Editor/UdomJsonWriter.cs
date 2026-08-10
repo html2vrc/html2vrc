@@ -79,6 +79,7 @@ namespace Html2Vrc.Editor
                 writer.PropertyName("embed");
                 writer.BeginObject();
                 writer.OptionalStringProperty("targetSlot", node.embed.targetSlot);
+                writer.OptionalStringProperty("fallbackLabel", node.embed.fallbackLabel);
                 writer.EndObject();
             }
 

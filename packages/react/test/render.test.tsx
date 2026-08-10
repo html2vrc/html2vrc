@@ -1,10 +1,28 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
-import { Button, Image, Text, UdomRenderError, View, renderToUDOM } from "../src/index.js";
+import {
+  Button,
+  Embed,
+  Image,
+  Scroll,
+  Slider,
+  Text,
+  TextInput,
+  Toggle,
+  UdomRenderError,
+  View,
+  renderToUDOM
+} from "../src/index.js";
 
 const expected = JSON.parse(
   await readFile(new URL("./fixtures/basic.udom.json", import.meta.url), "utf8")
+);
+const expectedControls = JSON.parse(
+  await readFile(
+    new URL("./fixtures/controls.udom.json", import.meta.url),
+    "utf8"
+  )
 );
 
 test("renders the minimal primitive set to conformant UDOM", () => {
@@ -35,7 +53,10 @@ test("renders the minimal primitive set to conformant UDOM", () => {
         Hello VRChat
       </Text>
       <Image id="logo" src="image.logo" fit="contain" />
-      <Button id="continue" on={{ activate: "menu.continue" }}>
+      <Button
+        id="continue"
+        on={{ activate: "menu.continue", focus: "controls.focusContinue" }}
+      >
         <Text id="continue-label">Continue</Text>
       </Button>
     </View>,
@@ -91,6 +112,72 @@ test("generates deterministic IDs from keys and tree paths", () => {
   assert.equal(button.children?.[0]?.id, "text-0-1-0");
 });
 
+test("renders every interactive primitive to conformant UDOM", () => {
+  const document = renderToUDOM(
+    <View id="controls">
+      <Toggle
+        id="music"
+        checked={false}
+        disabled={false}
+        bind={{ checked: "settings.music" }}
+        on={{ change: "settings.setMusic", focus: "controls.focusMusic" }}
+      >
+        <Text id="music-label">Music</Text>
+      </Toggle>
+      <Slider
+        id="volume"
+        value={0}
+        min={0}
+        max={100}
+        step={0}
+        disabled={false}
+        bind={{ value: "settings.volume" }}
+        on={{ change: "settings.setVolume", blur: "controls.blurVolume" }}
+      />
+      <TextInput
+        id="profile-name"
+        value=""
+        placeholder="Name"
+        multiline={false}
+        readOnly={false}
+        disabled={false}
+        bind={{ value: "profile.name" }}
+        on={{
+          change: "profile.setName",
+          submit: "profile.saveName",
+          focus: "controls.focusName",
+          blur: "controls.blurName"
+        }}
+      />
+      <Scroll
+        id="gallery"
+        axis="both"
+        initialOffset={{ x: 12, y: 24 }}
+        bind={{ offset: "gallery.offset" }}
+        on={{ scroll: "gallery.setOffset" }}
+      >
+        <View id="gallery-content">
+          <Text id="gallery-label">Gallery</Text>
+        </View>
+      </Scroll>
+      <Embed
+        id="avatar-preview"
+        object="world.avatarPreview"
+        fallbackLabel="Avatar unavailable"
+      />
+      <Text id="empty-status" value="" />
+    </View>,
+    {
+      viewport: {
+        width: 800,
+        height: 600
+      }
+    }
+  );
+
+  assert.deepEqual(document, expectedControls);
+});
+
 test("surfaces UDOM conformance diagnostics", () => {
   assert.throws(
     () =>
@@ -127,7 +214,7 @@ test("rejects arbitrary React and bare text", () => {
           height: 720
         }
       }),
-    /accepts only View, Text, Image, Button/
+    /accepts only @html2vrc\/react primitives/
   );
 
   assert.throws(

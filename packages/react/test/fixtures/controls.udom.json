@@ -1,0 +1,126 @@
+{
+  "asset": {
+    "version": "0.1",
+    "generator": "@html2vrc/react 0.1.0"
+  },
+  "viewport": {
+    "width": 800,
+    "height": 600
+  },
+  "root": {
+    "type": "element",
+    "id": "controls",
+    "name": "view",
+    "children": [
+      {
+        "type": "element",
+        "id": "music",
+        "name": "toggle",
+        "properties": {
+          "checked": false,
+          "disabled": false
+        },
+        "bind": {
+          "checked": "settings.music"
+        },
+        "on": {
+          "change": "settings.setMusic",
+          "focus": "controls.focusMusic"
+        },
+        "children": [
+          {
+            "type": "text",
+            "id": "music-label",
+            "value": "Music"
+          }
+        ]
+      },
+      {
+        "type": "element",
+        "id": "volume",
+        "name": "slider",
+        "properties": {
+          "value": 0,
+          "min": 0,
+          "max": 100,
+          "step": 0,
+          "disabled": false
+        },
+        "bind": {
+          "value": "settings.volume"
+        },
+        "on": {
+          "change": "settings.setVolume",
+          "blur": "controls.blurVolume"
+        }
+      },
+      {
+        "type": "element",
+        "id": "profile-name",
+        "name": "text-input",
+        "properties": {
+          "value": "",
+          "placeholder": "Name",
+          "multiline": false,
+          "readOnly": false,
+          "disabled": false
+        },
+        "bind": {
+          "value": "profile.name"
+        },
+        "on": {
+          "change": "profile.setName",
+          "submit": "profile.saveName",
+          "focus": "controls.focusName",
+          "blur": "controls.blurName"
+        }
+      },
+      {
+        "type": "element",
+        "id": "gallery",
+        "name": "scroll",
+        "properties": {
+          "axis": "both",
+          "initialOffset": {
+            "x": 12,
+            "y": 24
+          }
+        },
+        "bind": {
+          "offset": "gallery.offset"
+        },
+        "on": {
+          "scroll": "gallery.setOffset"
+        },
+        "children": [
+          {
+            "type": "element",
+            "id": "gallery-content",
+            "name": "view",
+            "children": [
+              {
+                "type": "text",
+                "id": "gallery-label",
+                "value": "Gallery"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "type": "element",
+        "id": "avatar-preview",
+        "name": "embed",
+        "properties": {
+          "object": "world.avatarPreview",
+          "fallbackLabel": "Avatar unavailable"
+        }
+      },
+      {
+        "type": "text",
+        "id": "empty-status",
+        "value": ""
+      }
+    ]
+  }
+}

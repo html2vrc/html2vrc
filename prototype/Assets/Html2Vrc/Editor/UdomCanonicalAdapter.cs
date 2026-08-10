@@ -340,7 +340,7 @@ namespace Html2Vrc.Editor
 
             if (string.Equals(canonicalType, "text", StringComparison.Ordinal))
             {
-                node.text = RequireString(value, "value", path + ".value");
+                node.text = RequireText(value, "value", path + ".value");
                 if (!mappedStyle.HasWidth && !fillParentByDefault)
                 {
                     node.style.size[0] = parentSize != null && parentSize.Length >= 1
@@ -725,12 +725,12 @@ namespace Html2Vrc.Editor
                             "disabled");
                         if (properties.TryGetValue("value", out var inputValue))
                         {
-                            node.textInputValue = RequireString(inputValue, path + ".properties.value");
+                            node.textInputValue = RequireText(inputValue, path + ".properties.value");
                         }
 
                         if (properties.TryGetValue("placeholder", out var placeholderValue))
                         {
-                            node.textInputPlaceholder = RequireString(
+                            node.textInputPlaceholder = RequireText(
                                 placeholderValue,
                                 path + ".properties.placeholder");
                         }
@@ -817,7 +817,10 @@ namespace Html2Vrc.Editor
                     EnsureOnlyKeys(properties, path + ".properties", "object", "fallbackLabel");
                     node.embed = new UdomEmbed
                     {
-                        targetSlot = RequireString(properties, "object", path + ".properties.object")
+                        targetSlot = RequireString(properties, "object", path + ".properties.object"),
+                        fallbackLabel = properties.TryGetValue("fallbackLabel", out var fallbackLabel)
+                            ? RequireText(fallbackLabel, path + ".properties.fallbackLabel")
+                            : string.Empty
                     };
                     break;
             }
@@ -896,16 +899,16 @@ namespace Html2Vrc.Editor
             }
 
             var events = RequireObject(onValue, path + ".on");
-            string supportedEvent;
             if (string.Equals(elementName, "button", StringComparison.Ordinal))
             {
-                supportedEvent = "activate";
+                EnsureOnlyKeys(events, path + ".on", "activate", "focus", "blur");
+                AddEventWarning(events, "activate", path, warnings);
+                AddEventWarning(events, "focus", path, warnings);
+                AddEventWarning(events, "blur", path, warnings);
+                return;
             }
-            else if (string.Equals(elementName, "toggle", StringComparison.Ordinal))
-            {
-                supportedEvent = "change";
-            }
-            else if (string.Equals(elementName, "slider", StringComparison.Ordinal))
+
+            if (string.Equals(elementName, "toggle", StringComparison.Ordinal))
             {
                 EnsureOnlyKeys(events, path + ".on", "change", "focus", "blur");
                 AddEventWarning(events, "change", path, warnings);
@@ -913,7 +916,16 @@ namespace Html2Vrc.Editor
                 AddEventWarning(events, "blur", path, warnings);
                 return;
             }
-            else if (string.Equals(elementName, "text-input", StringComparison.Ordinal))
+
+            if (string.Equals(elementName, "slider", StringComparison.Ordinal))
+            {
+                EnsureOnlyKeys(events, path + ".on", "change", "focus", "blur");
+                AddEventWarning(events, "change", path, warnings);
+                AddEventWarning(events, "focus", path, warnings);
+                AddEventWarning(events, "blur", path, warnings);
+                return;
+            }
+            if (string.Equals(elementName, "text-input", StringComparison.Ordinal))
             {
                 EnsureOnlyKeys(events, path + ".on", "change", "submit", "focus", "blur");
                 AddEventWarning(events, "change", path, warnings);
@@ -922,7 +934,7 @@ namespace Html2Vrc.Editor
                 AddEventWarning(events, "blur", path, warnings);
                 return;
             }
-            else if (string.Equals(elementName, "scroll", StringComparison.Ordinal))
+            if (string.Equals(elementName, "scroll", StringComparison.Ordinal))
             {
                 EnsureOnlyKeys(events, path + ".on", "scroll", "focus", "blur");
                 AddEventWarning(events, "scroll", path, warnings);
@@ -930,19 +942,7 @@ namespace Html2Vrc.Editor
                 AddEventWarning(events, "blur", path, warnings);
                 return;
             }
-            else
-            {
-                throw new FormatException($"{path}.on: canonical events are not supported for this element yet.");
-            }
-
-            EnsureOnlyKeys(events, path + ".on", supportedEvent);
-            if (events.TryGetValue(supportedEvent, out var eventValue))
-            {
-                var eventId = RequireString(eventValue, path + ".on." + supportedEvent);
-                warnings.Add(new UdomParseWarning(
-                    path + ".on." + supportedEvent,
-                    $"Symbolic event '{eventId}' is not executed until a safe Unity/Udon binding manifest is supplied."));
-            }
+            throw new FormatException($"{path}.on: canonical events are not supported for this element yet.");
         }
 
         private static void AddEventWarning(
@@ -1626,6 +1626,17 @@ namespace Html2Vrc.Editor
             }
 
             throw new FormatException($"{path}: a non-empty string is required.");
+        }
+
+        private static string RequireText(Dictionary<string, object> value, string key, string path)
+        {
+            return RequireText(RequireValue(value, key, path.Substring(0, path.LastIndexOf('.'))), path);
+        }
+
+        private static string RequireText(object value, string path)
+        {
+            return value as string
+                   ?? throw new FormatException($"{path}: a string is required.");
         }
 
         private static string GetString(Dictionary<string, object> value, string key)

@@ -1,11 +1,26 @@
-export { Button, Image, Text, View } from "./primitives.js";
+export {
+  Button,
+  Embed,
+  Image,
+  Scroll,
+  Slider,
+  Text,
+  TextInput,
+  Toggle,
+  View
+} from "./primitives.js";
 export { renderToUDOM, UdomRenderError } from "./renderer.js";
 export type {
   ButtonProps,
   CommonPrimitiveProps,
+  EmbedProps,
   ImageProps,
   RenderToUdomOptions,
+  ScrollProps,
+  SliderProps,
   TextProps,
+  TextInputProps,
+  ToggleProps,
   UdomAsset,
   UdomBackground,
   UdomColor,
@@ -16,6 +31,7 @@ export type {
   UdomLength,
   UdomNode,
   UdomPaintStyle,
+  UdomPoint,
   UdomResource,
   UdomStyle,
   UdomStyleDefinition,

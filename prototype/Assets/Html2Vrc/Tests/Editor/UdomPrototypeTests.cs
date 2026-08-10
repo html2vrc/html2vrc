@@ -67,6 +67,7 @@ namespace Html2Vrc.Tests
                 Is.False,
                 validation.Format());
             Assert.That(validation.Format(), Does.Contain("relative URI 'assets/logo.png'"));
+            Assert.That(validation.Format(), Does.Contain("Symbolic event 'controls.focusContinue'"));
 
             var document = validation.Document;
             Assert.That(document.schemaVersion, Is.EqualTo("0.1"));
@@ -91,6 +92,85 @@ namespace Html2Vrc.Tests
             Assert.That(logo.color, Is.EqualTo(Color.white).Using(ColorComparer.Instance));
             Assert.That(continueButton, Is.Not.Null);
             Assert.That(continueLabel.text, Is.EqualTo("Continue"));
+        }
+
+        [Test]
+        public void ReactControlFixture_MapsEveryInteractivePrimitiveToNativeUnityUi()
+        {
+            var json = LoadRepositoryFile(
+                "packages",
+                "react",
+                "test",
+                "fixtures",
+                "controls.udom.json");
+            var validation = UdomValidator.Validate(json);
+
+            Assert.That(validation.IsValid, Is.True, validation.Format());
+            Assert.That(
+                validation.Issues.Any(issue => issue.Severity == UdomIssueSeverity.Error),
+                Is.False,
+                validation.Format());
+            Assert.That(validation.Format(), Does.Contain("Symbolic binding 'settings.music'"));
+            Assert.That(validation.Format(), Does.Contain("Symbolic event 'profile.saveName'"));
+            Assert.That(validation.Format(), Does.Contain("Symbolic binding 'gallery.offset'"));
+
+            var build = UdomBuilder.GenerateOrRegenerate(validation.Document);
+            var root = build.Root;
+            var toggle = UdomBuilder.FindNode(root, "music").GetComponent<Toggle>();
+            var slider = UdomBuilder.FindNode(root, "volume").GetComponent<Slider>();
+            var input = UdomBuilder.FindNode(root, "profile-name").GetComponent<TMP_InputField>();
+            var scroll = UdomBuilder.FindNode(root, "gallery").GetComponent<ScrollRect>();
+            var embed = UdomBuilder.FindNode(root, "avatar-preview").GetComponent<UdomEmbedAnchor>();
+            var fallback = UdomBuilder.FindNode(root, "avatar-preview::__embed-fallback");
+
+            Assert.That(toggle, Is.Not.Null);
+            Assert.That(toggle.isOn, Is.False);
+            Assert.That(toggle.interactable, Is.True);
+            Assert.That(
+                UdomBuilder.FindNode(root, "music-label").GetComponent<TextMeshProUGUI>().text,
+                Is.EqualTo("Music"));
+            Assert.That(slider, Is.Not.Null);
+            Assert.That(slider.minValue, Is.EqualTo(0f));
+            Assert.That(slider.maxValue, Is.EqualTo(100f));
+            Assert.That(slider.value, Is.EqualTo(0f));
+            Assert.That(slider.wholeNumbers, Is.False);
+            Assert.That(slider.interactable, Is.True);
+            Assert.That(input, Is.Not.Null);
+            Assert.That(input.text, Is.Empty);
+            Assert.That(input.placeholder.GetComponent<TextMeshProUGUI>().text, Is.EqualTo("Name"));
+            Assert.That(input.lineType, Is.EqualTo(TMP_InputField.LineType.SingleLine));
+            Assert.That(input.readOnly, Is.False);
+            Assert.That(input.interactable, Is.True);
+            Assert.That(scroll, Is.Not.Null);
+            Assert.That(scroll.horizontal, Is.True);
+            Assert.That(scroll.vertical, Is.True);
+            Assert.That(scroll.content.anchoredPosition, Is.EqualTo(new Vector2(-12f, 24f)));
+            Assert.That(embed, Is.Not.Null);
+            Assert.That(embed.TargetSlot, Is.EqualTo("world.avatarPreview"));
+            Assert.That(embed.Target, Is.Null);
+            Assert.That(fallback, Is.Not.Null);
+            Assert.That(embed.FallbackVisual, Is.SameAs(fallback.gameObject));
+            Assert.That(fallback.gameObject.activeSelf, Is.True);
+            Assert.That(
+                fallback.GetComponent<TextMeshProUGUI>().text,
+                Is.EqualTo("Avatar unavailable"));
+            Assert.That(
+                UdomBuilder.FindNode(root, "empty-status").GetComponent<TextMeshProUGUI>().text,
+                Is.Empty);
+
+            var externalTarget = new GameObject("Avatar Preview Target");
+            root.SetExternalReference("world.avatarPreview", externalTarget);
+            Assert.That(embed.Target, Is.SameAs(externalTarget));
+            Assert.That(fallback.gameObject.activeSelf, Is.False);
+            root.SetExternalReference("world.avatarPreview", null);
+            Assert.That(fallback.gameObject.activeSelf, Is.True);
+
+            var embedNode = validation.Document.root.children.Single(node => node.id == "avatar-preview");
+            embedNode.embed.fallbackLabel = string.Empty;
+            UdomBuilder.GenerateOrRegenerate(validation.Document, root);
+            embed = UdomBuilder.FindNode(root, "avatar-preview").GetComponent<UdomEmbedAnchor>();
+            Assert.That(UdomBuilder.FindNode(root, "avatar-preview::__embed-fallback"), Is.Null);
+            Assert.That(embed.FallbackVisual, Is.Null);
         }
 
         [Test]
