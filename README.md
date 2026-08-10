@@ -98,6 +98,8 @@ Canonical resource URI는 UDOM TextAsset 폴더를 기준으로 안전하게 해
 
 Canonical scroll은 `vertical`, `horizontal`, `both` 축을 native ScrollRect로 생성하고, 왼쪽 위 기준 design-unit `initialOffset`을 Unity 콘텐츠 좌표로 변환합니다.
 
+UDOM Importer의 `Override Target Canvas`에서 Renderer 목표 크기를 지정하면 canonical `viewport.fit`의 `contain`, `cover`, `stretch`, `none`을 안정적인 내부 viewport wrapper에 적용합니다. `cover`와 넘칠 수 있는 `none`은 목표 영역에서 클리핑됩니다.
+
 ## Embed
 
 Embed는 HTML2VRC 레이아웃에 기존 Unity GameObject나 VRChat 프리팹을 연결합니다. 연결된 오브젝트의 내부 구조는 HTML2VRC가 소유하지 않습니다.

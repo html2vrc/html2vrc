@@ -1,0 +1,48 @@
+{
+  "asset": {
+    "version": "0.1",
+    "generator": "@html2vrc/udom Unity viewport fit fixture"
+  },
+  "viewport": {
+    "width": 400,
+    "height": 200,
+    "pixelRatio": 2,
+    "fit": "contain"
+  },
+  "root": {
+    "type": "element",
+    "id": "fit-root",
+    "name": "view",
+    "style": {
+      "layout": {
+        "width": "100%",
+        "height": "100%"
+      },
+      "paint": {
+        "backgrounds": [
+          {
+            "type": "color",
+            "color": "#58C8FFFF"
+          }
+        ]
+      }
+    },
+    "children": [
+      {
+        "type": "text",
+        "id": "fit-label",
+        "value": "Viewport fit",
+        "style": {
+          "layout": {
+            "width": 180,
+            "height": 48
+          },
+          "text": {
+            "fontSize": 28,
+            "color": "#171A2BFF"
+          }
+        }
+      }
+    ]
+  }
+}

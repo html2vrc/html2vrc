@@ -104,6 +104,7 @@ namespace Html2Vrc.Editor
         private const string InputViewportSuffix = "::__input-viewport";
         private const string InputTextSuffix = "::__input-text";
         private const string InputPlaceholderSuffix = "::__input-placeholder";
+        private const string ViewportFitSuffix = "::__viewport-fit";
 
         private static readonly Type[] ManagedComponentTypes =
         {
@@ -138,10 +139,17 @@ namespace Html2Vrc.Editor
             public TMP_FontAsset Font;
         }
 
+        private struct CanvasFitSettings
+        {
+            public bool RequiresClip;
+            public Vector2 ContentScale;
+        }
+
         public static UdomBuildResult GenerateOrRegenerate(
             string json,
             UdomGeneratedRoot existingRoot = null,
-            TextAsset sourceAsset = null)
+            TextAsset sourceAsset = null,
+            Vector2? targetCanvasSize = null)
         {
             var validation = UdomValidator.Validate(
                 json,
@@ -151,13 +159,14 @@ namespace Html2Vrc.Editor
                 throw new UdomBuildException(validation);
             }
 
-            return GenerateOrRegenerate(validation.Document, existingRoot, sourceAsset);
+            return GenerateOrRegenerate(validation.Document, existingRoot, sourceAsset, targetCanvasSize);
         }
 
         public static UdomBuildResult GenerateOrRegenerate(
             UdomDocument document,
             UdomGeneratedRoot existingRoot = null,
-            TextAsset sourceAsset = null)
+            TextAsset sourceAsset = null,
+            Vector2? targetCanvasSize = null)
         {
 #if UDONSHARP
             UdomVrchatSetup.EnsureReady();
@@ -169,8 +178,13 @@ namespace Html2Vrc.Editor
 
             var root = existingRoot != null ? existingRoot : CreateRoot(document);
             Undo.RecordObject(root, "Configure HTML2VRC UDOM root");
+            if (targetCanvasSize.HasValue)
+            {
+                root.SetTargetCanvasSize(targetCanvasSize.Value);
+            }
+
             root.Configure(sourceAsset, document);
-            ConfigureCanvas(root.gameObject, document.canvas);
+            var canvasFit = ConfigureCanvas(root, document.canvas);
             EnsureEventSystem();
 
             var existing = new Dictionary<string, UdomGeneratedNode>(StringComparer.Ordinal);
@@ -189,7 +203,40 @@ namespace Html2Vrc.Editor
             };
 
             CollectExternalSlots(document.root, root);
-            BuildNode(document.root, root.transform, null, 0, context);
+            var viewportId = document.root.id + ViewportFitSuffix;
+            var viewport = UpsertGeneratedObject(
+                viewportId,
+                "ViewportFit",
+                true,
+                root.transform,
+                context);
+            context.DesiredIds.Add(viewportId);
+            viewport.name = "Viewport Fit";
+            viewport.transform.SetSiblingIndex(0);
+            ConfigureStretch(viewport.GetComponent<RectTransform>());
+            RemoveIfPresent<LayoutElement>(viewport);
+            if (canvasFit.RequiresClip)
+            {
+                GetOrAdd<RectMask2D>(viewport);
+            }
+            else
+            {
+                RemoveIfPresent<RectMask2D>(viewport);
+            }
+
+            var buildParent = viewport.transform;
+            var documentRoot = BuildNode(document.root, buildParent, null, 0, context);
+            var viewportContent = documentRoot.transform;
+            while (viewportContent.parent != null && viewportContent.parent != buildParent)
+            {
+                viewportContent = viewportContent.parent;
+            }
+
+            Undo.RecordObject(viewportContent, "Configure UDOM viewport fit");
+            viewportContent.localScale = new Vector3(
+                canvasFit.ContentScale.x,
+                canvasFit.ContentScale.y,
+                1f);
             PruneStaleGeneratedNodes(context);
 #if UDONSHARP
             UdomVrchatSetup.RefreshBindingTargets(root);
@@ -256,12 +303,44 @@ namespace Html2Vrc.Editor
             return rootObject.GetComponent<UdomGeneratedRoot>();
         }
 
-        private static void ConfigureCanvas(GameObject rootObject, UdomCanvas canvasSettings)
+        private static CanvasFitSettings ConfigureCanvas(
+            UdomGeneratedRoot root,
+            UdomCanvas canvasSettings)
         {
+            var rootObject = root.gameObject;
             var canvas = rootObject.GetComponent<Canvas>();
             var scaler = rootObject.GetComponent<CanvasScaler>();
             var rect = rootObject.GetComponent<RectTransform>();
-            var size = GetVector2(canvasSettings != null ? canvasSettings.size : null, new Vector2(1200f, 800f));
+            var designSize = GetVector2(
+                canvasSettings != null ? canvasSettings.size : null,
+                new Vector2(1200f, 800f));
+            var requestedTarget = root.TargetCanvasSize;
+            var hasTargetOverride = requestedTarget.x > 0f && requestedTarget.y > 0f;
+            var targetSize = hasTargetOverride ? requestedTarget : designSize;
+            var fit = canvasSettings != null && !string.IsNullOrWhiteSpace(canvasSettings.viewportFit)
+                ? canvasSettings.viewportFit
+                : "none";
+            var ratio = new Vector2(targetSize.x / designSize.x, targetSize.y / designSize.y);
+            Vector2 contentScale;
+            if (string.Equals(fit, "contain", StringComparison.OrdinalIgnoreCase))
+            {
+                var uniform = Mathf.Min(ratio.x, ratio.y);
+                contentScale = new Vector2(uniform, uniform);
+            }
+            else if (string.Equals(fit, "cover", StringComparison.OrdinalIgnoreCase))
+            {
+                var uniform = Mathf.Max(ratio.x, ratio.y);
+                contentScale = new Vector2(uniform, uniform);
+            }
+            else if (string.Equals(fit, "stretch", StringComparison.OrdinalIgnoreCase))
+            {
+                contentScale = ratio;
+            }
+            else
+            {
+                contentScale = Vector2.one;
+            }
+
             var isOverlay = canvasSettings != null
                             && string.Equals(
                                 canvasSettings.renderMode,
@@ -274,7 +353,7 @@ namespace Html2Vrc.Editor
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ConstantPixelSize;
             scaler.scaleFactor = 1f;
             scaler.referencePixelsPerUnit = 100f;
-            rect.sizeDelta = size;
+            rect.sizeDelta = targetSize;
             rect.localScale = isOverlay
                 ? Vector3.one
                 : Vector3.one * Mathf.Max(0.0001f, canvasSettings != null ? canvasSettings.scale : 0.01f);
@@ -285,6 +364,13 @@ namespace Html2Vrc.Editor
                 Undo.AddComponent<VRCUiShape>(rootObject);
             }
 #endif
+            return new CanvasFitSettings
+            {
+                RequiresClip = hasTargetOverride
+                               && (string.Equals(fit, "cover", StringComparison.OrdinalIgnoreCase)
+                                   || string.Equals(fit, "none", StringComparison.OrdinalIgnoreCase)),
+                ContentScale = contentScale
+            };
         }
 
         private static void EnsureEventSystem()

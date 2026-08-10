@@ -366,6 +366,72 @@ namespace Html2Vrc.Tests
         }
 
         [Test]
+        public void CanonicalViewportFit_MapsRendererTargetSizeAndClipping()
+        {
+            var json = LoadRepositoryFile(
+                "packages",
+                "udom",
+                "fixtures",
+                "valid",
+                "unity-viewport-fit.udom.json");
+            var validation = UdomValidator.Validate(json);
+
+            Assert.That(validation.IsValid, Is.True, validation.Format());
+            Assert.That(validation.Issues, Is.Empty, validation.Format());
+            Assert.That(validation.Document.canvas.size, Is.EqualTo(new[] { 400f, 200f }));
+            Assert.That(validation.Document.canvas.viewportPixelRatio, Is.EqualTo(2f));
+            Assert.That(validation.Document.canvas.viewportFit, Is.EqualTo("contain"));
+
+            var targetSize = new Vector2(300f, 300f);
+            var build = UdomBuilder.GenerateOrRegenerate(
+                validation.Document,
+                null,
+                null,
+                targetSize);
+            var root = build.Root;
+            var canvasRect = root.GetComponent<RectTransform>();
+            var viewportId = "fit-root::__viewport-fit";
+            var viewport = UdomBuilder.FindNode(root, viewportId);
+            var content = UdomBuilder.FindNode(root, "fit-root").GetComponent<RectTransform>();
+            Assert.That(root.TargetCanvasSize, Is.EqualTo(targetSize));
+            Assert.That(canvasRect.sizeDelta, Is.EqualTo(targetSize));
+            Assert.That(viewport, Is.Not.Null);
+            Assert.That(viewport.GetComponent<RectMask2D>(), Is.Null);
+            Assert.That(content.localScale, Is.EqualTo(new Vector3(0.75f, 0.75f, 1f)));
+
+            validation.Document.canvas.viewportFit = "cover";
+            UdomBuilder.GenerateOrRegenerate(validation.Document, root);
+            viewport = UdomBuilder.FindNode(root, viewportId);
+            content = UdomBuilder.FindNode(root, "fit-root").GetComponent<RectTransform>();
+            Assert.That(root.TargetCanvasSize, Is.EqualTo(targetSize));
+            Assert.That(viewport.GetComponent<RectMask2D>(), Is.Not.Null);
+            Assert.That(content.localScale, Is.EqualTo(new Vector3(1.5f, 1.5f, 1f)));
+
+            validation.Document.canvas.viewportFit = "stretch";
+            UdomBuilder.GenerateOrRegenerate(validation.Document, root);
+            viewport = UdomBuilder.FindNode(root, viewportId);
+            content = UdomBuilder.FindNode(root, "fit-root").GetComponent<RectTransform>();
+            Assert.That(viewport.GetComponent<RectMask2D>(), Is.Null);
+            Assert.That(content.localScale, Is.EqualTo(new Vector3(0.75f, 1.5f, 1f)));
+
+            validation.Document.canvas.viewportFit = "none";
+            UdomBuilder.GenerateOrRegenerate(validation.Document, root);
+            viewport = UdomBuilder.FindNode(root, viewportId);
+            content = UdomBuilder.FindNode(root, "fit-root").GetComponent<RectTransform>();
+            Assert.That(viewport.GetComponent<RectMask2D>(), Is.Not.Null);
+            Assert.That(content.localScale, Is.EqualTo(Vector3.one));
+
+            UdomBuilder.GenerateOrRegenerate(validation.Document, root, null, Vector2.zero);
+            content = UdomBuilder.FindNode(root, "fit-root").GetComponent<RectTransform>();
+            Assert.That(root.TargetCanvasSize, Is.EqualTo(Vector2.zero));
+            Assert.That(canvasRect.sizeDelta, Is.EqualTo(new Vector2(400f, 200f)));
+            viewport = UdomBuilder.FindNode(root, viewportId);
+            Assert.That(viewport, Is.Not.Null);
+            Assert.That(viewport.GetComponent<RectMask2D>(), Is.Null);
+            Assert.That(content.localScale, Is.EqualTo(Vector3.one));
+        }
+
+        [Test]
         public void CanonicalUdom_RejectsUnknownElementName()
         {
             const string json = @"{

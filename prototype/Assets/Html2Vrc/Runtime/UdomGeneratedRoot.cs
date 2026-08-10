@@ -19,11 +19,15 @@ namespace Html2Vrc
         [SerializeField] private TextAsset sourceAsset;
         [SerializeField] private string documentId;
         [SerializeField] private string schemaVersion;
+        [SerializeField]
+        [Tooltip("Optional Renderer target size. Zero uses the UDOM viewport size.")]
+        private Vector2 targetCanvasSize;
         [SerializeField] private List<UdomExternalReference> externalReferences = new List<UdomExternalReference>();
 
         public TextAsset SourceAsset => sourceAsset;
         public string DocumentId => documentId;
         public string SchemaVersion => schemaVersion;
+        public Vector2 TargetCanvasSize => targetCanvasSize;
         public IReadOnlyList<UdomExternalReference> ExternalReferences => externalReferences;
 
         public void Configure(TextAsset source, UdomDocument document)
@@ -31,6 +35,11 @@ namespace Html2Vrc
             sourceAsset = source;
             documentId = document != null ? document.id : string.Empty;
             schemaVersion = document != null ? document.schemaVersion : string.Empty;
+        }
+
+        public void SetTargetCanvasSize(Vector2 size)
+        {
+            targetCanvasSize = size.x > 0f && size.y > 0f ? size : Vector2.zero;
         }
 
         public GameObject Resolve(string slot)

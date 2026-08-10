@@ -11,6 +11,8 @@ namespace Html2Vrc.Editor
         private Vector2 scroll;
         private UdomValidationResult lastValidation;
         private string status;
+        private bool overrideTargetCanvasSize;
+        private Vector2 targetCanvasSize = new Vector2(1200f, 800f);
 
         [MenuItem("Tools/HTML2VRC/UDOM Importer")]
         public static void Open()
@@ -62,6 +64,14 @@ namespace Html2Vrc.Editor
             {
                 lastValidation = null;
                 status = null;
+            }
+
+            overrideTargetCanvasSize = EditorGUILayout.Toggle(
+                "Override Target Canvas",
+                overrideTargetCanvasSize);
+            using (new EditorGUI.DisabledScope(!overrideTargetCanvasSize))
+            {
+                targetCanvasSize = EditorGUILayout.Vector2Field("Target Canvas Size", targetCanvasSize);
             }
 
             using (new EditorGUILayout.HorizontalScope())
@@ -137,9 +147,20 @@ namespace Html2Vrc.Editor
 
             try
             {
+                if (overrideTargetCanvasSize
+                    && (targetCanvasSize.x <= 0f || targetCanvasSize.y <= 0f))
+                {
+                    status = "생성 실패: Target Canvas Size는 양수여야 한다.";
+                    return;
+                }
+
                 var document = lastValidation.Document;
                 var existing = UdomBuilder.FindGeneratedRoot(source, document.id);
-                var build = UdomBuilder.GenerateOrRegenerate(document, existing, source);
+                var build = UdomBuilder.GenerateOrRegenerate(
+                    document,
+                    existing,
+                    source,
+                    overrideTargetCanvasSize ? targetCanvasSize : Vector2.zero);
                 EditorSceneManager.MarkSceneDirty(build.Root.gameObject.scene);
                 Selection.activeGameObject = build.Root.gameObject;
                 status = $"생성 완료 — 새 노드 {build.Created}, 갱신 {build.Updated}, 제거 {build.Removed}";

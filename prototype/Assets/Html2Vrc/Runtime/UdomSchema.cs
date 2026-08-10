@@ -18,6 +18,8 @@ namespace Html2Vrc
         public string renderMode = "WorldSpace";
         public float[] size = { 1200f, 800f };
         public float scale = 0.01f;
+        public float viewportPixelRatio = 1f;
+        public string viewportFit = "none";
     }
 
     [Serializable]

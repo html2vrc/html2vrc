@@ -64,15 +64,24 @@ namespace Html2Vrc.Editor
             EnsureOnlyKeys(viewport, "$.viewport", "width", "height", "pixelRatio", "fit", "extensions", "extras");
             var width = RequirePositiveFloat(viewport, "width", "$.viewport.width");
             var height = RequirePositiveFloat(viewport, "height", "$.viewport.height");
-            if (viewport.TryGetValue("fit", out var fitValue))
+            var pixelRatio = 1f;
+            if (viewport.TryGetValue("pixelRatio", out var pixelRatioValue))
             {
-                var fit = RequireString(fitValue, "$.viewport.fit");
-                if (!string.Equals(fit, "contain", StringComparison.Ordinal))
+                pixelRatio = RequireFloat(pixelRatioValue, "$.viewport.pixelRatio");
+                if (pixelRatio <= 0f)
                 {
-                    warnings.Add(new UdomParseWarning(
-                        "$.viewport.fit",
-                        $"Unity Canvas does not apply canonical viewport fit '{fit}'; viewport dimensions are used directly."));
+                    throw new FormatException("$.viewport.pixelRatio: value must be greater than zero.");
                 }
+            }
+
+            var fit = GetString(viewport, "fit") ?? "contain";
+            if (!string.Equals(fit, "contain", StringComparison.Ordinal)
+                && !string.Equals(fit, "cover", StringComparison.Ordinal)
+                && !string.Equals(fit, "stretch", StringComparison.Ordinal)
+                && !string.Equals(fit, "none", StringComparison.Ordinal))
+            {
+                throw new FormatException(
+                    $"$.viewport.fit: expected 'contain', 'cover', 'stretch', or 'none', got '{fit}'.");
             }
 
             RejectNonEmptyArray(
@@ -102,7 +111,9 @@ namespace Html2Vrc.Editor
                 {
                     renderMode = "WorldSpace",
                     size = canvasSize,
-                    scale = 0.01f
+                    scale = 0.01f,
+                    viewportPixelRatio = pixelRatio,
+                    viewportFit = fit
                 },
                 root = MapNode(rootValue, "$.root", 0, canvasSize, true, styles, resources, warnings)
             };

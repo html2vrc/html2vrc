@@ -21,11 +21,12 @@
 - canonical Slider의 min/max/value/step/disabled, `bind.value`, `on.change` 진단을 정규화하고 Unity Slider, fill, handle을 생성했다. min/max가 뒤집힌 공식 invalid fixture도 Unity importer가 거부한다.
 - canonical text-input의 value/placeholder/multiline/readOnly/disabled와 `bind.value`, change/submit/focus/blur 진단을 정규화하고 native TMP_InputField, viewport, text, placeholder를 생성했다.
 - canonical scroll의 vertical/horizontal/both, design-unit initialOffset, `bind.offset`, scroll/focus/blur 진단을 정규화하고 양축 native ScrollRect 콘텐츠 크기와 좌표 변환을 확인했다. 기존 legacy Horizontal layout의 축 추론도 유지한다.
+- canonical viewport의 pixelRatio와 contain/cover/stretch/none을 보존하고, Renderer 목표 Canvas override에 따른 uniform/non-uniform scale, cover/none clipping, override 해제와 안정 wrapper 재생성을 확인했다.
 
 자동 검증 결과:
 
-- `npm run check`: UDOM conformance 18/18, React 4/4, TypeScript typecheck와 build 통과
-- Unity EditMode `Html2Vrc.Tests.UdomPrototypeTests`: **18/18 통과, 실패 0**
+- `npm run check`: UDOM conformance 19/19, React 4/4, TypeScript typecheck와 build 통과
+- Unity EditMode `Html2Vrc.Tests.UdomPrototypeTests`: **19/19 통과, 실패 0**
 - Unity 종료 코드 0, C# 컴파일 오류 0
 - Windows CRLF에서 기존 HTML 재생성 테스트가 문자열을 교체하지 못하던 문제도 함께 수정했다.
 
@@ -55,7 +56,7 @@
 
 ## 자동 회귀 검증
 
-HTML2VRC 전용 Unity Test Framework 테스트 18개를 실행한다. 검증 범위는 다음과 같다.
+HTML2VRC 전용 Unity Test Framework 테스트 19개를 실행한다. 검증 범위는 다음과 같다.
 
 1. 샘플 UDOM Validation 성공과 잘못된 속성/중복 ID 거부
 2. Canvas, TextMeshProUGUI, Image, Button, ScrollRect, LayoutGroup과 VRChat용 `VRCUiShape` 생성
@@ -68,18 +69,19 @@ HTML2VRC 전용 Unity Test Framework 테스트 18개를 실행한다. 검증 범
 9. Scroll Content와 Viewport 배치 확인
 10. 저장된 샘플 Scene의 VRC Scene Descriptor, spawn, 사용자 소유 BoxCollider 바닥, 외부 참조, 핵심 UI, Missing Script 부재 확인
 11. React exporter의 canonical fixture를 Unity 내부 모델로 정규화하고 네이티브 UI 생성
-12. Unity가 구현하지 않은 canonical 요소를 묵시하지 않고 명확한 오류로 거부
+12. canonical 명세에 없는 요소를 묵시하지 않고 명확한 오류로 거부
 13. canonical shared style 배열 병합 순서와 inline style 우선순위를 실제 TextMeshPro 결과까지 확인
 14. 공식 canonical settings fixture의 시각 폴백 진단과 Unity Toggle 생성, 상징적 bind/on 비실행 보장
 15. UDOM source asset 기준 상대 image URI의 Texture2D/RawImage 연결과 `Assets/` 경계 탈출 차단
 16. canonical Slider의 native control/fill/handle 생성, 정수 step과 범위 검증, symbolic binding/event 비실행 보장
 17. canonical text-input의 단일행/다중행·읽기전용·비활성 상태와 native TMP_InputField 내부 구조, symbolic binding/event 비실행 보장
 18. canonical scroll의 vertical/horizontal/both 축, 양축 콘텐츠 크기, initialOffset 좌표 변환, legacy horizontal 호환과 symbolic binding/event 비실행 보장
+19. canonical viewport의 pixelRatio 보존과 contain/cover/stretch/none target Canvas scale, clipping, override 해제 및 안정 wrapper 재생성
 
 최종 자동 테스트 결과:
 
-- 전체 18개
-- 통과 18개
+- 전체 19개
+- 통과 19개
 - 실패 0개
 - 건너뜀 0개
 - Unity 종료 코드 0

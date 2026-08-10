@@ -38,6 +38,8 @@ namespace Html2Vrc.Editor
             writer.StringProperty("renderMode", canvas.renderMode);
             writer.FloatArrayProperty("size", canvas.size);
             writer.FloatProperty("scale", canvas.scale);
+            writer.FloatProperty("viewportPixelRatio", canvas.viewportPixelRatio);
+            writer.StringProperty("viewportFit", canvas.viewportFit);
             writer.EndObject();
         }
 

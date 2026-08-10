@@ -80,7 +80,7 @@ namespace Html2Vrc.Editor
         private static readonly HashSet<string> KnownProperties = new HashSet<string>(StringComparer.Ordinal)
         {
             "schemaVersion", "id", "name", "canvas", "root",
-            "renderMode", "size", "scale",
+            "renderMode", "size", "scale", "viewportPixelRatio", "viewportFit",
             "type", "text", "sprite", "texture", "interactable", "toggleValue",
             "sliderValue", "sliderMin", "sliderMax", "sliderStep",
             "textInputValue", "textInputPlaceholder", "textInputMultiline", "textInputReadOnly",
@@ -174,6 +174,21 @@ namespace Html2Vrc.Editor
             if (canvas.scale <= 0f)
             {
                 AddError(result, "$.canvas.scale", "scale은 0보다 커야 한다.");
+            }
+
+            if (canvas.viewportPixelRatio <= 0f
+                || float.IsNaN(canvas.viewportPixelRatio)
+                || float.IsInfinity(canvas.viewportPixelRatio))
+            {
+                AddError(result, "$.canvas.viewportPixelRatio", "viewportPixelRatio는 유한한 양수여야 한다.");
+            }
+
+            if (!string.Equals(canvas.viewportFit, "contain", StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(canvas.viewportFit, "cover", StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(canvas.viewportFit, "stretch", StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(canvas.viewportFit, "none", StringComparison.OrdinalIgnoreCase))
+            {
+                AddError(result, "$.canvas.viewportFit", $"지원하지 않는 viewport fit '{canvas.viewportFit}'.");
             }
         }
 

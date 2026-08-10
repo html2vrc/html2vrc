@@ -63,6 +63,16 @@ namespace Html2Vrc.Editor
                 canvas.scale = GetFloat(scale, "canvas.scale");
             }
 
+            if (value.TryGetValue("viewportPixelRatio", out var pixelRatio))
+            {
+                canvas.viewportPixelRatio = GetFloat(pixelRatio, "canvas.viewportPixelRatio");
+            }
+
+            if (value.TryGetValue("viewportFit", out _))
+            {
+                canvas.viewportFit = GetString(value, "viewportFit");
+            }
+
             return canvas;
         }
 

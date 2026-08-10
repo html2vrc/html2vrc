@@ -18,9 +18,11 @@ Unity Importer는 이 문서의 기존 형식과 함께 `packages/udom` JSON Sch
 | `element/scroll` | `ScrollView` |
 | `element/embed` | `Embed` |
 | `layout.mode: flex` | `Vertical` 또는 `Horizontal` Layout Group |
-| `viewport.width`, `viewport.height` | Unity Canvas 크기 |
+| `viewport.width`, `viewport.height`, `pixelRatio`, `fit` | 디자인 크기와 Unity Canvas 배치 |
 
 Canonical 길이의 숫자와 부모 크기 기준 백분율, 기본 flex 방향과 간격, cross-axis 정렬, padding/margin, 단일 색상 배경, 기본 텍스트 스타일과 font weight를 변환한다. `styleRefs`는 배열 순서대로 깊은 병합한 뒤 노드의 inline `style`로 마지막 덮어쓴다. canonical `image` resource는 Texture2D/RawImage, `sprite` resource는 Sprite/Image로 생성한다.
+
+Canonical viewport 크기는 디자인 좌표계를 유지한다. UDOM Importer의 선택적 Renderer 목표 Canvas 크기가 다르면 `contain`은 작은 축 비율, `cover`는 큰 축 비율, `stretch`는 축별 비율, `none`은 1:1 scale을 적용한다. `cover`와 넘칠 수 있는 `none`은 생성기 소유의 안정적인 viewport wrapper에서 클리핑한다. 목표 크기 override를 끄면 Canvas는 디자인 viewport 크기로 돌아간다.
 
 Resource URI는 canonical 명세대로 UDOM TextAsset이 있는 폴더를 기준으로 해석한다. `Assets/`로 시작하는 절대 Unity 에셋 경로도 지원한다. `..`로 정규화하더라도 결과가 `Assets/` 밖으로 나가면 참조하지 않고 경고를 남긴다.
 
@@ -36,7 +38,9 @@ Resource URI는 canonical 명세대로 UDOM TextAsset이 있는 폴더를 기준
   "canvas": {
     "renderMode": "WorldSpace",
     "size": [1200, 800],
-    "scale": 0.01
+    "scale": 0.01,
+    "viewportPixelRatio": 1,
+    "viewportFit": "none"
   },
   "root": {
     "id": "settings-panel",
@@ -51,6 +55,8 @@ Resource URI는 canonical 명세대로 UDOM TextAsset이 있는 폴더를 기준
 - `canvas.renderMode`: `WorldSpace` 또는 `ScreenSpaceOverlay`.
 - `canvas.size`: Canvas의 픽셀 기준 너비와 높이.
 - `canvas.scale`: World Space Canvas의 Unity 월드 스케일.
+- `canvas.viewportPixelRatio`: canonical viewport의 원본 pixel ratio. design unit 크기에는 다시 곱하지 않는다.
+- `canvas.viewportFit`: `contain`, `cover`, `stretch`, `none`. 기존 내부 JSON 기본값은 `none`이다.
 - `root`: 하나의 루트 UI 노드.
 
 ## 노드
