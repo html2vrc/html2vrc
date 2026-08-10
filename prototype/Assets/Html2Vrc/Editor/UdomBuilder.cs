@@ -99,6 +99,8 @@ namespace Html2Vrc.Editor
         private const string ViewportSuffix = "::__viewport";
         private const string ContentSuffix = "::__content";
         private const string ToggleCheckmarkSuffix = "::__toggle-checkmark";
+        private const string SliderFillSuffix = "::__slider-fill";
+        private const string SliderHandleSuffix = "::__slider-handle";
 
         private static readonly Type[] ManagedComponentTypes =
         {
@@ -106,6 +108,7 @@ namespace Html2Vrc.Editor
             typeof(RawImage),
             typeof(Button),
             typeof(Toggle),
+            typeof(Slider),
             typeof(ScrollRect),
             typeof(Mask),
             typeof(RectMask2D),
@@ -400,6 +403,10 @@ namespace Html2Vrc.Editor
                     break;
                 case "toggle":
                     ConfigureToggle(nodeObject, node, style, context);
+                    BuildChildren(node, nodeObject.transform, panelForChildren, context);
+                    break;
+                case "slider":
+                    ConfigureSlider(nodeObject, node, style, context);
                     BuildChildren(node, nodeObject.transform, panelForChildren, context);
                     break;
                 case "scrollview":
@@ -767,6 +774,72 @@ namespace Html2Vrc.Editor
             toggle.transition = Selectable.Transition.ColorTint;
             toggle.SetIsOnWithoutNotify(node.toggleValue);
             toggle.interactable = node.interactable;
+        }
+
+        private static void ConfigureSlider(
+            GameObject target,
+            UdomNode node,
+            UdomStyle style,
+            BuildContext context)
+        {
+            var background = GetOrAdd<Image>(target);
+            var slider = GetOrAdd<Slider>(target);
+            Undo.RecordObjects(new UnityEngine.Object[] { background, slider }, "Configure UDOM Slider");
+            background.color = UdomBuilderUtility.ParseColor(style.backgroundColor, new Color32(0x4A, 0x4A, 0x58, 0xFF));
+            background.raycastTarget = true;
+
+            var fillId = node.id + SliderFillSuffix;
+            var fill = UpsertGeneratedObject(fillId, "SliderFill", true, target.transform, context);
+            context.DesiredIds.Add(fillId);
+            fill.name = "Fill";
+            fill.transform.SetSiblingIndex(0);
+            var fillRect = fill.GetComponent<RectTransform>();
+            Undo.RecordObject(fillRect, "Configure UDOM Slider fill");
+            fillRect.anchorMin = new Vector2(0f, 0.25f);
+            fillRect.anchorMax = new Vector2(1f, 0.75f);
+            fillRect.pivot = new Vector2(0.5f, 0.5f);
+            fillRect.anchoredPosition = Vector2.zero;
+            fillRect.offsetMin = new Vector2(8f, 0f);
+            fillRect.offsetMax = new Vector2(-8f, 0f);
+            fillRect.localScale = Vector3.one;
+            fillRect.localRotation = Quaternion.identity;
+            RemoveIfPresent<LayoutElement>(fill);
+            var fillImage = GetOrAdd<Image>(fill);
+            Undo.RecordObject(fillImage, "Configure UDOM Slider fill");
+            fillImage.color = new Color32(0x58, 0xC8, 0xFF, 0xFF);
+            fillImage.raycastTarget = false;
+
+            var handleId = node.id + SliderHandleSuffix;
+            var handle = UpsertGeneratedObject(handleId, "SliderHandle", true, target.transform, context);
+            context.DesiredIds.Add(handleId);
+            handle.name = "Handle";
+            handle.transform.SetSiblingIndex(1);
+            var handleRect = handle.GetComponent<RectTransform>();
+            Undo.RecordObject(handleRect, "Configure UDOM Slider handle");
+            handleRect.anchorMin = new Vector2(0f, 0.5f);
+            handleRect.anchorMax = new Vector2(0f, 0.5f);
+            handleRect.pivot = new Vector2(0.5f, 0.5f);
+            handleRect.anchoredPosition = Vector2.zero;
+            handleRect.sizeDelta = new Vector2(28f, 28f);
+            handleRect.localScale = Vector3.one;
+            handleRect.localRotation = Quaternion.identity;
+            RemoveIfPresent<LayoutElement>(handle);
+            var handleImage = GetOrAdd<Image>(handle);
+            Undo.RecordObject(handleImage, "Configure UDOM Slider handle");
+            handleImage.color = Color.white;
+            handleImage.raycastTarget = true;
+
+            slider.fillRect = fillRect;
+            slider.handleRect = handleRect;
+            slider.targetGraphic = handleImage;
+            slider.direction = Slider.Direction.LeftToRight;
+            slider.minValue = node.sliderMin;
+            slider.maxValue = node.sliderMax;
+            slider.wholeNumbers = Mathf.Abs(node.sliderStep - 1f) < 0.0001f
+                                  && Mathf.Abs(node.sliderMin - Mathf.Round(node.sliderMin)) < 0.0001f
+                                  && Mathf.Abs(node.sliderMax - Mathf.Round(node.sliderMax)) < 0.0001f;
+            slider.SetValueWithoutNotify(node.sliderValue);
+            slider.interactable = node.interactable;
         }
 
         private static void ConfigureScrollView(

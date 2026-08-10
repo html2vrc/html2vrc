@@ -13,6 +13,7 @@ Unity Importer는 이 문서의 기존 형식과 함께 `packages/udom` JSON Sch
 | `element/image` | `Image` |
 | `element/button` | `Button` |
 | `element/toggle` | `Toggle` |
+| `element/slider` | `Slider` |
 | `element/scroll` | `ScrollView` |
 | `element/embed` | `Embed` |
 | `layout.mode: flex` | `Vertical` 또는 `Horizontal` Layout Group |
@@ -22,7 +23,7 @@ Canonical 길이의 숫자와 부모 크기 기준 백분율, 기본 flex 방향
 
 Resource URI는 canonical 명세대로 UDOM TextAsset이 있는 폴더를 기준으로 해석한다. `Assets/`로 시작하는 절대 Unity 에셋 경로도 지원한다. `..`로 정규화하더라도 결과가 `Assets/` 밖으로 나가면 참조하지 않고 경고를 남긴다.
 
-아직 지원하지 않는 canonical 기능은 묵시하지 않고 검증 오류나 명시적 폴백 경고로 반환한다. 현재 `slider`, `text-input`, 변환·테두리·그림자는 오류로 거부한다. gradient는 첫 color stop, radius는 square corner, font resource는 프로젝트 기본 TMP font로 폴백하고 각각 경고를 남긴다. source asset 경로가 없는 raw JSON 검증에서는 상대 resource URI를 추측하지 않고 빈 Image와 경고를 사용한다. `bind`와 `on`의 symbolic ID는 임의 로직으로 실행하지 않고, 안전한 Unity/Udon binding manifest가 없다는 경고로 남는다.
+아직 지원하지 않는 canonical 기능은 묵시하지 않고 검증 오류나 명시적 폴백 경고로 반환한다. 현재 `text-input`, 변환·테두리·그림자는 오류로 거부한다. gradient는 첫 color stop, radius는 square corner, font resource는 프로젝트 기본 TMP font로 폴백하고 각각 경고를 남긴다. source asset 경로가 없는 raw JSON 검증에서는 상대 resource URI를 추측하지 않고 빈 Image와 경고를 사용한다. `bind`와 `on`의 symbolic ID는 임의 로직으로 실행하지 않고, 안전한 Unity/Udon binding manifest가 없다는 경고로 남는다. Slider의 step은 정수 범위의 `1`일 때 Unity `wholeNumbers`로 적용하고 그 외의 step은 아직 경고와 연속 Slider 폴백을 사용한다.
 
 ## 최상위 구조
 

@@ -200,18 +200,64 @@ namespace Html2Vrc.Tests
         }
 
         [Test]
+        public void CanonicalSlider_GeneratesNativeControlAndRejectsInvalidRange()
+        {
+            var json = LoadRepositoryFile(
+                "packages",
+                "udom",
+                "fixtures",
+                "valid",
+                "unity-slider.udom.json");
+            var validation = UdomValidator.Validate(json);
+
+            Assert.That(validation.IsValid, Is.True, validation.Format());
+            Assert.That(validation.Format(), Does.Contain("Symbolic binding 'settings.volume'"));
+            Assert.That(validation.Format(), Does.Contain("Symbolic event 'settings.setVolume'"));
+            var sliderNode = validation.Document.root.children[1];
+            Assert.That(sliderNode.type, Is.EqualTo("Slider"));
+            Assert.That(sliderNode.sliderMin, Is.EqualTo(0f));
+            Assert.That(sliderNode.sliderMax, Is.EqualTo(10f));
+            Assert.That(sliderNode.sliderValue, Is.EqualTo(7f));
+            Assert.That(sliderNode.sliderStep, Is.EqualTo(1f));
+
+            var build = UdomBuilder.GenerateOrRegenerate(validation.Document);
+            var slider = UdomBuilder.FindNode(build.Root, "volume-slider").GetComponent<Slider>();
+            var fill = UdomBuilder.FindNode(build.Root, "volume-slider::__slider-fill");
+            var handle = UdomBuilder.FindNode(build.Root, "volume-slider::__slider-handle");
+            Assert.That(slider, Is.Not.Null);
+            Assert.That(slider.minValue, Is.EqualTo(0f));
+            Assert.That(slider.maxValue, Is.EqualTo(10f));
+            Assert.That(slider.value, Is.EqualTo(7f));
+            Assert.That(slider.wholeNumbers, Is.True);
+            Assert.That(slider.fillRect, Is.SameAs(fill.GetComponent<RectTransform>()));
+            Assert.That(slider.handleRect, Is.SameAs(handle.GetComponent<RectTransform>()));
+            slider.value = 8f;
+            Assert.That(slider.value, Is.EqualTo(8f));
+
+            var invalidJson = LoadRepositoryFile(
+                "packages",
+                "udom",
+                "fixtures",
+                "invalid",
+                "slider-range.udom.json");
+            var invalidValidation = UdomValidator.Validate(invalidJson);
+            Assert.That(invalidValidation.IsValid, Is.False);
+            Assert.That(invalidValidation.Format(), Does.Contain("slider max must be greater than min"));
+        }
+
+        [Test]
         public void CanonicalUdom_RejectsElementNotImplementedByUnityRenderer()
         {
             const string json = @"{
               ""asset"": { ""version"": ""0.1"" },
               ""viewport"": { ""width"": 400, ""height"": 300 },
-              ""root"": { ""type"": ""element"", ""id"": ""slider"", ""name"": ""slider"" }
+              ""root"": { ""type"": ""element"", ""id"": ""text-input"", ""name"": ""text-input"" }
             }";
 
             var validation = UdomValidator.Validate(json);
 
             Assert.That(validation.IsValid, Is.False);
-            Assert.That(validation.Format(), Does.Contain("canonical element 'slider'"));
+            Assert.That(validation.Format(), Does.Contain("canonical element 'text-input'"));
         }
 
         [Test]

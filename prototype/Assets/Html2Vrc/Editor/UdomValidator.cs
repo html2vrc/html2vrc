@@ -64,6 +64,7 @@ namespace Html2Vrc.Editor
             "Image",
             "Button",
             "Toggle",
+            "Slider",
             "ScrollView",
             "Embed"
         };
@@ -200,6 +201,23 @@ namespace Html2Vrc.Editor
             if (string.Equals(node.type, "Text", StringComparison.OrdinalIgnoreCase) && node.text == null)
             {
                 AddError(result, path + ".text", "Text 요소에는 text가 필요하다.");
+            }
+
+            if (string.Equals(node.type, "Slider", StringComparison.OrdinalIgnoreCase))
+            {
+                if (node.sliderMax <= node.sliderMin)
+                {
+                    AddError(result, path + ".sliderMax", "Slider maximum must be greater than its minimum.");
+                }
+                else if (node.sliderValue < node.sliderMin || node.sliderValue > node.sliderMax)
+                {
+                    AddError(result, path + ".sliderValue", "Slider value must be within its minimum and maximum.");
+                }
+
+                if (node.sliderStep < 0f)
+                {
+                    AddError(result, path + ".sliderStep", "Slider step cannot be negative.");
+                }
             }
 
             if (!string.IsNullOrWhiteSpace(node.sprite))

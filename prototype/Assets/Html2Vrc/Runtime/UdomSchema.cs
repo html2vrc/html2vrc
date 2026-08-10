@@ -31,6 +31,10 @@ namespace Html2Vrc
         public string texture;
         public bool interactable = true;
         public bool toggleValue;
+        public float sliderValue;
+        public float sliderMin;
+        public float sliderMax = 1f;
+        public float sliderStep;
         public UdomStyle style = new UdomStyle();
         public UdomBinding binding;
         public UdomEmbed embed;

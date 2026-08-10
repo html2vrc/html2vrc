@@ -465,11 +465,12 @@ namespace Html2Vrc.Editor
                     return "Button";
                 case "toggle":
                     return "Toggle";
+                case "slider":
+                    return "Slider";
                 case "scroll":
                     return "ScrollView";
                 case "embed":
                     return "Embed";
-                case "slider":
                 case "text-input":
                     throw new FormatException($"{path}: canonical element '{elementName}' is not supported by the Unity renderer yet.");
                 default:
@@ -622,6 +623,82 @@ namespace Html2Vrc.Editor
                     }
 
                     break;
+                case "slider":
+                    node.sliderMin = 0f;
+                    node.sliderMax = 1f;
+                    node.sliderValue = 0f;
+                    node.sliderStep = 0f;
+                    if (properties != null)
+                    {
+                        EnsureOnlyKeys(properties, path + ".properties", "value", "min", "max", "step", "disabled");
+                        if (properties.TryGetValue("min", out var minValue))
+                        {
+                            node.sliderMin = RequireFloat(minValue, path + ".properties.min");
+                        }
+
+                        if (properties.TryGetValue("max", out var maxValue))
+                        {
+                            node.sliderMax = RequireFloat(maxValue, path + ".properties.max");
+                        }
+
+                        if (properties.TryGetValue("value", out var valueValue))
+                        {
+                            node.sliderValue = RequireFloat(valueValue, path + ".properties.value");
+                        }
+
+                        if (properties.TryGetValue("step", out var stepValue))
+                        {
+                            node.sliderStep = RequireFloat(stepValue, path + ".properties.step");
+                        }
+
+                        node.interactable = !GetBoolean(
+                            properties,
+                            "disabled",
+                            false,
+                            path + ".properties.disabled");
+                    }
+
+                    if (node.sliderMax <= node.sliderMin)
+                    {
+                        throw new FormatException($"{path}.properties.max: slider max must be greater than min.");
+                    }
+
+                    if (node.sliderValue < node.sliderMin || node.sliderValue > node.sliderMax)
+                    {
+                        throw new FormatException($"{path}.properties.value: slider value must be between min and max.");
+                    }
+
+                    if (node.sliderStep < 0f)
+                    {
+                        throw new FormatException($"{path}.properties.step: slider step cannot be negative.");
+                    }
+
+                    if (node.sliderStep > 0f
+                        && (Math.Abs(node.sliderStep - 1f) > 0.0001f
+                            || Math.Abs(node.sliderMin - Math.Round(node.sliderMin)) > 0.0001f
+                            || Math.Abs(node.sliderMax - Math.Round(node.sliderMax)) > 0.0001f))
+                    {
+                        warnings.Add(new UdomParseWarning(
+                            path + ".properties.step",
+                            $"Canonical slider step {node.sliderStep.ToString(CultureInfo.InvariantCulture)} is not enforced by the Unity Slider fallback; only step 1 with integer bounds maps to wholeNumbers."));
+                    }
+
+                    if (!mappedStyle.HasWidth)
+                    {
+                        node.style.size[0] = 320f;
+                    }
+
+                    if (!mappedStyle.HasHeight)
+                    {
+                        node.style.size[1] = 40f;
+                    }
+
+                    if (!mappedStyle.HasBackground)
+                    {
+                        node.style.backgroundColor = "#4A4A58FF";
+                    }
+
+                    break;
                 case "scroll":
                     if (properties != null)
                     {
@@ -667,8 +744,7 @@ namespace Html2Vrc.Editor
             }
 
             var bindings = RequireObject(bindValue, path + ".bind");
-            if (!string.Equals(canonicalType, "element", StringComparison.Ordinal)
-                || !string.Equals(elementName, "toggle", StringComparison.Ordinal))
+            if (!string.Equals(canonicalType, "element", StringComparison.Ordinal))
             {
                 if (bindings.Count > 0)
                 {
@@ -678,12 +754,27 @@ namespace Html2Vrc.Editor
                 return;
             }
 
-            EnsureOnlyKeys(bindings, path + ".bind", "checked");
-            if (bindings.TryGetValue("checked", out var checkedValue))
+            var bindingKey = string.Equals(elementName, "toggle", StringComparison.Ordinal)
+                ? "checked"
+                : string.Equals(elementName, "slider", StringComparison.Ordinal)
+                    ? "value"
+                    : null;
+            if (bindingKey == null)
             {
-                var binding = RequireString(checkedValue, path + ".bind.checked");
+                if (bindings.Count > 0)
+                {
+                    throw new FormatException($"{path}.bind: canonical data bindings are not supported for this element yet.");
+                }
+
+                return;
+            }
+
+            EnsureOnlyKeys(bindings, path + ".bind", bindingKey);
+            if (bindings.TryGetValue(bindingKey, out var bindingValue))
+            {
+                var binding = RequireString(bindingValue, path + ".bind." + bindingKey);
                 warnings.Add(new UdomParseWarning(
-                    path + ".bind.checked",
+                    path + ".bind." + bindingKey,
                     $"Symbolic binding '{binding}' is not connected until a Unity/Udon binding manifest is supplied."));
             }
         }
@@ -709,6 +800,14 @@ namespace Html2Vrc.Editor
             {
                 supportedEvent = "change";
             }
+            else if (string.Equals(elementName, "slider", StringComparison.Ordinal))
+            {
+                EnsureOnlyKeys(events, path + ".on", "change", "focus", "blur");
+                AddEventWarning(events, "change", path, warnings);
+                AddEventWarning(events, "focus", path, warnings);
+                AddEventWarning(events, "blur", path, warnings);
+                return;
+            }
             else
             {
                 throw new FormatException($"{path}.on: canonical events are not supported for this element yet.");
@@ -722,6 +821,23 @@ namespace Html2Vrc.Editor
                     path + ".on." + supportedEvent,
                     $"Symbolic event '{eventId}' is not executed until a safe Unity/Udon binding manifest is supplied."));
             }
+        }
+
+        private static void AddEventWarning(
+            Dictionary<string, object> events,
+            string eventName,
+            string path,
+            List<UdomParseWarning> warnings)
+        {
+            if (!events.TryGetValue(eventName, out var eventValue))
+            {
+                return;
+            }
+
+            var eventId = RequireString(eventValue, path + ".on." + eventName);
+            warnings.Add(new UdomParseWarning(
+                path + ".on." + eventName,
+                $"Symbolic event '{eventId}' is not executed until a safe Unity/Udon binding manifest is supplied."));
         }
 
         private static StyleMapping MapStyle(
