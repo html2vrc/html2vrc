@@ -4,6 +4,24 @@
 
 검증 환경: Windows 11, Unity 2022.3.22f1, TextMeshPro 3.0.6, Unity UI 1.0.0, VRChat Worlds SDK 3.10.1, 통합 UdonSharp/ClientSim
 
+## Canonical UDOM → Unity 통합 검증
+
+추가 검증 일자: 2026-08-10
+
+- `packages/react/test/fixtures/basic.udom.json`을 바꾸지 않고 Unity 호환 계층에 직접 입력했다.
+- canonical `asset`, `viewport`, `element/view`, `text`, `image`, `button`, flex column과 gap이 Unity 내부 모델로 정규화되는 것을 확인했다.
+- 정규화된 문서가 실제 TextMeshProUGUI, Image, Button을 생성하는 것을 Unity Test Framework로 확인했다.
+- Unity 렌더러가 아직 구현하지 않은 canonical `toggle`을 명확한 검증 오류로 거부하는 회귀 테스트를 추가했다.
+- 상대 image URI `assets/logo.png`는 Unity `Assets/` 경로가 아니므로 경고를 남기고 참조를 추측하지 않는다.
+- canonical `on.activate` 심볼은 임의 코드로 실행하지 않고, 안전한 binding이 없는 Button 경고로 유지한다.
+
+자동 검증 결과:
+
+- `npm run check`: UDOM conformance 14/14, React 4/4, TypeScript typecheck와 build 통과
+- Unity EditMode `Html2Vrc.Tests.UdomPrototypeTests`: **12/12 통과, 실패 0**
+- Unity 종료 코드 0, C# 컴파일 오류 0
+- Windows CRLF에서 기존 HTML 재생성 테스트가 문자열을 교체하지 못하던 문제도 함께 수정했다.
+
 ## 제한형 HTML 입력 0.1 추가 검증
 
 - 실행 명령: Unity Batch Mode, `EditMode`, `Html2Vrc.Tests.UdomPrototypeTests`
@@ -30,7 +48,7 @@
 
 ## 자동 회귀 검증
 
-HTML2VRC 전용 Unity Test Framework 테스트 10개를 실행한다. 검증 범위는 다음과 같다.
+HTML2VRC 전용 Unity Test Framework 테스트 12개를 실행한다. 검증 범위는 다음과 같다.
 
 1. 샘플 UDOM Validation 성공과 잘못된 속성/중복 ID 거부
 2. Canvas, TextMeshProUGUI, Image, Button, ScrollRect, LayoutGroup과 VRChat용 `VRCUiShape` 생성
@@ -42,11 +60,13 @@ HTML2VRC 전용 Unity Test Framework 테스트 10개를 실행한다. 검증 범
 8. 반복 재생성 시 안정 ID와 GameObject 중복 방지
 9. Scroll Content와 Viewport 배치 확인
 10. 저장된 샘플 Scene의 VRC Scene Descriptor, spawn, 사용자 소유 BoxCollider 바닥, 외부 참조, 핵심 UI, Missing Script 부재 확인
+11. React exporter의 canonical fixture를 Unity 내부 모델로 정규화하고 네이티브 UI 생성
+12. Unity가 구현하지 않은 canonical 요소를 묵시하지 않고 명확한 오류로 거부
 
 최종 자동 테스트 결과:
 
-- 전체 10개
-- 통과 10개
+- 전체 12개
+- 통과 12개
 - 실패 0개
 - 건너뜀 0개
 - Unity 종료 코드 0

@@ -9,11 +9,23 @@ namespace Html2Vrc.Editor
     {
         public static UdomDocument Parse(string json)
         {
+            return Parse(json, out _, out _);
+        }
+
+        public static UdomDocument Parse(
+            string json,
+            out bool isCanonical,
+            out List<UdomParseWarning> warnings)
+        {
             var reader = new Reader(json);
             var root = reader.ParseValue() as Dictionary<string, object>
                        ?? throw new FormatException("최상위 JSON 값은 객체여야 한다.");
             reader.EnsureEnd();
-            return MapDocument(root);
+            isCanonical = root.ContainsKey("asset") || root.ContainsKey("viewport");
+            warnings = new List<UdomParseWarning>();
+            return isCanonical
+                ? UdomCanonicalAdapter.Map(root, warnings)
+                : MapDocument(root);
         }
 
         private static UdomDocument MapDocument(Dictionary<string, object> value)

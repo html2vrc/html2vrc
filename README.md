@@ -92,6 +92,8 @@ UDOM은 VRChat 월드에서 UI를 재현하는 데 필요한 정보를 표현합
 
 UDOM 안에는 임의의 JavaScript를 저장하지 않습니다. 웹 로직은 Udon 또는 UdonSharp로 변환하고, UDOM은 생성된 동작과 UI 요소 사이의 연결을 표현합니다.
 
+Unity Importer는 `packages/udom`의 canonical UDOM 0.1과 기존 Unity 프로토타입 JSON 프로필을 모두 자동 감지합니다. 따라서 `@html2vrc/react`의 기본 fixture는 별도 변환 스크립트 없이 동일한 Unity 생성 경로로 들어갑니다. 지원하지 않는 canonical 요소는 묵시하지 않고 검증 오류나 안전한 경고로 반환합니다.
+
 ## Embed
 
 Embed는 HTML2VRC 레이아웃에 기존 Unity GameObject나 VRChat 프리팹을 연결합니다. 연결된 오브젝트의 내부 구조는 HTML2VRC가 소유하지 않습니다.

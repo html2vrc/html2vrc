@@ -97,11 +97,21 @@ namespace Html2Vrc.Editor
                 return result;
             }
 
-            ValidateKnownProperties(json, result);
-
             try
             {
-                result.Document = UdomJsonParser.Parse(json);
+                result.Document = UdomJsonParser.Parse(json, out var isCanonical, out var parseWarnings);
+                if (!isCanonical)
+                {
+                    ValidateKnownProperties(json, result);
+                }
+
+                for (var index = 0; index < parseWarnings.Count; index++)
+                {
+                    result.Issues.Add(new UdomValidationIssue(
+                        UdomIssueSeverity.Warning,
+                        parseWarnings[index].Path,
+                        parseWarnings[index].Message));
+                }
             }
             catch (Exception exception)
             {

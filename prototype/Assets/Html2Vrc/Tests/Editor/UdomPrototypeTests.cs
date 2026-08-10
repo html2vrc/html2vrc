@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using Html2Vrc.Editor;
 using NUnit.Framework;
@@ -53,6 +54,59 @@ namespace Html2Vrc.Tests
         }
 
         [Test]
+        public void CanonicalReactFixture_MapsToEditableNativeUnityUi()
+        {
+            var json = LoadReactFixture();
+            var validation = UdomValidator.Validate(json);
+
+            Assert.That(validation.IsValid, Is.True, validation.Format());
+            Assert.That(
+                validation.Issues.Any(issue => issue.Severity == UdomIssueSeverity.Error),
+                Is.False,
+                validation.Format());
+            Assert.That(validation.Format(), Does.Contain("relative URI 'assets/logo.png'"));
+
+            var document = validation.Document;
+            Assert.That(document.schemaVersion, Is.EqualTo("0.1"));
+            Assert.That(document.canvas.size, Is.EqualTo(new[] { 1200f, 720f }));
+            Assert.That(document.root.id, Is.EqualTo("screen"));
+            Assert.That(document.root.type, Is.EqualTo("Panel"));
+            Assert.That(document.root.style.layout, Is.EqualTo("Vertical"));
+            Assert.That(document.root.style.spacing, Is.EqualTo(24f));
+            Assert.That(document.root.style.size, Is.EqualTo(new[] { 1200f, 720f }));
+
+            var build = UdomBuilder.GenerateOrRegenerate(document);
+            var root = build.Root;
+            var title = UdomBuilder.FindNode(root, "title").GetComponent<TextMeshProUGUI>();
+            var logo = UdomBuilder.FindNode(root, "logo").GetComponent<Image>();
+            var continueButton = UdomBuilder.FindNode(root, "continue").GetComponent<Button>();
+            var continueLabel = UdomBuilder.FindNode(root, "continue-label").GetComponent<TextMeshProUGUI>();
+
+            Assert.That(title, Is.Not.Null);
+            Assert.That(title.text, Is.EqualTo("Hello VRChat"));
+            Assert.That(title.fontSize, Is.EqualTo(48f));
+            Assert.That(logo, Is.Not.Null);
+            Assert.That(logo.color, Is.EqualTo(Color.white).Using(ColorComparer.Instance));
+            Assert.That(continueButton, Is.Not.Null);
+            Assert.That(continueLabel.text, Is.EqualTo("Continue"));
+        }
+
+        [Test]
+        public void CanonicalUdom_RejectsElementNotImplementedByUnityRenderer()
+        {
+            const string json = @"{
+              ""asset"": { ""version"": ""0.1"" },
+              ""viewport"": { ""width"": 400, ""height"": 300 },
+              ""root"": { ""type"": ""element"", ""id"": ""toggle"", ""name"": ""toggle"" }
+            }";
+
+            var validation = UdomValidator.Validate(json);
+
+            Assert.That(validation.IsValid, Is.False);
+            Assert.That(validation.Format(), Does.Contain("canonical element 'toggle'"));
+        }
+
+        [Test]
         public void SampleHtml_ConvertsToValidUdom()
         {
             var html = AssetDatabase.LoadAssetAtPath<TextAsset>(SampleHtmlPath);
@@ -95,7 +149,7 @@ namespace Html2Vrc.Tests
 
             var changed = HtmlToUdomConverter.Convert(
                 html.text
-                    .Replace("World Settings\n    </h1>", "World Settings — HTML Regenerated\n    </h1>")
+                    .Replace("      World Settings", "      World Settings — HTML Regenerated")
                     .Replace("#182033F2", "#4A1538F2"));
             Assert.That(changed.IsValid, Is.True, changed.Format());
 
@@ -387,6 +441,22 @@ namespace Html2Vrc.Tests
 #else
             button.onClick.Invoke();
 #endif
+        }
+
+        private static string LoadReactFixture()
+        {
+            var prototypeDirectory = Directory.GetParent(Application.dataPath);
+            Assert.That(prototypeDirectory, Is.Not.Null, "Unity project directory must be available.");
+            Assert.That(prototypeDirectory.Parent, Is.Not.Null, "Monorepo root directory must be available.");
+            var fixturePath = Path.Combine(
+                prototypeDirectory.Parent.FullName,
+                "packages",
+                "react",
+                "test",
+                "fixtures",
+                "basic.udom.json");
+            Assert.That(File.Exists(fixturePath), Is.True, $"React fixture must exist: {fixturePath}");
+            return File.ReadAllText(fixturePath);
         }
 
         private static void AssertGeneratedBinding(Button button, GameObject expectedTarget)

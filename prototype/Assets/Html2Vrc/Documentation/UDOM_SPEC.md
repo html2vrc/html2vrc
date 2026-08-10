@@ -1,6 +1,25 @@
-# UDOM 0.1 최소 규격
+# Unity 렌더러 UDOM 0.1 규격
 
-이 문서는 첫 번째 기술 검증 프로토타입이 실제로 읽는 JSON 형식을 정의한다. UDOM은 HTML이나 CSS가 아니며, Unity 네이티브 UI를 만들기 위한 작고 제한된 중간 표현이다.
+이 문서는 Unity 프로토타입의 내부 렌더러 모델과 기존 JSON 프로필을 정의한다. UDOM은 HTML이나 CSS가 아니며, Unity 네이티브 UI를 만들기 위한 작고 제한된 중간 표현이다.
+
+## Canonical UDOM 0.1 호환 입력
+
+Unity Importer는 이 문서의 기존 형식과 함께 `packages/udom` JSON Schema가 정의한 canonical UDOM 0.1을 자동 감지한다. `@html2vrc/react`가 만든 `asset`, `viewport`, `root`, `resources` 구조는 Unity 내부 모델로 정규화된 뒤 기존 생성기를 그대로 사용한다.
+
+| Canonical UDOM | Unity 내부 노드 |
+| --- | --- |
+| `element/view` | `Panel` |
+| `text` | `Text` / TextMeshProUGUI |
+| `element/image` | `Image` |
+| `element/button` | `Button` |
+| `element/scroll` | `ScrollView` |
+| `element/embed` | `Embed` |
+| `layout.mode: flex` | `Vertical` 또는 `Horizontal` Layout Group |
+| `viewport.width`, `viewport.height` | Unity Canvas 크기 |
+
+Canonical 길이의 숫자와 부모 크기 기준 백분율, 기본 flex 방향과 간격, padding/margin, 단일 색상 배경, 기본 텍스트 스타일을 변환한다. `Assets/`로 시작하는 image/sprite resource URI는 Unity Sprite 경로로 연결한다.
+
+아직 지원하지 않는 canonical 기능은 묵시하지 않고 검증 오류로 반환한다. 현재 `toggle`, `slider`, `text-input`, shared `styleRefs`, data `bind`, 변환·그라데이션·테두리·그림자는 포함된다. 상대 image URI는 Unity 에셋 위치를 알 수 없어 경고를 남기고 빈 Image로 생성한다. `on.activate` 이벤트 이름은 임의 로직으로 실행하지 않고, 안전한 Unity/Udon binding이 없는 Button 경고로 남는다.
 
 ## 최상위 구조
 
