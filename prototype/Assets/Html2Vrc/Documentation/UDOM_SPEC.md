@@ -60,7 +60,7 @@ Resource URI는 canonical 명세대로 UDOM TextAsset이 있는 폴더를 기준
 | 필드 | 의미 |
 | --- | --- |
 | `id` | 문서 전체에서 유일하고 재생성 후에도 바뀌지 않는 ID |
-| `type` | `Panel`, `Text`, `Image`, `Button`, `ScrollView`, `Embed` |
+| `type` | `Panel`, `Text`, `Image`, `Button`, `Toggle`, `Slider`, `TextInput`, `ScrollView`, `Embed` |
 | `name` | Unity Hierarchy 표시 이름 |
 | `text` | Text 노드의 내용 |
 | `sprite` | `Assets/`로 시작하는 Sprite 에셋 경로 |
@@ -101,7 +101,7 @@ Resource URI는 canonical 명세대로 UDOM TextAsset이 있는 폴더를 기준
 - `alignment`: `TopLeft`, `Top`, `TopRight`, `Left`, `Center`, `Right`, `BottomLeft`, `Bottom`, `BottomRight`, `MiddleLeft`, `MiddleRight`.
 - `flexibleWidth`, `flexibleHeight`: 레이아웃 안에서 남는 공간을 차지하는 정도.
 
-Panel은 배경 Image와 선택적 Vertical/Horizontal Layout Group을 만든다. Image는 Sprite가 없으면 단색 블록으로 동작한다. ScrollView의 `style.layout`은 스크롤 Content 배치를 결정한다.
+Panel은 배경 Image와 선택적 Vertical/Horizontal Layout Group을 만든다. Image는 Sprite가 없으면 단색 블록으로 동작한다. ScrollView의 `style.layout`은 스크롤 Content 배치를 결정한다. Canonical scroll의 axis는 ScrollRect의 horizontal/vertical 축으로, 왼쪽 위 기준 design-unit `initialOffset`은 Content의 `(-x, +y)` anchored position으로 변환한다.
 
 ## 안전한 Binding
 

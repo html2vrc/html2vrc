@@ -39,6 +39,10 @@ namespace Html2Vrc
         public string textInputPlaceholder;
         public bool textInputMultiline;
         public bool textInputReadOnly;
+        public bool scrollAxisExplicit;
+        public bool scrollHorizontal;
+        public bool scrollVertical = true;
+        public float[] scrollInitialOffset = { 0f, 0f };
         public UdomStyle style = new UdomStyle();
         public UdomBinding binding;
         public UdomEmbed embed;

@@ -758,18 +758,41 @@ namespace Html2Vrc.Editor
 
                     break;
                 case "scroll":
+                    node.scrollAxisExplicit = true;
+                    node.scrollHorizontal = false;
+                    node.scrollVertical = true;
+                    node.scrollInitialOffset = new[] { 0f, 0f };
                     if (properties != null)
                     {
                         EnsureOnlyKeys(properties, path + ".properties", "axis", "initialOffset");
                         var axis = GetString(properties, "axis") ?? "vertical";
-                        if (!string.Equals(axis, "vertical", StringComparison.Ordinal))
+                        switch (axis)
                         {
-                            throw new FormatException($"{path}.properties.axis: only vertical canonical scroll views are supported yet.");
+                            case "vertical":
+                                break;
+                            case "horizontal":
+                                node.scrollHorizontal = true;
+                                node.scrollVertical = false;
+                                break;
+                            case "both":
+                                node.scrollHorizontal = true;
+                                node.scrollVertical = true;
+                                break;
+                            default:
+                                throw new FormatException(
+                                    $"{path}.properties.axis: expected 'vertical', 'horizontal', or 'both'.");
                         }
 
-                        if (properties.ContainsKey("initialOffset"))
+                        if (properties.TryGetValue("initialOffset", out var offsetValue))
                         {
-                            throw new FormatException($"{path}.properties.initialOffset: initial scroll offsets are not supported yet.");
+                            var offsetPath = path + ".properties.initialOffset";
+                            var offset = RequireObject(offsetValue, offsetPath);
+                            EnsureOnlyKeys(offset, offsetPath, "x", "y");
+                            node.scrollInitialOffset = new[]
+                            {
+                                RequireFloat(RequireValue(offset, "x", offsetPath), offsetPath + ".x"),
+                                RequireFloat(RequireValue(offset, "y", offsetPath), offsetPath + ".y")
+                            };
                         }
                     }
 
@@ -812,12 +835,24 @@ namespace Html2Vrc.Editor
                 return;
             }
 
-            var bindingKey = string.Equals(elementName, "toggle", StringComparison.Ordinal)
-                ? "checked"
-                : string.Equals(elementName, "slider", StringComparison.Ordinal)
-                  || string.Equals(elementName, "text-input", StringComparison.Ordinal)
-                    ? "value"
-                    : null;
+            string bindingKey;
+            if (string.Equals(elementName, "toggle", StringComparison.Ordinal))
+            {
+                bindingKey = "checked";
+            }
+            else if (string.Equals(elementName, "slider", StringComparison.Ordinal)
+                     || string.Equals(elementName, "text-input", StringComparison.Ordinal))
+            {
+                bindingKey = "value";
+            }
+            else if (string.Equals(elementName, "scroll", StringComparison.Ordinal))
+            {
+                bindingKey = "offset";
+            }
+            else
+            {
+                bindingKey = null;
+            }
             if (bindingKey == null)
             {
                 if (bindings.Count > 0)
@@ -872,6 +907,14 @@ namespace Html2Vrc.Editor
                 EnsureOnlyKeys(events, path + ".on", "change", "submit", "focus", "blur");
                 AddEventWarning(events, "change", path, warnings);
                 AddEventWarning(events, "submit", path, warnings);
+                AddEventWarning(events, "focus", path, warnings);
+                AddEventWarning(events, "blur", path, warnings);
+                return;
+            }
+            else if (string.Equals(elementName, "scroll", StringComparison.Ordinal))
+            {
+                EnsureOnlyKeys(events, path + ".on", "scroll", "focus", "blur");
+                AddEventWarning(events, "scroll", path, warnings);
                 AddEventWarning(events, "focus", path, warnings);
                 AddEventWarning(events, "blur", path, warnings);
                 return;

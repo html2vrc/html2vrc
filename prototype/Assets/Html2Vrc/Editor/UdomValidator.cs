@@ -84,6 +84,7 @@ namespace Html2Vrc.Editor
             "type", "text", "sprite", "texture", "interactable", "toggleValue",
             "sliderValue", "sliderMin", "sliderMax", "sliderStep",
             "textInputValue", "textInputPlaceholder", "textInputMultiline", "textInputReadOnly",
+            "scrollAxisExplicit", "scrollHorizontal", "scrollVertical", "scrollInitialOffset",
             "style", "binding", "embed", "children",
             "position", "layout", "padding", "margin", "spacing", "backgroundColor", "textColor",
             "fontSize", "alignment", "flexibleWidth", "flexibleHeight",
@@ -222,6 +223,21 @@ namespace Html2Vrc.Editor
                 {
                     AddError(result, path + ".sliderStep", "Slider step cannot be negative.");
                 }
+            }
+
+            if (string.Equals(node.type, "ScrollView", StringComparison.OrdinalIgnoreCase))
+            {
+                var explicitAxis = node.scrollAxisExplicit || node.scrollHorizontal || !node.scrollVertical;
+                var horizontal = explicitAxis
+                    ? node.scrollHorizontal
+                    : string.Equals(node.style.layout, "Horizontal", StringComparison.OrdinalIgnoreCase);
+                var vertical = explicitAxis ? node.scrollVertical : !horizontal;
+                if (!horizontal && !vertical)
+                {
+                    AddError(result, path, "ScrollView must enable at least one axis.");
+                }
+
+                ValidateVector(node.scrollInitialOffset, 2, path + ".scrollInitialOffset", result, false);
             }
 
             if (!string.IsNullOrWhiteSpace(node.sprite))

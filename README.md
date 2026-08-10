@@ -96,6 +96,8 @@ Unity Importer는 `packages/udom`의 canonical UDOM 0.1과 기존 Unity 프로�
 
 Canonical resource URI는 UDOM TextAsset 폴더를 기준으로 안전하게 해석합니다. image resource는 Texture2D/RawImage, sprite resource는 Sprite/Image로 매핑하며, 정규화된 경로가 Unity `Assets/` 밖으로 나가면 참조를 거부합니다.
 
+Canonical scroll은 `vertical`, `horizontal`, `both` 축을 native ScrollRect로 생성하고, 왼쪽 위 기준 design-unit `initialOffset`을 Unity 콘텐츠 좌표로 변환합니다.
+
 ## Embed
 
 Embed는 HTML2VRC 레이아웃에 기존 Unity GameObject나 VRChat 프리팹을 연결합니다. 연결된 오브젝트의 내부 구조는 HTML2VRC가 소유하지 않습니다.

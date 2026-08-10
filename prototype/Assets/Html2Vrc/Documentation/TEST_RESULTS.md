@@ -20,11 +20,12 @@
 - `CanonicalRelativeImage.udom.json`의 문서 상대 URI를 실제 Texture2D로 해석해 RawImage에 연결했다. `Assets/` 밖으로 나가는 상대 경로는 차단하는 회귀도 함께 확인했다.
 - canonical Slider의 min/max/value/step/disabled, `bind.value`, `on.change` 진단을 정규화하고 Unity Slider, fill, handle을 생성했다. min/max가 뒤집힌 공식 invalid fixture도 Unity importer가 거부한다.
 - canonical text-input의 value/placeholder/multiline/readOnly/disabled와 `bind.value`, change/submit/focus/blur 진단을 정규화하고 native TMP_InputField, viewport, text, placeholder를 생성했다.
+- canonical scroll의 vertical/horizontal/both, design-unit initialOffset, `bind.offset`, scroll/focus/blur 진단을 정규화하고 양축 native ScrollRect 콘텐츠 크기와 좌표 변환을 확인했다. 기존 legacy Horizontal layout의 축 추론도 유지한다.
 
 자동 검증 결과:
 
-- `npm run check`: UDOM conformance 17/17, React 4/4, TypeScript typecheck와 build 통과
-- Unity EditMode `Html2Vrc.Tests.UdomPrototypeTests`: **17/17 통과, 실패 0**
+- `npm run check`: UDOM conformance 18/18, React 4/4, TypeScript typecheck와 build 통과
+- Unity EditMode `Html2Vrc.Tests.UdomPrototypeTests`: **18/18 통과, 실패 0**
 - Unity 종료 코드 0, C# 컴파일 오류 0
 - Windows CRLF에서 기존 HTML 재생성 테스트가 문자열을 교체하지 못하던 문제도 함께 수정했다.
 
@@ -54,7 +55,7 @@
 
 ## 자동 회귀 검증
 
-HTML2VRC 전용 Unity Test Framework 테스트 17개를 실행한다. 검증 범위는 다음과 같다.
+HTML2VRC 전용 Unity Test Framework 테스트 18개를 실행한다. 검증 범위는 다음과 같다.
 
 1. 샘플 UDOM Validation 성공과 잘못된 속성/중복 ID 거부
 2. Canvas, TextMeshProUGUI, Image, Button, ScrollRect, LayoutGroup과 VRChat용 `VRCUiShape` 생성
@@ -73,11 +74,12 @@ HTML2VRC 전용 Unity Test Framework 테스트 17개를 실행한다. 검증 범
 15. UDOM source asset 기준 상대 image URI의 Texture2D/RawImage 연결과 `Assets/` 경계 탈출 차단
 16. canonical Slider의 native control/fill/handle 생성, 정수 step과 범위 검증, symbolic binding/event 비실행 보장
 17. canonical text-input의 단일행/다중행·읽기전용·비활성 상태와 native TMP_InputField 내부 구조, symbolic binding/event 비실행 보장
+18. canonical scroll의 vertical/horizontal/both 축, 양축 콘텐츠 크기, initialOffset 좌표 변환, legacy horizontal 호환과 symbolic binding/event 비실행 보장
 
 최종 자동 테스트 결과:
 
-- 전체 17개
-- 통과 17개
+- 전체 18개
+- 통과 18개
 - 실패 0개
 - 건너뜀 0개
 - Unity 종료 코드 0

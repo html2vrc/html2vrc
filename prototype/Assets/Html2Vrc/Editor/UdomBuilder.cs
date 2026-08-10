@@ -976,6 +976,12 @@ namespace Html2Vrc.Editor
             background.color = UdomBuilderUtility.ParseColor(style.backgroundColor, Color.clear);
             background.raycastTarget = true;
 
+            var explicitAxis = node.scrollAxisExplicit || node.scrollHorizontal || !node.scrollVertical;
+            var horizontal = explicitAxis
+                ? node.scrollHorizontal
+                : string.Equals(style.layout, "Horizontal", StringComparison.OrdinalIgnoreCase);
+            var vertical = explicitAxis ? node.scrollVertical : !horizontal;
+
             var viewportId = node.id + ViewportSuffix;
             var viewport = UpsertGeneratedObject(viewportId, "ScrollViewport", true, target.transform, context);
             context.DesiredIds.Add(viewportId);
@@ -993,23 +999,23 @@ namespace Html2Vrc.Editor
             context.DesiredIds.Add(contentId);
             content.name = "Content";
             content.transform.SetSiblingIndex(0);
-            ConfigureScrollContentRect(content.GetComponent<RectTransform>());
+            var contentRect = content.GetComponent<RectTransform>();
+            ConfigureScrollContentRect(contentRect, horizontal, vertical);
             ConfigureLayout(content, style);
 
             var fitter = GetOrAdd<ContentSizeFitter>(content);
             Undo.RecordObject(fitter, "Configure UDOM Scroll Content");
-            var horizontal = string.Equals(style.layout, "Horizontal", StringComparison.OrdinalIgnoreCase);
             fitter.horizontalFit = horizontal
                 ? ContentSizeFitter.FitMode.PreferredSize
                 : ContentSizeFitter.FitMode.Unconstrained;
-            fitter.verticalFit = horizontal
-                ? ContentSizeFitter.FitMode.Unconstrained
-                : ContentSizeFitter.FitMode.PreferredSize;
+            fitter.verticalFit = vertical
+                ? ContentSizeFitter.FitMode.PreferredSize
+                : ContentSizeFitter.FitMode.Unconstrained;
 
             scrollRect.viewport = viewport.GetComponent<RectTransform>();
-            scrollRect.content = content.GetComponent<RectTransform>();
+            scrollRect.content = contentRect;
             scrollRect.horizontal = horizontal;
-            scrollRect.vertical = !horizontal;
+            scrollRect.vertical = vertical;
             scrollRect.movementType = ScrollRect.MovementType.Clamped;
             scrollRect.inertia = true;
             scrollRect.scrollSensitivity = 24f;
@@ -1019,6 +1025,11 @@ namespace Html2Vrc.Editor
             {
                 BuildNode(children[index], content.transform, documentPanel, index, context);
             }
+
+            var initialOffset = GetVector2(node.scrollInitialOffset, Vector2.zero);
+            contentRect.anchoredPosition = new Vector2(
+                horizontal ? -initialOffset.x : 0f,
+                vertical ? initialOffset.y : 0f);
         }
 
         private static void ConfigureEmbed(GameObject target, UdomNode node, UdomGeneratedRoot root)
@@ -1042,12 +1053,15 @@ namespace Html2Vrc.Editor
             rect.localRotation = Quaternion.identity;
         }
 
-        private static void ConfigureScrollContentRect(RectTransform rect)
+        private static void ConfigureScrollContentRect(
+            RectTransform rect,
+            bool horizontal,
+            bool vertical)
         {
             Undo.RecordObject(rect, "Configure Scroll Content RectTransform");
-            rect.anchorMin = new Vector2(0f, 1f);
-            rect.anchorMax = new Vector2(1f, 1f);
-            rect.pivot = new Vector2(0.5f, 1f);
+            rect.anchorMin = new Vector2(0f, vertical ? 1f : 0f);
+            rect.anchorMax = new Vector2(horizontal ? 0f : 1f, 1f);
+            rect.pivot = new Vector2(horizontal ? 0f : 0.5f, vertical ? 1f : 0.5f);
             rect.anchoredPosition = Vector2.zero;
             rect.sizeDelta = Vector2.zero;
             rect.localScale = Vector3.one;

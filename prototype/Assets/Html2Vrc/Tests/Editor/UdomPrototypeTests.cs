@@ -303,6 +303,69 @@ namespace Html2Vrc.Tests
         }
 
         [Test]
+        public void CanonicalScroll_GeneratesBothAxesAndAppliesDesignUnitOffset()
+        {
+            var json = LoadRepositoryFile(
+                "packages",
+                "udom",
+                "fixtures",
+                "valid",
+                "unity-scroll.udom.json");
+            var validation = UdomValidator.Validate(json);
+
+            Assert.That(validation.IsValid, Is.True, validation.Format());
+            Assert.That(validation.Format(), Does.Contain("Symbolic binding 'gallery.offset'"));
+            Assert.That(validation.Format(), Does.Contain("Symbolic event 'gallery.rememberOffset'"));
+            Assert.That(validation.Format(), Does.Contain("Symbolic event 'gallery.beginScroll'"));
+            Assert.That(validation.Format(), Does.Contain("Symbolic event 'gallery.endScroll'"));
+
+            var scrollNode = validation.Document.root.children[0];
+            Assert.That(scrollNode.type, Is.EqualTo("ScrollView"));
+            Assert.That(scrollNode.scrollAxisExplicit, Is.True);
+            Assert.That(scrollNode.scrollHorizontal, Is.True);
+            Assert.That(scrollNode.scrollVertical, Is.True);
+            Assert.That(scrollNode.scrollInitialOffset, Is.EqualTo(new[] { 48f, 72f }));
+
+            var build = UdomBuilder.GenerateOrRegenerate(validation.Document);
+            var scroll = UdomBuilder.FindNode(build.Root, "gallery-scroll").GetComponent<ScrollRect>();
+            Assert.That(scroll, Is.Not.Null);
+            Assert.That(scroll.horizontal, Is.True);
+            Assert.That(scroll.vertical, Is.True);
+            Assert.That(scroll.viewport.GetComponent<RectMask2D>(), Is.Not.Null);
+            Assert.That(scroll.content.GetComponent<HorizontalLayoutGroup>(), Is.Not.Null);
+            var fitter = scroll.content.GetComponent<ContentSizeFitter>();
+            Assert.That(fitter.horizontalFit, Is.EqualTo(ContentSizeFitter.FitMode.PreferredSize));
+            Assert.That(fitter.verticalFit, Is.EqualTo(ContentSizeFitter.FitMode.PreferredSize));
+            Assert.That(scroll.content.anchorMin, Is.EqualTo(new Vector2(0f, 1f)));
+            Assert.That(scroll.content.anchorMax, Is.EqualTo(new Vector2(0f, 1f)));
+            Assert.That(scroll.content.pivot, Is.EqualTo(new Vector2(0f, 1f)));
+            Assert.That(scroll.content.anchoredPosition, Is.EqualTo(new Vector2(-48f, 72f)));
+            Assert.That(scroll.content.rect.width, Is.GreaterThan(scroll.viewport.rect.width));
+            Assert.That(scroll.content.rect.height, Is.GreaterThan(scroll.viewport.rect.height));
+
+            var legacyDocument = new UdomDocument
+            {
+                schemaVersion = "0.1",
+                id = "legacy-horizontal-scroll",
+                root = new UdomNode
+                {
+                    id = "legacy-horizontal-scroll-root",
+                    type = "ScrollView",
+                    style = new UdomStyle
+                    {
+                        size = new[] { 320f, 160f },
+                        layout = "Horizontal"
+                    }
+                }
+            };
+            var legacyBuild = UdomBuilder.GenerateOrRegenerate(legacyDocument);
+            var legacyScroll = UdomBuilder.FindNode(legacyBuild.Root, "legacy-horizontal-scroll-root")
+                .GetComponent<ScrollRect>();
+            Assert.That(legacyScroll.horizontal, Is.True);
+            Assert.That(legacyScroll.vertical, Is.False);
+        }
+
+        [Test]
         public void CanonicalUdom_RejectsUnknownElementName()
         {
             const string json = @"{
@@ -437,6 +500,8 @@ namespace Html2Vrc.Tests
 
             var scroll = UdomBuilder.FindNode(root, "settings-list").GetComponent<ScrollRect>();
             Assert.That(scroll, Is.Not.Null);
+            Assert.That(scroll.horizontal, Is.False);
+            Assert.That(scroll.vertical, Is.True);
             Assert.That(scroll.viewport, Is.Not.Null);
             Assert.That(scroll.content, Is.Not.Null);
             Assert.That(scroll.content.GetComponent<VerticalLayoutGroup>(), Is.Not.Null);
