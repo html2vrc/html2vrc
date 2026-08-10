@@ -1,16 +1,28 @@
-name: CI
+name: Node packages
 
 on:
   push:
     branches:
       - main
+    paths:
+      - ".github/workflows/node-packages.yml"
+      - "package.json"
+      - "package-lock.json"
+      - "packages/udom/**"
+      - "packages/react/**"
   pull_request:
+    paths:
+      - ".github/workflows/node-packages.yml"
+      - "package.json"
+      - "package-lock.json"
+      - "packages/udom/**"
+      - "packages/react/**"
 
 permissions:
   contents: read
 
 jobs:
-  test:
+  check:
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -25,4 +37,3 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run check
-

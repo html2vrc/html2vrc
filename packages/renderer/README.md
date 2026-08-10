@@ -634,7 +634,7 @@ AI는 특정 Unity 라이브러리 API보다 HTML, CSS, React와 일반적인 Un
 기술 검토 시 원본 저장소와 공식 문서를 기준으로 삼는다.
 
 - [VRChat Current Unity Version](https://creators.vrchat.com/sdk/upgrade/current-unity-version/)
-- [UDOM 0.1 초기 명세](https://github.com/html2vrc/udom/blob/main/SPECIFICATION.md)
+- [UDOM 0.1 초기 명세](../udom/SPECIFICATION.md)
 - [Yoga](https://github.com/facebook/yoga)
 - [unity-flex-ui](https://github.com/gilzoide/unity-flex-ui)
 - [UIEffect](https://github.com/mob-sakai/UIEffect)

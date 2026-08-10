@@ -1,4 +1,7 @@
 .tools/UnityMCP-VRC/
 .codex
+node_modules/
+dist/
+*.tgz
 
 prototype2

@@ -48,7 +48,7 @@ UDOM은 렌더링 방법을 지정하지 않는다. `gradient`가 Shader, Vertex
 - Unity에서 사용할 Shader와 레이아웃 라이브러리 선택
 - React 상태와 이벤트를 Udon으로 변환하는 방법
 
-AI의 추론 정책은 `html2vrc/skill`, Unity 구현은 `html2vrc/renderer`, React 제작 환경은 `html2vrc/react`가 담당한다.
+AI의 추론 정책은 저장소 루트, Unity 구현은 [`packages/renderer`](../renderer), React 제작 환경은 [`packages/react`](../react)가 담당한다.
 
 ## 문서와 구현
 

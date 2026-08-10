@@ -26,7 +26,7 @@
     "react": "^19.2.0"
   },
   "dependencies": {
-    "@html2vrc/udom": "https://github.com/html2vrc/udom/archive/f6dfec02dc3beb9a92037563cdc6e47b80a6ec9e.tar.gz"
+    "@html2vrc/udom": "file:../udom"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",

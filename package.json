@@ -1,0 +1,15 @@
+{
+  "name": "html2vrc-monorepo",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "packages/udom",
+    "packages/react"
+  ],
+  "scripts": {
+    "check": "npm run test --workspace @html2vrc/udom && npm run check --workspace @html2vrc/react"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

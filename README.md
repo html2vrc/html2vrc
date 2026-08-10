@@ -113,13 +113,25 @@ HTML2VRC는 다음을 목표로 하지 않습니다.
 
 웹 UI의 구조, 시각적 정체성과 유용한 인터랙션을 유지하면서 현실적으로 사용할 수 있는 VRChat 네이티브 결과물을 만드는 것이 목표입니다.
 
-## 예정된 패키지
+## 저장소 구성
 
-| 구성           | 이름                    |
-| ------------ | --------------------- |
-| Unity 패키지    | `com.nupamo.html2vrc` |
-| React 저작 SDK | `@html2vrc/react`     |
-| 중간 표현        | `UDOM`                |
+HTML2VRC의 명세, 저작 도구와 Unity 프로토타입은 한 저장소에서 함께 버전 관리합니다.
+
+| 경로 | 역할 |
+| --- | --- |
+| [`packages/udom`](packages/udom) | UDOM 0.1 명세, JSON Schema, fixture와 reference validator |
+| [`packages/react`](packages/react) | 제한된 React primitive와 정적 React-to-UDOM exporter |
+| [`packages/renderer`](packages/renderer) | 결정론적 UDOM-to-Unity renderer 설계 문서 |
+| [`prototype`](prototype) | Unity 및 VRChat 수직 프로토타입 |
+
+Node 패키지는 루트 npm workspace로 연결됩니다.
+
+```bash
+npm install
+npm run check
+```
+
+예정된 배포 이름은 Unity 패키지 `com.nupamo.html2vrc`, React SDK `@html2vrc/react`, 중간 표현 `UDOM`입니다.
 
 ## 로드맵
 
