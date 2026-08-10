@@ -136,6 +136,16 @@ namespace Html2Vrc.Editor
         private static UdomStyle MapStyle(Dictionary<string, object> value, string path)
         {
             var style = new UdomStyle();
+            if (value.TryGetValue("visible", out var visible))
+            {
+                style.visible = GetBoolean(visible, path + ".visible");
+            }
+
+            if (value.TryGetValue("opacity", out var opacity))
+            {
+                style.opacity = GetFloat(opacity, path + ".opacity");
+            }
+
             if (value.TryGetValue("position", out var position))
             {
                 style.position = GetFloatArray(position, path + ".position");
@@ -230,6 +240,16 @@ namespace Html2Vrc.Editor
             }
 
             throw new FormatException($"{path}: 숫자가 필요하다.");
+        }
+
+        private static bool GetBoolean(object value, string path)
+        {
+            if (value is bool result)
+            {
+                return result;
+            }
+
+            throw new FormatException($"{path}: boolean이 필요하다.");
         }
 
         private static Dictionary<string, object> RequireObject(object value, string path)

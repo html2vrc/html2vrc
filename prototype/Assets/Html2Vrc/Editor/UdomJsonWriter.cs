@@ -109,6 +109,8 @@ namespace Html2Vrc.Editor
             }
 
             writer.BeginObject();
+            writer.BoolProperty("visible", style.visible);
+            writer.FloatProperty("opacity", style.opacity);
             writer.FloatArrayProperty("position", style.position);
             writer.FloatArrayProperty("size", style.size);
             writer.StringProperty("layout", style.layout);
@@ -202,6 +204,13 @@ namespace Html2Vrc.Editor
             {
                 PropertyName(name);
                 AppendFloat(value);
+                needsComma = true;
+            }
+
+            public void BoolProperty(string name, bool value)
+            {
+                PropertyName(name);
+                builder.Append(value ? "true" : "false");
                 needsComma = true;
             }
 

@@ -86,7 +86,7 @@ namespace Html2Vrc.Editor
             "textInputValue", "textInputPlaceholder", "textInputMultiline", "textInputReadOnly",
             "scrollAxisExplicit", "scrollHorizontal", "scrollVertical", "scrollInitialOffset",
             "style", "binding", "embed", "children",
-            "position", "layout", "padding", "margin", "spacing", "backgroundColor", "textColor",
+            "visible", "opacity", "position", "layout", "padding", "margin", "spacing", "backgroundColor", "textColor",
             "fontSize", "alignment", "flexibleWidth", "flexibleHeight",
             "action", "targetSlot", "fallbackLabel"
         };
@@ -353,6 +353,14 @@ namespace Html2Vrc.Editor
             ValidateVector(style.size, 2, path + ".size", result, requirePositive: true);
             ValidateVector(style.padding, 4, path + ".padding", result, requirePositive: false, requireNonNegative: true);
             ValidateVector(style.margin, 4, path + ".margin", result, requirePositive: false, requireNonNegative: true);
+
+            if (style.opacity < 0f
+                || style.opacity > 1f
+                || float.IsNaN(style.opacity)
+                || float.IsInfinity(style.opacity))
+            {
+                AddError(result, path + ".opacity", "opacity는 0 이상 1 이하의 유한한 값이어야 한다.");
+            }
 
             if (!SupportedLayouts.Contains(style.layout ?? "None"))
             {

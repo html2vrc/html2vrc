@@ -100,6 +100,8 @@ Canonical scroll은 `vertical`, `horizontal`, `both` 축을 native ScrollRect로
 
 UDOM Importer의 `Override Target Canvas`에서 Renderer 목표 크기를 지정하면 canonical `viewport.fit`의 `contain`, `cover`, `stretch`, `none`을 안정적인 내부 viewport wrapper에 적용합니다. `cover`와 넘칠 수 있는 `none`은 목표 영역에서 클리핑됩니다.
 
+Canonical `paint.visible`과 `paint.opacity`는 CanvasGroup으로 자식 전체에 합성됩니다. 숨김 상태도 GameObject와 레이아웃은 유지하며 입력만 차단하고, 기존 사용자 CanvasGroup이 있으면 원래 설정을 보존한 채 opacity를 곱합니다.
+
 ## Embed
 
 Embed는 HTML2VRC 레이아웃에 기존 Unity GameObject나 VRChat 프리팹을 연결합니다. 연결된 오브젝트의 내부 구조는 HTML2VRC가 소유하지 않습니다.

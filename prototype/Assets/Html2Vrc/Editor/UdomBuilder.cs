@@ -470,6 +470,8 @@ namespace Html2Vrc.Editor
                 ConfigureRect(nodeObject, style, parent);
             }
 
+            ConfigurePaint(nodeObject, style);
+
             var panelForChildren = documentPanel;
             if (panelForChildren == null && string.Equals(node.type, "Panel", StringComparison.OrdinalIgnoreCase))
             {
@@ -608,6 +610,62 @@ namespace Html2Vrc.Editor
             layoutElement.flexibleWidth = style.flexibleWidth;
             layoutElement.flexibleHeight = style.flexibleHeight;
             layoutElement.ignoreLayout = parent.GetComponent<LayoutGroup>() == null;
+        }
+
+        private static void ConfigurePaint(GameObject target, UdomStyle style)
+        {
+            var visible = style == null || style.visible;
+            var opacity = style != null ? style.opacity : 1f;
+            var requiresCanvasGroup = !visible || Mathf.Abs(opacity - 1f) > 0.0001f;
+            var paintState = target.GetComponent<UdomPaintState>();
+
+            if (!requiresCanvasGroup)
+            {
+                if (paintState == null)
+                {
+                    return;
+                }
+
+                var existingGroup = paintState.CanvasGroup;
+                if (existingGroup != null)
+                {
+                    Undo.RecordObject(existingGroup, "Restore UDOM paint state");
+                    paintState.Restore();
+                }
+
+                if (paintState.CreatedCanvasGroup && existingGroup != null)
+                {
+                    Undo.DestroyObjectImmediate(existingGroup);
+                }
+
+                Undo.DestroyObjectImmediate(paintState);
+                return;
+            }
+
+            if (paintState != null && paintState.CanvasGroup == null)
+            {
+                Undo.DestroyObjectImmediate(paintState);
+                paintState = null;
+            }
+
+            if (paintState == null)
+            {
+                var canvasGroup = target.GetComponent<CanvasGroup>();
+                var createdCanvasGroup = canvasGroup == null;
+                if (createdCanvasGroup)
+                {
+                    canvasGroup = Undo.AddComponent<CanvasGroup>(target);
+                }
+
+                paintState = Undo.AddComponent<UdomPaintState>(target);
+                Undo.RecordObject(paintState, "Capture UDOM paint state");
+                paintState.Capture(canvasGroup, createdCanvasGroup);
+            }
+
+            Undo.RecordObjects(
+                new UnityEngine.Object[] { paintState, paintState.CanvasGroup },
+                "Configure UDOM paint state");
+            paintState.Apply(visible, opacity);
         }
 
         private static void ConfigureMarginWrapper(GameObject wrapper, UdomStyle style, Transform parent)

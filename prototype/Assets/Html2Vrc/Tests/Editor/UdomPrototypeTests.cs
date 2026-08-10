@@ -512,6 +512,99 @@ namespace Html2Vrc.Tests
         }
 
         [Test]
+        public void CanonicalPaintState_ComposesOpacityAndPreservesUserCanvasGroup()
+        {
+            var json = LoadRepositoryFile(
+                "packages",
+                "udom",
+                "fixtures",
+                "valid",
+                "unity-paint-state.udom.json");
+            var validation = UdomValidator.Validate(json);
+
+            Assert.That(validation.IsValid, Is.True, validation.Format());
+            Assert.That(validation.Issues, Is.Empty, validation.Format());
+            var document = validation.Document;
+            var hiddenNode = document.root.children.Single(node => node.id == "hidden-panel");
+            var translucentNode = document.root.children.Single(node => node.id == "translucent-panel");
+            var transparentToggleNode = document.root.children.Single(node => node.id == "transparent-toggle");
+            Assert.That(document.root.style.visible, Is.True);
+            Assert.That(document.root.style.opacity, Is.EqualTo(0.5f));
+            Assert.That(hiddenNode.style.visible, Is.False);
+            Assert.That(hiddenNode.style.opacity, Is.EqualTo(1f));
+            Assert.That(translucentNode.style.opacity, Is.EqualTo(0.25f));
+            Assert.That(transparentToggleNode.style.opacity, Is.EqualTo(0f));
+
+            translucentNode.style.opacity = 1f;
+            var build = UdomBuilder.GenerateOrRegenerate(document);
+            var root = build.Root;
+            var documentRoot = UdomBuilder.FindNode(root, "paint-root");
+            var hidden = UdomBuilder.FindNode(root, "hidden-panel");
+            var translucent = UdomBuilder.FindNode(root, "translucent-panel");
+            var transparentToggle = UdomBuilder.FindNode(root, "transparent-toggle");
+            var rootGroup = documentRoot.GetComponent<CanvasGroup>();
+            var hiddenGroup = hidden.GetComponent<CanvasGroup>();
+            var transparentGroup = transparentToggle.GetComponent<CanvasGroup>();
+
+            Assert.That(rootGroup, Is.Not.Null);
+            Assert.That(rootGroup.alpha, Is.EqualTo(0.5f));
+            Assert.That(documentRoot.GetComponent<UdomPaintState>().CreatedCanvasGroup, Is.True);
+            Assert.That(hidden.gameObject.activeInHierarchy, Is.True);
+            Assert.That(hidden.GetComponent<LayoutElement>().ignoreLayout, Is.False);
+            Assert.That(UdomBuilder.FindNode(root, "hidden-label").gameObject.activeInHierarchy, Is.True);
+            Assert.That(hiddenGroup.alpha, Is.EqualTo(0f));
+            Assert.That(hiddenGroup.interactable, Is.False);
+            Assert.That(hiddenGroup.blocksRaycasts, Is.False);
+            Assert.That(transparentGroup.alpha, Is.EqualTo(0f));
+            Assert.That(transparentGroup.interactable, Is.True);
+            Assert.That(transparentGroup.blocksRaycasts, Is.True);
+            Assert.That(transparentToggle.GetComponent<Toggle>().interactable, Is.True);
+            Assert.That(translucent.GetComponent<CanvasGroup>(), Is.Null);
+            Assert.That(translucent.GetComponent<UdomPaintState>(), Is.Null);
+
+            var userGroup = translucent.gameObject.AddComponent<CanvasGroup>();
+            userGroup.alpha = 0.8f;
+            userGroup.interactable = false;
+            userGroup.blocksRaycasts = false;
+            userGroup.ignoreParentGroups = true;
+            translucentNode.style.opacity = 0.25f;
+            UdomBuilder.GenerateOrRegenerate(document, root);
+
+            translucent = UdomBuilder.FindNode(root, "translucent-panel");
+            var composedGroup = translucent.GetComponent<CanvasGroup>();
+            var composedState = translucent.GetComponent<UdomPaintState>();
+            Assert.That(composedGroup, Is.SameAs(userGroup));
+            Assert.That(composedGroup.alpha, Is.EqualTo(0.2f).Within(0.0001f));
+            Assert.That(composedGroup.interactable, Is.False);
+            Assert.That(composedGroup.blocksRaycasts, Is.False);
+            Assert.That(composedGroup.ignoreParentGroups, Is.False);
+            Assert.That(composedState.CreatedCanvasGroup, Is.False);
+            Assert.That(composedState.BaseAlpha, Is.EqualTo(0.8f));
+
+            translucentNode.style.opacity = 1f;
+            UdomBuilder.GenerateOrRegenerate(document, root);
+            translucent = UdomBuilder.FindNode(root, "translucent-panel");
+            var restoredGroup = translucent.GetComponent<CanvasGroup>();
+            Assert.That(restoredGroup, Is.SameAs(userGroup));
+            Assert.That(restoredGroup.alpha, Is.EqualTo(0.8f));
+            Assert.That(restoredGroup.interactable, Is.False);
+            Assert.That(restoredGroup.blocksRaycasts, Is.False);
+            Assert.That(restoredGroup.ignoreParentGroups, Is.True);
+            Assert.That(translucent.GetComponent<UdomPaintState>(), Is.Null);
+
+            document.root.style.opacity = 1f;
+            hiddenNode.style.visible = true;
+            transparentToggleNode.style.opacity = 1f;
+            UdomBuilder.GenerateOrRegenerate(document, root);
+            Assert.That(UdomBuilder.FindNode(root, "paint-root").GetComponent<CanvasGroup>(), Is.Null);
+            Assert.That(UdomBuilder.FindNode(root, "hidden-panel").GetComponent<CanvasGroup>(), Is.Null);
+            Assert.That(UdomBuilder.FindNode(root, "transparent-toggle").GetComponent<CanvasGroup>(), Is.Null);
+            Assert.That(UdomBuilder.FindNode(root, "paint-root").GetComponent<UdomPaintState>(), Is.Null);
+            Assert.That(UdomBuilder.FindNode(root, "hidden-panel").GetComponent<UdomPaintState>(), Is.Null);
+            Assert.That(UdomBuilder.FindNode(root, "transparent-toggle").GetComponent<UdomPaintState>(), Is.Null);
+        }
+
+        [Test]
         public void CanonicalUdom_RejectsUnknownElementName()
         {
             const string json = @"{

@@ -1243,15 +1243,18 @@ namespace Html2Vrc.Editor
             List<UdomParseWarning> warnings)
         {
             EnsureOnlyKeys(value, path, "visible", "opacity", "backgrounds", "border", "radius", "shadows");
-            if (!GetBoolean(value, "visible", true, path + ".visible"))
-            {
-                throw new FormatException($"{path}.visible: hidden canonical nodes are not supported yet.");
-            }
+            result.Style.visible = GetBoolean(value, "visible", true, path + ".visible");
 
-            if (value.TryGetValue("opacity", out var opacityValue)
-                && Math.Abs(RequireFloat(opacityValue, path + ".opacity") - 1f) > 0.0001f)
+            if (value.TryGetValue("opacity", out var opacityValue))
             {
-                throw new FormatException($"{path}.opacity: paint opacity is not supported yet.");
+                result.Style.opacity = RequireFloat(opacityValue, path + ".opacity");
+                if (result.Style.opacity < 0f
+                    || result.Style.opacity > 1f
+                    || float.IsNaN(result.Style.opacity)
+                    || float.IsInfinity(result.Style.opacity))
+                {
+                    throw new FormatException($"{path}.opacity: value must be between zero and one.");
+                }
             }
 
             RejectPresent(value, path, "border", "canonical borders are not supported yet");

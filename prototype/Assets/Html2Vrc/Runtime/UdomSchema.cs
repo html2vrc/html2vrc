@@ -54,6 +54,8 @@ namespace Html2Vrc
     [Serializable]
     public sealed class UdomStyle
     {
+        public bool visible = true;
+        public float opacity = 1f;
         public float[] position = { 0f, 0f };
         public float[] size = { 100f, 100f };
         public string layout = "None";
