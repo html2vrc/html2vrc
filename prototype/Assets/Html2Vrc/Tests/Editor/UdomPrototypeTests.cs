@@ -92,6 +92,39 @@ namespace Html2Vrc.Tests
         }
 
         [Test]
+        public void CanonicalStyleRefs_MergeInOrderBeforeInlineStyle()
+        {
+            var json = LoadRepositoryFile(
+                "packages",
+                "udom",
+                "fixtures",
+                "valid",
+                "unity-style-refs.udom.json");
+            var validation = UdomValidator.Validate(json);
+
+            Assert.That(validation.IsValid, Is.True, validation.Format());
+            Assert.That(validation.Issues, Is.Empty, validation.Format());
+            var shared = validation.Document.root.children[0];
+            var inline = validation.Document.root.children[1];
+            Assert.That(shared.style.fontSize, Is.EqualTo(34f));
+            Assert.That(shared.style.textColor, Is.EqualTo("#58C8FFFF"));
+            Assert.That(inline.style.fontSize, Is.EqualTo(46f));
+            Assert.That(inline.style.textColor, Is.EqualTo("#FFAA00FF"));
+
+            var build = UdomBuilder.GenerateOrRegenerate(validation.Document);
+            var sharedText = UdomBuilder.FindNode(build.Root, "shared-label").GetComponent<TextMeshProUGUI>();
+            var inlineText = UdomBuilder.FindNode(build.Root, "inline-label").GetComponent<TextMeshProUGUI>();
+            Assert.That(sharedText.fontSize, Is.EqualTo(34f));
+            Assert.That(
+                sharedText.color,
+                Is.EqualTo((Color)new Color32(0x58, 0xC8, 0xFF, 0xFF)).Using(ColorComparer.Instance));
+            Assert.That(inlineText.fontSize, Is.EqualTo(46f));
+            Assert.That(
+                inlineText.color,
+                Is.EqualTo((Color)new Color32(0xFF, 0xAA, 0x00, 0xFF)).Using(ColorComparer.Instance));
+        }
+
+        [Test]
         public void CanonicalUdom_RejectsElementNotImplementedByUnityRenderer()
         {
             const string json = @"{
@@ -445,17 +478,17 @@ namespace Html2Vrc.Tests
 
         private static string LoadReactFixture()
         {
+            return LoadRepositoryFile("packages", "react", "test", "fixtures", "basic.udom.json");
+        }
+
+        private static string LoadRepositoryFile(params string[] relativePath)
+        {
             var prototypeDirectory = Directory.GetParent(Application.dataPath);
             Assert.That(prototypeDirectory, Is.Not.Null, "Unity project directory must be available.");
             Assert.That(prototypeDirectory.Parent, Is.Not.Null, "Monorepo root directory must be available.");
             var fixturePath = Path.Combine(
-                prototypeDirectory.Parent.FullName,
-                "packages",
-                "react",
-                "test",
-                "fixtures",
-                "basic.udom.json");
-            Assert.That(File.Exists(fixturePath), Is.True, $"React fixture must exist: {fixturePath}");
+                new[] { prototypeDirectory.Parent.FullName }.Concat(relativePath).ToArray());
+            Assert.That(File.Exists(fixturePath), Is.True, $"Repository fixture must exist: {fixturePath}");
             return File.ReadAllText(fixturePath);
         }
 

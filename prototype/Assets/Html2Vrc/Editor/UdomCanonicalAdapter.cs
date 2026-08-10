@@ -72,7 +72,6 @@ namespace Html2Vrc.Editor
                 }
             }
 
-            RejectNonEmptyArray(value, "styles", "$.styles", "shared canonical styles are not supported yet");
             RejectNonEmptyArray(
                 value,
                 "extensionsRequired",
@@ -85,6 +84,7 @@ namespace Html2Vrc.Editor
                 "Canonical extensions are ignored by the Unity compatibility adapter.",
                 warnings);
 
+            var styles = MapStyles(value);
             var resources = MapResources(value);
             var rootValue = RequireObject(RequireValue(value, "root", "$"), "$.root");
             var rootId = RequireString(rootValue, "id", "$.root.id");
@@ -101,8 +101,37 @@ namespace Html2Vrc.Editor
                     size = canvasSize,
                     scale = 0.01f
                 },
-                root = MapNode(rootValue, "$.root", 0, canvasSize, true, resources, warnings)
+                root = MapNode(rootValue, "$.root", 0, canvasSize, true, styles, resources, warnings)
             };
+        }
+
+        private static Dictionary<string, Dictionary<string, object>> MapStyles(
+            Dictionary<string, object> document)
+        {
+            var result = new Dictionary<string, Dictionary<string, object>>(StringComparer.Ordinal);
+            if (!document.TryGetValue("styles", out var stylesValue))
+            {
+                return result;
+            }
+
+            var styles = RequireArray(stylesValue, "$.styles");
+            for (var index = 0; index < styles.Count; index++)
+            {
+                var path = $"$.styles[{index}]";
+                var definition = RequireObject(styles[index], path);
+                EnsureOnlyKeys(definition, path, "id", "style", "extensions", "extras");
+                var id = RequireString(definition, "id", path + ".id");
+                if (result.ContainsKey(id))
+                {
+                    throw new FormatException($"{path}.id: duplicate canonical style id '{id}'.");
+                }
+
+                var style = RequireObject(RequireValue(definition, "style", path), path + ".style");
+                EnsureOnlyKeys(style, path + ".style", "layout", "paint", "text", "transform");
+                result.Add(id, style);
+            }
+
+            return result;
         }
 
         private static Dictionary<string, ResourceInfo> MapResources(Dictionary<string, object> document)
@@ -163,6 +192,7 @@ namespace Html2Vrc.Editor
             int depth,
             float[] parentSize,
             bool fillParentByDefault,
+            Dictionary<string, Dictionary<string, object>> styles,
             Dictionary<string, ResourceInfo> resources,
             List<UdomParseWarning> warnings)
         {
@@ -205,12 +235,9 @@ namespace Html2Vrc.Editor
                 throw new FormatException($"{path}.type: unsupported canonical node type '{canonicalType}'.");
             }
 
-            RejectNonEmptyArray(value, "styleRefs", path + ".styleRefs", "canonical style references are not supported yet");
             RejectNonEmptyObject(value, "bind", path + ".bind", "canonical data bindings are not supported yet");
 
-            var styleObject = value.TryGetValue("style", out var styleValue)
-                ? RequireObject(styleValue, path + ".style")
-                : null;
+            var styleObject = ResolveStyle(value, path, styles);
             var mappedStyle = MapStyle(styleObject, path + ".style", parentSize, fillParentByDefault);
             var node = new UdomNode
             {
@@ -254,12 +281,96 @@ namespace Html2Vrc.Editor
                         depth + 1,
                         node.style.size,
                         false,
+                        styles,
                         resources,
                         warnings);
                 }
             }
 
             return node;
+        }
+
+        private static Dictionary<string, object> ResolveStyle(
+            Dictionary<string, object> node,
+            string path,
+            Dictionary<string, Dictionary<string, object>> styles)
+        {
+            Dictionary<string, object> merged = null;
+            if (node.TryGetValue("styleRefs", out var styleRefsValue))
+            {
+                var styleRefs = RequireArray(styleRefsValue, path + ".styleRefs");
+                var seen = new HashSet<string>(StringComparer.Ordinal);
+                merged = new Dictionary<string, object>(StringComparer.Ordinal);
+                for (var index = 0; index < styleRefs.Count; index++)
+                {
+                    var referencePath = $"{path}.styleRefs[{index}]";
+                    var styleId = RequireString(styleRefs[index], referencePath);
+                    if (!seen.Add(styleId))
+                    {
+                        throw new FormatException($"{referencePath}: duplicate canonical style reference '{styleId}'.");
+                    }
+
+                    if (!styles.TryGetValue(styleId, out var referencedStyle))
+                    {
+                        throw new FormatException($"{referencePath}: unknown canonical style '{styleId}'.");
+                    }
+
+                    MergeObjects(merged, referencedStyle);
+                }
+            }
+
+            if (node.TryGetValue("style", out var inlineStyleValue))
+            {
+                if (merged == null)
+                {
+                    merged = new Dictionary<string, object>(StringComparer.Ordinal);
+                }
+
+                MergeObjects(merged, RequireObject(inlineStyleValue, path + ".style"));
+            }
+
+            return merged;
+        }
+
+        private static void MergeObjects(
+            Dictionary<string, object> target,
+            Dictionary<string, object> source)
+        {
+            foreach (var pair in source)
+            {
+                if (pair.Value is Dictionary<string, object> sourceObject
+                    && target.TryGetValue(pair.Key, out var targetValue)
+                    && targetValue is Dictionary<string, object> targetObject)
+                {
+                    MergeObjects(targetObject, sourceObject);
+                    continue;
+                }
+
+                target[pair.Key] = CloneValue(pair.Value);
+            }
+        }
+
+        private static object CloneValue(object value)
+        {
+            if (value is Dictionary<string, object> sourceObject)
+            {
+                var clone = new Dictionary<string, object>(StringComparer.Ordinal);
+                MergeObjects(clone, sourceObject);
+                return clone;
+            }
+
+            if (value is List<object> sourceArray)
+            {
+                var clone = new List<object>(sourceArray.Count);
+                for (var index = 0; index < sourceArray.Count; index++)
+                {
+                    clone.Add(CloneValue(sourceArray[index]));
+                }
+
+                return clone;
+            }
+
+            return value;
         }
 
         private static string MapElementType(string elementName, string path)

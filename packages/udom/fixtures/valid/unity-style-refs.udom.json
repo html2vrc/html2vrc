@@ -1,0 +1,71 @@
+{
+  "asset": {
+    "version": "0.1",
+    "generator": "@html2vrc/udom Unity compatibility fixture"
+  },
+  "viewport": {
+    "width": 800,
+    "height": 480
+  },
+  "styles": [
+    {
+      "id": "base-label",
+      "style": {
+        "text": {
+          "fontSize": 34,
+          "color": "#FFFFFFFF"
+        }
+      }
+    },
+    {
+      "id": "accent-label",
+      "style": {
+        "text": {
+          "color": "#58C8FFFF"
+        }
+      }
+    }
+  ],
+  "root": {
+    "type": "element",
+    "id": "style-screen",
+    "name": "view",
+    "style": {
+      "layout": {
+        "mode": "flex",
+        "width": "100%",
+        "height": "100%",
+        "flex": {
+          "direction": "column",
+          "rowGap": 16
+        }
+      }
+    },
+    "children": [
+      {
+        "type": "text",
+        "id": "shared-label",
+        "value": "Shared style",
+        "styleRefs": [
+          "base-label",
+          "accent-label"
+        ]
+      },
+      {
+        "type": "text",
+        "id": "inline-label",
+        "value": "Inline override",
+        "styleRefs": [
+          "base-label",
+          "accent-label"
+        ],
+        "style": {
+          "text": {
+            "fontSize": 46,
+            "color": "#FFAA00FF"
+          }
+        }
+      }
+    ]
+  }
+}
