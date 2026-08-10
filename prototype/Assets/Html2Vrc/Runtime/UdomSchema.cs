@@ -35,6 +35,10 @@ namespace Html2Vrc
         public float sliderMin;
         public float sliderMax = 1f;
         public float sliderStep;
+        public string textInputValue;
+        public string textInputPlaceholder;
+        public bool textInputMultiline;
+        public bool textInputReadOnly;
         public UdomStyle style = new UdomStyle();
         public UdomBinding binding;
         public UdomEmbed embed;

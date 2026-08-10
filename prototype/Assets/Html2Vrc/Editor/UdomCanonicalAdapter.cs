@@ -467,12 +467,12 @@ namespace Html2Vrc.Editor
                     return "Toggle";
                 case "slider":
                     return "Slider";
+                case "text-input":
+                    return "TextInput";
                 case "scroll":
                     return "ScrollView";
                 case "embed":
                     return "Embed";
-                case "text-input":
-                    throw new FormatException($"{path}: canonical element '{elementName}' is not supported by the Unity renderer yet.");
                 default:
                     throw new FormatException($"{path}: unknown canonical element '{elementName}'.");
             }
@@ -699,6 +699,64 @@ namespace Html2Vrc.Editor
                     }
 
                     break;
+                case "text-input":
+                    node.textInputValue = string.Empty;
+                    node.textInputPlaceholder = string.Empty;
+                    if (properties != null)
+                    {
+                        EnsureOnlyKeys(
+                            properties,
+                            path + ".properties",
+                            "value",
+                            "placeholder",
+                            "multiline",
+                            "readOnly",
+                            "disabled");
+                        if (properties.TryGetValue("value", out var inputValue))
+                        {
+                            node.textInputValue = RequireString(inputValue, path + ".properties.value");
+                        }
+
+                        if (properties.TryGetValue("placeholder", out var placeholderValue))
+                        {
+                            node.textInputPlaceholder = RequireString(
+                                placeholderValue,
+                                path + ".properties.placeholder");
+                        }
+
+                        node.textInputMultiline = GetBoolean(
+                            properties,
+                            "multiline",
+                            false,
+                            path + ".properties.multiline");
+                        node.textInputReadOnly = GetBoolean(
+                            properties,
+                            "readOnly",
+                            false,
+                            path + ".properties.readOnly");
+                        node.interactable = !GetBoolean(
+                            properties,
+                            "disabled",
+                            false,
+                            path + ".properties.disabled");
+                    }
+
+                    if (!mappedStyle.HasWidth)
+                    {
+                        node.style.size[0] = 360f;
+                    }
+
+                    if (!mappedStyle.HasHeight)
+                    {
+                        node.style.size[1] = node.textInputMultiline ? 128f : 56f;
+                    }
+
+                    if (!mappedStyle.HasBackground)
+                    {
+                        node.style.backgroundColor = "#252733FF";
+                    }
+
+                    break;
                 case "scroll":
                     if (properties != null)
                     {
@@ -757,6 +815,7 @@ namespace Html2Vrc.Editor
             var bindingKey = string.Equals(elementName, "toggle", StringComparison.Ordinal)
                 ? "checked"
                 : string.Equals(elementName, "slider", StringComparison.Ordinal)
+                  || string.Equals(elementName, "text-input", StringComparison.Ordinal)
                     ? "value"
                     : null;
             if (bindingKey == null)
@@ -804,6 +863,15 @@ namespace Html2Vrc.Editor
             {
                 EnsureOnlyKeys(events, path + ".on", "change", "focus", "blur");
                 AddEventWarning(events, "change", path, warnings);
+                AddEventWarning(events, "focus", path, warnings);
+                AddEventWarning(events, "blur", path, warnings);
+                return;
+            }
+            else if (string.Equals(elementName, "text-input", StringComparison.Ordinal))
+            {
+                EnsureOnlyKeys(events, path + ".on", "change", "submit", "focus", "blur");
+                AddEventWarning(events, "change", path, warnings);
+                AddEventWarning(events, "submit", path, warnings);
                 AddEventWarning(events, "focus", path, warnings);
                 AddEventWarning(events, "blur", path, warnings);
                 return;

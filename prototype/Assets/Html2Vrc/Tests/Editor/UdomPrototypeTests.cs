@@ -246,18 +246,75 @@ namespace Html2Vrc.Tests
         }
 
         [Test]
-        public void CanonicalUdom_RejectsElementNotImplementedByUnityRenderer()
+        public void CanonicalTextInput_GeneratesNativeSingleAndMultilineControls()
+        {
+            var json = LoadRepositoryFile(
+                "packages",
+                "udom",
+                "fixtures",
+                "valid",
+                "unity-text-input.udom.json");
+            var validation = UdomValidator.Validate(json);
+
+            Assert.That(validation.IsValid, Is.True, validation.Format());
+            Assert.That(validation.Format(), Does.Contain("Symbolic binding 'profile.displayName'"));
+            Assert.That(validation.Format(), Does.Contain("Symbolic event 'profile.previewDisplayName'"));
+            Assert.That(validation.Format(), Does.Contain("Symbolic event 'profile.saveDisplayName'"));
+            Assert.That(validation.Format(), Does.Contain("Symbolic event 'profile.beginDisplayNameEdit'"));
+            Assert.That(validation.Format(), Does.Contain("Symbolic event 'profile.endDisplayNameEdit'"));
+
+            var singleNode = validation.Document.root.children[0];
+            var multilineNode = validation.Document.root.children[1];
+            Assert.That(singleNode.type, Is.EqualTo("TextInput"));
+            Assert.That(singleNode.textInputValue, Is.EqualTo("Nupamo"));
+            Assert.That(singleNode.textInputPlaceholder, Is.EqualTo("Display name"));
+            Assert.That(singleNode.textInputMultiline, Is.False);
+            Assert.That(singleNode.textInputReadOnly, Is.False);
+            Assert.That(singleNode.interactable, Is.True);
+            Assert.That(multilineNode.textInputMultiline, Is.True);
+            Assert.That(multilineNode.textInputReadOnly, Is.True);
+            Assert.That(multilineNode.interactable, Is.False);
+
+            var build = UdomBuilder.GenerateOrRegenerate(validation.Document);
+            var single = UdomBuilder.FindNode(build.Root, "display-name-input").GetComponent<TMP_InputField>();
+            var singleViewport = UdomBuilder.FindNode(build.Root, "display-name-input::__input-viewport");
+            var singleText = UdomBuilder.FindNode(build.Root, "display-name-input::__input-text")
+                .GetComponent<TextMeshProUGUI>();
+            var singlePlaceholder = UdomBuilder.FindNode(build.Root, "display-name-input::__input-placeholder")
+                .GetComponent<TextMeshProUGUI>();
+            Assert.That(single, Is.Not.Null);
+            Assert.That(single.text, Is.EqualTo("Nupamo"));
+            Assert.That(single.lineType, Is.EqualTo(TMP_InputField.LineType.SingleLine));
+            Assert.That(single.readOnly, Is.False);
+            Assert.That(single.interactable, Is.True);
+            Assert.That(single.textViewport, Is.SameAs(singleViewport.GetComponent<RectTransform>()));
+            Assert.That(single.textComponent, Is.SameAs(singleText));
+            Assert.That(single.placeholder, Is.SameAs(singlePlaceholder));
+            Assert.That(singlePlaceholder.text, Is.EqualTo("Display name"));
+            single.SetTextWithoutNotify("Updated name");
+            Assert.That(single.text, Is.EqualTo("Updated name"));
+
+            var multiline = UdomBuilder.FindNode(build.Root, "locked-bio-input").GetComponent<TMP_InputField>();
+            Assert.That(multiline, Is.Not.Null);
+            Assert.That(multiline.text, Is.EqualTo("This profile is managed externally."));
+            Assert.That(multiline.lineType, Is.EqualTo(TMP_InputField.LineType.MultiLineNewline));
+            Assert.That(multiline.readOnly, Is.True);
+            Assert.That(multiline.interactable, Is.False);
+        }
+
+        [Test]
+        public void CanonicalUdom_RejectsUnknownElementName()
         {
             const string json = @"{
               ""asset"": { ""version"": ""0.1"" },
               ""viewport"": { ""width"": 400, ""height"": 300 },
-              ""root"": { ""type"": ""element"", ""id"": ""text-input"", ""name"": ""text-input"" }
+              ""root"": { ""type"": ""element"", ""id"": ""video"", ""name"": ""video"" }
             }";
 
             var validation = UdomValidator.Validate(json);
 
             Assert.That(validation.IsValid, Is.False);
-            Assert.That(validation.Format(), Does.Contain("canonical element 'text-input'"));
+            Assert.That(validation.Format(), Does.Contain("unknown canonical element 'video'"));
         }
 
         [Test]

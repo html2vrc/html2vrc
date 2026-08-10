@@ -11,7 +11,7 @@
 - `packages/react/test/fixtures/basic.udom.json`을 바꾸지 않고 Unity 호환 계층에 직접 입력했다.
 - canonical `asset`, `viewport`, `element/view`, `text`, `image`, `button`, flex column과 gap이 Unity 내부 모델로 정규화되는 것을 확인했다.
 - 정규화된 문서가 실제 TextMeshProUGUI, Image, Button을 생성하는 것을 Unity Test Framework로 확인했다.
-- canonical `text-input`처럼 아직 구현하지 않은 core control을 명확한 검증 오류로 거부하는 회귀 테스트를 유지한다.
+- canonical 명세에 없는 element 이름을 명확한 검증 오류로 거부하는 회귀 테스트를 유지한다.
 - 상대 image URI `assets/logo.png`는 Unity `Assets/` 경로가 아니므로 경고를 남기고 참조를 추측하지 않는다.
 - canonical `on.activate` 심볼은 임의 코드로 실행하지 않고, 안전한 binding이 없는 Button 경고로 유지한다.
 - shared `styleRefs`를 배열 순서대로 병합하고 inline `style`이 마지막에 덮어쓰는 것을 Node와 Unity 공유 fixture로 확인했다.
@@ -19,11 +19,12 @@
 - Toggle의 `bind.checked`와 `on.change`는 임의 코드로 실행하지 않고 binding manifest가 필요하다는 경고를 남긴다.
 - `CanonicalRelativeImage.udom.json`의 문서 상대 URI를 실제 Texture2D로 해석해 RawImage에 연결했다. `Assets/` 밖으로 나가는 상대 경로는 차단하는 회귀도 함께 확인했다.
 - canonical Slider의 min/max/value/step/disabled, `bind.value`, `on.change` 진단을 정규화하고 Unity Slider, fill, handle을 생성했다. min/max가 뒤집힌 공식 invalid fixture도 Unity importer가 거부한다.
+- canonical text-input의 value/placeholder/multiline/readOnly/disabled와 `bind.value`, change/submit/focus/blur 진단을 정규화하고 native TMP_InputField, viewport, text, placeholder를 생성했다.
 
 자동 검증 결과:
 
-- `npm run check`: UDOM conformance 16/16, React 4/4, TypeScript typecheck와 build 통과
-- Unity EditMode `Html2Vrc.Tests.UdomPrototypeTests`: **16/16 통과, 실패 0**
+- `npm run check`: UDOM conformance 17/17, React 4/4, TypeScript typecheck와 build 통과
+- Unity EditMode `Html2Vrc.Tests.UdomPrototypeTests`: **17/17 통과, 실패 0**
 - Unity 종료 코드 0, C# 컴파일 오류 0
 - Windows CRLF에서 기존 HTML 재생성 테스트가 문자열을 교체하지 못하던 문제도 함께 수정했다.
 
@@ -53,7 +54,7 @@
 
 ## 자동 회귀 검증
 
-HTML2VRC 전용 Unity Test Framework 테스트 16개를 실행한다. 검증 범위는 다음과 같다.
+HTML2VRC 전용 Unity Test Framework 테스트 17개를 실행한다. 검증 범위는 다음과 같다.
 
 1. 샘플 UDOM Validation 성공과 잘못된 속성/중복 ID 거부
 2. Canvas, TextMeshProUGUI, Image, Button, ScrollRect, LayoutGroup과 VRChat용 `VRCUiShape` 생성
@@ -71,11 +72,12 @@ HTML2VRC 전용 Unity Test Framework 테스트 16개를 실행한다. 검증 범
 14. 공식 canonical settings fixture의 시각 폴백 진단과 Unity Toggle 생성, 상징적 bind/on 비실행 보장
 15. UDOM source asset 기준 상대 image URI의 Texture2D/RawImage 연결과 `Assets/` 경계 탈출 차단
 16. canonical Slider의 native control/fill/handle 생성, 정수 step과 범위 검증, symbolic binding/event 비실행 보장
+17. canonical text-input의 단일행/다중행·읽기전용·비활성 상태와 native TMP_InputField 내부 구조, symbolic binding/event 비실행 보장
 
 최종 자동 테스트 결과:
 
-- 전체 16개
-- 통과 16개
+- 전체 17개
+- 통과 17개
 - 실패 0개
 - 건너뜀 0개
 - Unity 종료 코드 0

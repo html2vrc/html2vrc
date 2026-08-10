@@ -65,6 +65,7 @@ namespace Html2Vrc.Editor
             "Button",
             "Toggle",
             "Slider",
+            "TextInput",
             "ScrollView",
             "Embed"
         };
@@ -80,7 +81,10 @@ namespace Html2Vrc.Editor
         {
             "schemaVersion", "id", "name", "canvas", "root",
             "renderMode", "size", "scale",
-            "type", "text", "sprite", "style", "binding", "embed", "children",
+            "type", "text", "sprite", "texture", "interactable", "toggleValue",
+            "sliderValue", "sliderMin", "sliderMax", "sliderStep",
+            "textInputValue", "textInputPlaceholder", "textInputMultiline", "textInputReadOnly",
+            "style", "binding", "embed", "children",
             "position", "layout", "padding", "margin", "spacing", "backgroundColor", "textColor",
             "fontSize", "alignment", "flexibleWidth", "flexibleHeight",
             "action", "targetSlot"

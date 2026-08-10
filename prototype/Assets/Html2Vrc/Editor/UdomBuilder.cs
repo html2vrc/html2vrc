@@ -101,6 +101,9 @@ namespace Html2Vrc.Editor
         private const string ToggleCheckmarkSuffix = "::__toggle-checkmark";
         private const string SliderFillSuffix = "::__slider-fill";
         private const string SliderHandleSuffix = "::__slider-handle";
+        private const string InputViewportSuffix = "::__input-viewport";
+        private const string InputTextSuffix = "::__input-text";
+        private const string InputPlaceholderSuffix = "::__input-placeholder";
 
         private static readonly Type[] ManagedComponentTypes =
         {
@@ -109,6 +112,7 @@ namespace Html2Vrc.Editor
             typeof(Button),
             typeof(Toggle),
             typeof(Slider),
+            typeof(TMP_InputField),
             typeof(ScrollRect),
             typeof(Mask),
             typeof(RectMask2D),
@@ -407,6 +411,10 @@ namespace Html2Vrc.Editor
                     break;
                 case "slider":
                     ConfigureSlider(nodeObject, node, style, context);
+                    BuildChildren(node, nodeObject.transform, panelForChildren, context);
+                    break;
+                case "textinput":
+                    ConfigureTextInput(nodeObject, node, style, context);
                     BuildChildren(node, nodeObject.transform, panelForChildren, context);
                     break;
                 case "scrollview":
@@ -840,6 +848,119 @@ namespace Html2Vrc.Editor
                                   && Mathf.Abs(node.sliderMax - Mathf.Round(node.sliderMax)) < 0.0001f;
             slider.SetValueWithoutNotify(node.sliderValue);
             slider.interactable = node.interactable;
+        }
+
+        private static void ConfigureTextInput(
+            GameObject target,
+            UdomNode node,
+            UdomStyle style,
+            BuildContext context)
+        {
+            RemoveIfPresent<RawImage>(target);
+            var background = GetOrAdd<Image>(target);
+            var input = GetOrAdd<TMP_InputField>(target);
+            Undo.RecordObjects(new UnityEngine.Object[] { background, input }, "Configure UDOM Text Input");
+            background.color = UdomBuilderUtility.ParseColor(
+                style.backgroundColor,
+                new Color32(0x25, 0x27, 0x33, 0xFF));
+            background.raycastTarget = true;
+
+            var viewportId = node.id + InputViewportSuffix;
+            var viewport = UpsertGeneratedObject(viewportId, "InputViewport", true, target.transform, context);
+            context.DesiredIds.Add(viewportId);
+            viewport.name = "Text Area";
+            viewport.transform.SetSiblingIndex(0);
+            var viewportRect = viewport.GetComponent<RectTransform>();
+            ConfigureStretch(viewportRect);
+            Undo.RecordObject(viewportRect, "Configure UDOM Text Input viewport");
+            viewportRect.offsetMin = new Vector2(12f, 8f);
+            viewportRect.offsetMax = new Vector2(-12f, -8f);
+            RemoveIfPresent<LayoutElement>(viewport);
+            RemoveIfPresent<Image>(viewport);
+            GetOrAdd<RectMask2D>(viewport);
+
+            var textId = node.id + InputTextSuffix;
+            var textObject = UpsertGeneratedObject(textId, "InputText", true, viewport.transform, context);
+            context.DesiredIds.Add(textId);
+            textObject.name = "Text";
+            textObject.transform.SetSiblingIndex(0);
+            ConfigureStretch(textObject.GetComponent<RectTransform>());
+            RemoveIfPresent<LayoutElement>(textObject);
+            var text = GetOrAdd<TextMeshProUGUI>(textObject);
+            ConfigureInputTextGraphic(text, node.textInputValue, style, context.Font, false);
+
+            var placeholderId = node.id + InputPlaceholderSuffix;
+            var placeholderObject = UpsertGeneratedObject(
+                placeholderId,
+                "InputPlaceholder",
+                true,
+                viewport.transform,
+                context);
+            context.DesiredIds.Add(placeholderId);
+            placeholderObject.name = "Placeholder";
+            placeholderObject.transform.SetSiblingIndex(1);
+            ConfigureStretch(placeholderObject.GetComponent<RectTransform>());
+            RemoveIfPresent<LayoutElement>(placeholderObject);
+            var placeholder = GetOrAdd<TextMeshProUGUI>(placeholderObject);
+            ConfigureInputTextGraphic(
+                placeholder,
+                node.textInputPlaceholder,
+                style,
+                context.Font,
+                true);
+
+            input.targetGraphic = background;
+            input.textViewport = viewportRect;
+            input.textComponent = text;
+            input.placeholder = placeholder;
+            input.contentType = TMP_InputField.ContentType.Standard;
+            input.lineType = node.textInputMultiline
+                ? TMP_InputField.LineType.MultiLineNewline
+                : TMP_InputField.LineType.SingleLine;
+            input.richText = false;
+            input.readOnly = node.textInputReadOnly;
+            input.interactable = node.interactable;
+            input.transition = Selectable.Transition.ColorTint;
+            input.customCaretColor = true;
+            input.caretColor = text.color;
+            input.selectionColor = new Color(text.color.r, text.color.g, text.color.b, 0.35f);
+            input.SetTextWithoutNotify(node.textInputValue ?? string.Empty);
+        }
+
+        private static void ConfigureInputTextGraphic(
+            TextMeshProUGUI text,
+            string value,
+            UdomStyle style,
+            TMP_FontAsset font,
+            bool placeholder)
+        {
+            Undo.RecordObject(text, placeholder ? "Configure UDOM Input placeholder" : "Configure UDOM Input text");
+            text.text = value ?? string.Empty;
+            text.fontSize = style.fontSize;
+            var color = UdomBuilderUtility.ParseColor(style.textColor, Color.white);
+            if (placeholder)
+            {
+                color.a *= 0.5f;
+            }
+
+            text.color = color;
+            text.raycastTarget = false;
+            text.enableWordWrapping = true;
+            text.overflowMode = TextOverflowModes.Overflow;
+            if (UdomBuilderUtility.TryParseAlignment(style.alignment, out var alignment))
+            {
+                text.alignment = alignment;
+            }
+
+            if (UdomBuilderUtility.TryParseFontStyle(style.fontStyle, out var fontStyle))
+            {
+                text.fontStyle = fontStyle;
+            }
+
+            if (font != null)
+            {
+                text.font = font;
+            }
         }
 
         private static void ConfigureScrollView(
