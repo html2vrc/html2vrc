@@ -1,0 +1,39 @@
+name: Node packages
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/node-packages.yml"
+      - "package.json"
+      - "package-lock.json"
+      - "packages/udom/**"
+      - "packages/react/**"
+  pull_request:
+    paths:
+      - ".github/workflows/node-packages.yml"
+      - "package.json"
+      - "package-lock.json"
+      - "packages/udom/**"
+      - "packages/react/**"
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version:
+          - 20
+          - 22
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+      - run: npm ci
+      - run: npm run check

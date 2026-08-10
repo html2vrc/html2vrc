@@ -7,7 +7,7 @@ HTML2VRC는 웹 기술로 제작한 인터페이스를 수정 가능한 VRChat �
 웹은 AI 친화적인 디자인 환경으로만 사용하며 런타임으로 포함하지 않습니다. 최종 결과물은 Unity UI, TextMeshPro, 에셋과 Udon으로 구성되며, 월드 안에는 브라우저, WebView, React 또는 Node.js가 들어가지 않습니다.
 
 > [!IMPORTANT]
-> HTML2VRC는 현재 설계 및 프로토타입 단계입니다. 아직 사용할 수 있는 릴리스가 없습니다.
+> HTML2VRC는 현재 기술 검증 프로토타입 단계입니다. UDOM에서 VRChat 월드 번들까지의 첫 수직 경로는 동작하지만, 아직 사용할 수 있는 제품 릴리스는 없습니다.
 
 ## 왜 HTML2VRC인가요?
 
@@ -113,13 +113,25 @@ HTML2VRC는 다음을 목표로 하지 않습니다.
 
 웹 UI의 구조, 시각적 정체성과 유용한 인터랙션을 유지하면서 현실적으로 사용할 수 있는 VRChat 네이티브 결과물을 만드는 것이 목표입니다.
 
-## 예정된 패키지
+## 저장소 구성
 
-| 구성           | 이름                    |
-| ------------ | --------------------- |
-| Unity 패키지    | `com.nupamo.html2vrc` |
-| React 저작 SDK | `@html2vrc/react`     |
-| 중간 표현        | `UDOM`                |
+HTML2VRC의 명세, 저작 도구와 Unity 프로토타입은 한 저장소에서 함께 버전 관리합니다.
+
+| 경로 | 역할 |
+| --- | --- |
+| [`packages/udom`](packages/udom) | UDOM 0.1 명세, JSON Schema, fixture와 reference validator |
+| [`packages/react`](packages/react) | 제한된 React primitive와 정적 React-to-UDOM exporter |
+| [`packages/renderer`](packages/renderer) | 결정론적 UDOM-to-Unity renderer 설계 문서 |
+| [`prototype`](prototype) | Unity 및 VRChat 수직 프로토타입 |
+
+Node 패키지는 루트 npm workspace로 연결됩니다.
+
+```bash
+npm install
+npm run check
+```
+
+예정된 배포 이름은 Unity 패키지 `com.nupamo.html2vrc`, React SDK `@html2vrc/react`, 중간 표현 `UDOM`입니다.
 
 ## 로드맵
 
@@ -188,3 +200,82 @@ HTML2VRC는 현재 아키텍처, UDOM 범위와 첫 번째 수직 프로토타�
 3. 실제로 동작하는 VRChat UI를 생성합니다.
 4. Node.js가 필요하지 않은지 확인합니다.
 5. 그 위에 React 저작 환경과 AI 포팅을 추가합니다.
+
+## 첫 번째 기술 검증 프로토타입
+
+`prototype` 브랜치에는 UDOM 0.1 JSON을 Unity 네이티브 UI로 만드는 수직 프로토타입이 포함되어 있습니다.
+
+### 요구 환경
+
+- Unity `2022.3.22f1`
+- TextMeshPro `3.0.6`
+- Unity UI `1.0.0`
+- VRChat Worlds SDK `3.10.1`
+- Worlds SDK에 통합된 UdonSharp와 ClientSim
+- Node.js 불필요
+
+VRChat 패키지는 VPM manifest에 고정되어 있습니다. UDOM 파서와 Unity UI 생성 코어는 SDK와 분리되어 있고, VRChat 프로젝트에서는 미리 정의된 안전 동작이 `UdomUdonSafeAction : UdonSharpBehaviour`로 생성됩니다. 임의 JavaScript나 매번 새로 만든 Udon 코드는 사용하지 않습니다.
+
+### 1분 사용법
+
+1. Unity Hub에서 이 저장소 폴더를 Unity `2022.3.22f1` 프로젝트로 엽니다.
+2. Unity가 패키지 가져오기와 컴파일을 끝낼 때까지 기다립니다.
+3. `Assets/Html2Vrc/Samples/WorldSettings.udom.json`을 선택합니다.
+4. `Tools > HTML2VRC > UDOM Importer`를 엽니다.
+5. `Validate`를 누른 뒤 `Generate / Regenerate`를 누릅니다.
+6. 생성된 Canvas의 `UdomGeneratedRoot > External References`에서 `world-light` 슬롯에 원하는 Light GameObject를 드래그합니다.
+7. Play Mode에서 `Toggle World Light`와 `Close Panel` 버튼을 누릅니다.
+
+### 제한형 HTML 입력 사용법
+
+이제 작은 정적 HTML 파일을 UDOM으로 먼저 번역한 뒤 같은 Unity UI 생성 경로로 보낼 수 있습니다.
+
+1. `Assets/Html2Vrc/Samples/WorldSettings.html`을 선택합니다.
+2. `Tools > HTML2VRC > HTML Importer (Preview)`를 엽니다.
+3. `HTML 검증 / 변환`을 눌러 생성될 UDOM을 확인합니다.
+4. `Generate / Regenerate`를 누릅니다.
+5. 생성 루트의 `External References`에서 `world-light` 슬롯을 연결합니다.
+
+지원 범위는 `div`, 제목과 문단, `img`, `button`, 목록, ScrollView, Embed와 일부 인라인 CSS입니다. `script`, `onclick`, 외부 CSS와 임의 JavaScript는 실행하지 않고 오류로 표시합니다. 자세한 계약은 `Assets/Html2Vrc/Documentation/HTML_SUBSET.md`에 있습니다.
+
+HTML 입력부터 독립된 샘플 Scene까지 한 번에 확인하려면 `Tools > HTML2VRC > Build HTML World Settings Scene`을 실행합니다. 결과는 `Assets/Html2Vrc/Samples/WorldSettingsHtmlSample.unity`에 저장됩니다. VRChat에서 바로 확인하려면 `Tools > HTML2VRC > VRChat > Build & Test HTML Sample World`를 실행합니다.
+
+완성된 예제를 바로 보려면 `Tools > HTML2VRC > Build Sample World Settings Scene`을 실행합니다. `Assets/Html2Vrc/Samples/WorldSettingsSample.unity`에 Camera, Light, VRC Scene Descriptor, player spawn, 20×20m BoxCollider 바닥, 외부 연결과 생성 UI가 포함된 샘플 Scene이 저장됩니다. VRChat SDK가 있는 프로젝트에서는 월드 공간 Canvas에 클릭 입력을 전달하는 `VRCUiShape`도 자동으로 추가됩니다. 바닥은 UDOM 자동 생성 영역 밖의 사용자 소유 오브젝트이므로 패널을 Regenerate해도 삭제되지 않습니다.
+
+VRChat용 로컬 월드 번들을 만들려면 `Tools > HTML2VRC > VRChat > Build Sample World Bundle`을 실행합니다. 첫 실행에서 프로젝트가 Unity 기본 레이어만 사용하는 경우 VRChat 공식 레이어와 충돌 규칙도 함께 설정합니다. 업로드는 하지 않습니다.
+
+### 재생성 확인
+
+1. 샘플 JSON의 `title.text` 또는 `settings-panel.style.backgroundColor`를 바꿉니다.
+2. Importer에서 같은 파일로 `Generate / Regenerate`를 다시 실행합니다.
+3. 기존 안정 ID의 GameObject가 갱신되고 `world-light` 외부 참조는 유지되는지 확인합니다.
+4. Hierarchy에서 생성 마커가 없는 사용자 GameObject를 Canvas 아래 추가해도 재생성 시 삭제되지 않습니다.
+
+### 문서와 코드
+
+- 최소 규격: `Assets/Html2Vrc/Documentation/UDOM_SPEC.md`
+- HTML 입력 범위: `Assets/Html2Vrc/Documentation/HTML_SUBSET.md`
+- 샘플 HTML: `Assets/Html2Vrc/Samples/WorldSettings.html`
+- 샘플 JSON: `Assets/Html2Vrc/Samples/WorldSettings.udom.json`
+- HTML Importer: `Assets/Html2Vrc/Editor/HtmlImporterWindow.cs`
+- HTML 변환기: `Assets/Html2Vrc/Editor/HtmlToUdomConverter.cs`
+- HTML 샘플 Scene 빌더: `Assets/Html2Vrc/Editor/UdomHtmlSampleSceneBuilder.cs`
+- Importer: `Assets/Html2Vrc/Editor/UdomImporterWindow.cs`
+- 재생성 빌더: `Assets/Html2Vrc/Editor/UdomBuilder.cs`
+- Unity 폴백 동작: `Assets/Html2Vrc/Runtime/UdomSafeAction.cs`
+- VRChat UdonSharp 동작: `Assets/Html2Vrc/VRChat/Runtime/UdomUdonSafeAction.cs`
+- UdonSharp 연결 설명: `Assets/Html2Vrc/Documentation/UDONSHARP_BOUNDARY.md`
+- 실제 테스트 결과: `Assets/Html2Vrc/Documentation/TEST_RESULTS.md`
+- EditMode 테스트: `Assets/Html2Vrc/Tests/Editor/UdomPrototypeTests.cs`
+
+### 현재 한계
+
+- 제한된 정적 HTML과 일부 인라인 CSS만 읽습니다. 일반 웹사이트, React, JavaScript와 CSS 전체 호환은 지원하지 않습니다.
+- UDOM 0.1의 제한된 요소와 스타일만 지원합니다.
+- Sprite는 Unity 프로젝트의 `Assets/` 경로만 참조합니다.
+- 사용자 오브젝트는 보존하지만, 생성 마커가 붙은 오브젝트에서 생성기가 소유하는 UI 컴포넌트를 다른 타입으로 바꾸면 다음 재생성 때 원래 타입에 맞게 복구됩니다.
+- PC용 VRChat 월드 번들 빌드는 통과했지만 Quest 빌드와 업로드는 확인하지 않았습니다.
+- ClientSim 3.10.1은 자동 실행에서 시작과 초기화까지 진행되지만, Unity Batch Mode에는 입력 장치가 없어 SDK 내부 `ClientSimPlayerController`가 예외를 냅니다. 일반 Editor Play Mode 수동 확인이 더 필요합니다.
+- 바닥을 포함한 새 월드를 Build & Test로 다시 열고 로컬 번들 로딩과 Udon 구성까지 확인했습니다. BoxCollider가 Scene과 빌드에 포함된 것은 확인했지만, 실제 캐릭터가 바닥 위에 멈추는 장면과 버튼 클릭은 사람이 클라이언트에서 확인해야 합니다.
+- VR 헤드셋 확인은 아직 하지 않았습니다.
+- 네트워크 동기화는 이번 프로토타입 범위가 아닙니다.

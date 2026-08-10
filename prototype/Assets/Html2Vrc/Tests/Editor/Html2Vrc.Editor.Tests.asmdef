@@ -1,0 +1,28 @@
+{
+  "name": "Html2Vrc.Editor.Tests",
+  "rootNamespace": "Html2Vrc.Tests",
+  "references": [
+    "Html2Vrc.Runtime",
+    "Html2Vrc.Editor",
+    "Html2Vrc.VRChat.Runtime",
+    "Unity.TextMeshPro",
+    "Unity.ugui",
+    "UdonSharp.Runtime"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": false,
+  "defineConstraints": [
+    "UNITY_INCLUDE_TESTS"
+  ],
+  "versionDefines": [],
+  "noEngineReferences": false,
+  "optionalUnityReferences": [
+    "TestAssemblies"
+  ]
+}

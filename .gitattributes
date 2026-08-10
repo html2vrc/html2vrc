@@ -1,0 +1,13 @@
+# Unity's YAML serializer writes empty scalar values with a trailing space.
+# Keep whitespace checks strict for source and documentation files.
+*.cs      text eol=lf
+*.asmdef  text eol=lf
+*.json    text eol=lf
+*.unity   text eol=lf whitespace=-blank-at-eol
+*.prefab  text eol=lf whitespace=-blank-at-eol
+*.asset   text eol=lf whitespace=-blank-at-eol
+*.meta    text eol=lf whitespace=-blank-at-eol
+*.mat     text eol=lf whitespace=-blank-at-eol
+
+# TextMesh Pro essential resources are vendored by Unity and retain upstream formatting.
+"Assets/TextMesh Pro/Shaders/**" -whitespace
