@@ -1,0 +1,15 @@
+{
+  "asset": {
+    "version": "0.1",
+    "generator": "@html2vrc/udom fixtures"
+  },
+  "viewport": {
+    "width": 1280,
+    "height": 720
+  },
+  "root": {
+    "type": "element",
+    "id": "root",
+    "name": "view"
+  }
+}

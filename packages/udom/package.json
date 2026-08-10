@@ -1,0 +1,29 @@
+{
+  "name": "@html2vrc/udom",
+  "version": "0.1.0",
+  "description": "UDOM specification, schema, fixtures, and reference validator",
+  "type": "module",
+  "files": [
+    "bin",
+    "schemas",
+    "src"
+  ],
+  "bin": {
+    "udom-validate": "./bin/udom-validate.mjs"
+  },
+  "exports": {
+    ".": "./src/validator.mjs",
+    "./schema": "./schemas/udom-0.1.schema.json"
+  },
+  "scripts": {
+    "test": "node --test",
+    "validate": "node ./bin/udom-validate.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "ajv": "^8.20.0"
+  },
+  "license": "MIT"
+}
