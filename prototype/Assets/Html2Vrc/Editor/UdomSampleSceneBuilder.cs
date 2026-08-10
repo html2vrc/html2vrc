@@ -38,7 +38,7 @@ namespace Html2Vrc.Editor
                 throw new FileNotFoundException("Sample UDOM was not imported as TextAsset.", SampleUdomPath);
             }
 
-            var validation = UdomValidator.Validate(source.text);
+            var validation = UdomValidator.Validate(source.text, SampleUdomPath);
             if (!validation.IsValid)
             {
                 throw new UdomBuildException(validation);

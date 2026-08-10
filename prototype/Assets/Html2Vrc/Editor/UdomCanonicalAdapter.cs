@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.IO;
 
 namespace Html2Vrc.Editor
 {
@@ -24,6 +25,7 @@ namespace Html2Vrc.Editor
         {
             public string Type;
             public string Uri;
+            public string UnityPath;
             public float Width;
             public float Height;
         }
@@ -38,6 +40,7 @@ namespace Html2Vrc.Editor
 
         public static UdomDocument Map(
             Dictionary<string, object> value,
+            string sourceAssetPath,
             List<UdomParseWarning> warnings)
         {
             EnsureOnlyKeys(
@@ -85,7 +88,7 @@ namespace Html2Vrc.Editor
                 warnings);
 
             var styles = MapStyles(value);
-            var resources = MapResources(value);
+            var resources = MapResources(value, sourceAssetPath);
             var rootValue = RequireObject(RequireValue(value, "root", "$"), "$.root");
             var rootId = RequireString(rootValue, "id", "$.root.id");
             var canvasSize = new[] { width, height };
@@ -134,7 +137,9 @@ namespace Html2Vrc.Editor
             return result;
         }
 
-        private static Dictionary<string, ResourceInfo> MapResources(Dictionary<string, object> document)
+        private static Dictionary<string, ResourceInfo> MapResources(
+            Dictionary<string, object> document,
+            string sourceAssetPath)
         {
             var result = new Dictionary<string, ResourceInfo>(StringComparer.Ordinal);
             if (!document.TryGetValue("resources", out var resourcesValue))
@@ -174,16 +179,85 @@ namespace Html2Vrc.Editor
                     throw new FormatException($"{path}.type: unsupported canonical resource type '{type}'.");
                 }
 
+                var uri = RequireString(resource, "uri", path + ".uri");
                 result.Add(id, new ResourceInfo
                 {
                     Type = type,
-                    Uri = RequireString(resource, "uri", path + ".uri"),
+                    Uri = uri,
+                    UnityPath = ResolveUnityAssetPath(uri, sourceAssetPath),
                     Width = GetOptionalPositiveFloat(resource, "width", path + ".width"),
                     Height = GetOptionalPositiveFloat(resource, "height", path + ".height")
                 });
             }
 
             return result;
+        }
+
+        private static string ResolveUnityAssetPath(string uri, string sourceAssetPath)
+        {
+            if (string.IsNullOrWhiteSpace(uri))
+            {
+                return null;
+            }
+
+            var normalizedUri = uri.Replace('\\', '/');
+            if (normalizedUri.StartsWith("Assets/", StringComparison.Ordinal))
+            {
+                return NormalizeAssetSegments(normalizedUri);
+            }
+
+            if (string.IsNullOrWhiteSpace(sourceAssetPath)
+                || !sourceAssetPath.Replace('\\', '/').StartsWith("Assets/", StringComparison.Ordinal)
+                || normalizedUri.StartsWith("/", StringComparison.Ordinal)
+                || normalizedUri.Contains("://")
+                || Path.IsPathRooted(uri))
+            {
+                return null;
+            }
+
+            var normalizedSource = sourceAssetPath.Replace('\\', '/');
+            var separator = normalizedSource.LastIndexOf('/');
+            if (separator < 0)
+            {
+                return null;
+            }
+
+            return NormalizeAssetSegments(
+                normalizedSource.Substring(0, separator + 1) + normalizedUri);
+        }
+
+        private static string NormalizeAssetSegments(string path)
+        {
+            var result = new List<string>();
+            var segments = path.Replace('\\', '/').Split('/');
+            for (var index = 0; index < segments.Length; index++)
+            {
+                var segment = segments[index];
+                if (string.IsNullOrEmpty(segment) || string.Equals(segment, ".", StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                if (string.Equals(segment, "..", StringComparison.Ordinal))
+                {
+                    if (result.Count <= 1)
+                    {
+                        return null;
+                    }
+
+                    result.RemoveAt(result.Count - 1);
+                    continue;
+                }
+
+                result.Add(segment);
+            }
+
+            if (result.Count < 2 || !string.Equals(result[0], "Assets", StringComparison.Ordinal))
+            {
+                return null;
+            }
+
+            return string.Join("/", result);
         }
 
         private static UdomNode MapNode(
@@ -439,9 +513,16 @@ namespace Html2Vrc.Editor
                         throw new FormatException($"{path}.properties.resource: font resource '{resourceId}' cannot be used by an image.");
                     }
 
-                    if (resource.Uri.StartsWith("Assets/", StringComparison.Ordinal))
+                    if (!string.IsNullOrWhiteSpace(resource.UnityPath))
                     {
-                        node.sprite = resource.Uri;
+                        if (string.Equals(resource.Type, "sprite", StringComparison.Ordinal))
+                        {
+                            node.sprite = resource.UnityPath;
+                        }
+                        else
+                        {
+                            node.texture = resource.UnityPath;
+                        }
                     }
                     else
                     {

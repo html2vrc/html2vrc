@@ -89,7 +89,7 @@ namespace Html2Vrc.Editor
             "^[A-Za-z0-9][A-Za-z0-9._-]*$",
             RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
-        public static UdomValidationResult Validate(string json)
+        public static UdomValidationResult Validate(string json, string sourceAssetPath = null)
         {
             var result = new UdomValidationResult();
             if (string.IsNullOrWhiteSpace(json))
@@ -100,7 +100,11 @@ namespace Html2Vrc.Editor
 
             try
             {
-                result.Document = UdomJsonParser.Parse(json, out var isCanonical, out var parseWarnings);
+                result.Document = UdomJsonParser.Parse(
+                    json,
+                    sourceAssetPath,
+                    out var isCanonical,
+                    out var parseWarnings);
                 if (!isCanonical)
                 {
                     ValidateKnownProperties(json, result);
@@ -207,6 +211,22 @@ namespace Html2Vrc.Editor
                 else if (AssetDatabase.LoadAssetAtPath<Sprite>(node.sprite) == null)
                 {
                     AddError(result, path + ".sprite", $"Sprite를 찾을 수 없거나 Sprite 타입이 아니다: {node.sprite}");
+                }
+            }
+
+            if (!string.IsNullOrWhiteSpace(node.texture))
+            {
+                if (!string.IsNullOrWhiteSpace(node.sprite))
+                {
+                    AddError(result, path, "Image node cannot reference both a Sprite and a Texture.");
+                }
+                else if (!node.texture.StartsWith("Assets/", StringComparison.Ordinal))
+                {
+                    AddError(result, path + ".texture", "Texture path must start with Assets/.");
+                }
+                else if (AssetDatabase.LoadAssetAtPath<Texture2D>(node.texture) == null)
+                {
+                    AddError(result, path + ".texture", $"Texture2D asset was not found: {node.texture}");
                 }
             }
 

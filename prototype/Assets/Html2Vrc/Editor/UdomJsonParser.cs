@@ -9,11 +9,12 @@ namespace Html2Vrc.Editor
     {
         public static UdomDocument Parse(string json)
         {
-            return Parse(json, out _, out _);
+            return Parse(json, null, out _, out _);
         }
 
         public static UdomDocument Parse(
             string json,
+            string sourceAssetPath,
             out bool isCanonical,
             out List<UdomParseWarning> warnings)
         {
@@ -24,7 +25,7 @@ namespace Html2Vrc.Editor
             isCanonical = root.ContainsKey("asset") || root.ContainsKey("viewport");
             warnings = new List<UdomParseWarning>();
             return isCanonical
-                ? UdomCanonicalAdapter.Map(root, warnings)
+                ? UdomCanonicalAdapter.Map(root, sourceAssetPath, warnings)
                 : MapDocument(root);
         }
 

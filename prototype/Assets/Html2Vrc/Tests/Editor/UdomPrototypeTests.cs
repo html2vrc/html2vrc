@@ -21,6 +21,8 @@ namespace Html2Vrc.Tests
     public sealed class UdomPrototypeTests
     {
         private const string SampleHtmlPath = "Assets/Html2Vrc/Samples/WorldSettings.html";
+        private const string CanonicalRelativeImagePath =
+            "Assets/Html2Vrc/Samples/CanonicalRelativeImage.udom.json";
         private TextAsset sample;
 
         [SetUp]
@@ -164,6 +166,37 @@ namespace Html2Vrc.Tests
             Assert.That(toggle.isOn, Is.True);
             Assert.That(checkmark, Is.Not.Null);
             Assert.That(toggle.graphic, Is.SameAs(checkmark.GetComponent<Image>()));
+        }
+
+        [Test]
+        public void CanonicalRelativeResource_ResolvesFromSourceAssetWithoutEscapingAssets()
+        {
+            var source = AssetDatabase.LoadAssetAtPath<TextAsset>(CanonicalRelativeImagePath);
+            Assert.That(source, Is.Not.Null, "Canonical relative-resource sample must import as TextAsset.");
+
+            var validation = UdomValidator.Validate(source.text, CanonicalRelativeImagePath);
+            Assert.That(validation.IsValid, Is.True, validation.Format());
+            Assert.That(validation.Format(), Does.Not.Contain("uses relative URI"));
+            var imageNode = validation.Document.root.children[0];
+            Assert.That(
+                imageNode.texture,
+                Is.EqualTo("Assets/TextMesh Pro/Sprites/EmojiOne.png"));
+            Assert.That(AssetDatabase.LoadAssetAtPath<Texture2D>(imageNode.texture), Is.Not.Null);
+
+            var build = UdomBuilder.GenerateOrRegenerate(
+                validation.Document,
+                null,
+                source);
+            var image = UdomBuilder.FindNode(build.Root, "relative-resource-image").GetComponent<RawImage>();
+            Assert.That(image.texture, Is.Not.Null);
+
+            var escapingJson = source.text.Replace(
+                "../../TextMesh Pro/Sprites/EmojiOne.png",
+                "../../../../outside.png");
+            var escapingValidation = UdomValidator.Validate(escapingJson, CanonicalRelativeImagePath);
+            Assert.That(escapingValidation.IsValid, Is.True, escapingValidation.Format());
+            Assert.That(escapingValidation.Document.root.children[0].texture, Is.Null);
+            Assert.That(escapingValidation.Format(), Does.Contain("uses relative URI '../../../../outside.png'"));
         }
 
         [Test]

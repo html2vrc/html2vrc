@@ -103,6 +103,7 @@ namespace Html2Vrc.Editor
         private static readonly Type[] ManagedComponentTypes =
         {
             typeof(Image),
+            typeof(RawImage),
             typeof(Button),
             typeof(Toggle),
             typeof(ScrollRect),
@@ -135,7 +136,9 @@ namespace Html2Vrc.Editor
             UdomGeneratedRoot existingRoot = null,
             TextAsset sourceAsset = null)
         {
-            var validation = UdomValidator.Validate(json);
+            var validation = UdomValidator.Validate(
+                json,
+                sourceAsset != null ? AssetDatabase.GetAssetPath(sourceAsset) : null);
             if (!validation.IsValid)
             {
                 throw new UdomBuildException(validation);
@@ -622,9 +625,23 @@ namespace Html2Vrc.Editor
 
         private static void ConfigureImage(GameObject target, UdomNode node, UdomStyle style)
         {
+            var color = UdomBuilderUtility.ParseColor(style.backgroundColor, Color.white);
+            if (!string.IsNullOrWhiteSpace(node.texture))
+            {
+                RemoveIfPresent<Image>(target);
+                var rawImage = GetOrAdd<RawImage>(target);
+                Undo.RecordObject(rawImage, "Configure UDOM RawImage");
+                rawImage.color = color;
+                rawImage.texture = AssetDatabase.LoadAssetAtPath<Texture2D>(node.texture);
+                rawImage.uvRect = new Rect(0f, 0f, 1f, 1f);
+                rawImage.raycastTarget = false;
+                return;
+            }
+
+            RemoveIfPresent<RawImage>(target);
             var image = GetOrAdd<Image>(target);
             Undo.RecordObject(image, "Configure UDOM Image");
-            image.color = UdomBuilderUtility.ParseColor(style.backgroundColor, Color.white);
+            image.color = color;
             image.sprite = string.IsNullOrWhiteSpace(node.sprite)
                 ? null
                 : AssetDatabase.LoadAssetAtPath<Sprite>(node.sprite);

@@ -18,9 +18,11 @@ Unity Importer는 이 문서의 기존 형식과 함께 `packages/udom` JSON Sch
 | `layout.mode: flex` | `Vertical` 또는 `Horizontal` Layout Group |
 | `viewport.width`, `viewport.height` | Unity Canvas 크기 |
 
-Canonical 길이의 숫자와 부모 크기 기준 백분율, 기본 flex 방향과 간격, cross-axis 정렬, padding/margin, 단일 색상 배경, 기본 텍스트 스타일과 font weight를 변환한다. `styleRefs`는 배열 순서대로 깊은 병합한 뒤 노드의 inline `style`로 마지막 덮어쓴다. `Assets/`로 시작하는 image/sprite resource URI는 Unity Sprite 경로로 연결한다.
+Canonical 길이의 숫자와 부모 크기 기준 백분율, 기본 flex 방향과 간격, cross-axis 정렬, padding/margin, 단일 색상 배경, 기본 텍스트 스타일과 font weight를 변환한다. `styleRefs`는 배열 순서대로 깊은 병합한 뒤 노드의 inline `style`로 마지막 덮어쓴다. canonical `image` resource는 Texture2D/RawImage, `sprite` resource는 Sprite/Image로 생성한다.
 
-아직 지원하지 않는 canonical 기능은 묵시하지 않고 검증 오류나 명시적 폴백 경고로 반환한다. 현재 `slider`, `text-input`, 변환·테두리·그림자는 오류로 거부한다. gradient는 첫 color stop, radius는 square corner, font resource는 프로젝트 기본 TMP font로 폴백하고 각각 경고를 남긴다. 상대 image URI는 Unity 에셋 위치를 알 수 없어 경고를 남기고 빈 Image로 생성한다. `bind`와 `on`의 symbolic ID는 임의 로직으로 실행하지 않고, 안전한 Unity/Udon binding manifest가 없다는 경고로 남는다.
+Resource URI는 canonical 명세대로 UDOM TextAsset이 있는 폴더를 기준으로 해석한다. `Assets/`로 시작하는 절대 Unity 에셋 경로도 지원한다. `..`로 정규화하더라도 결과가 `Assets/` 밖으로 나가면 참조하지 않고 경고를 남긴다.
+
+아직 지원하지 않는 canonical 기능은 묵시하지 않고 검증 오류나 명시적 폴백 경고로 반환한다. 현재 `slider`, `text-input`, 변환·테두리·그림자는 오류로 거부한다. gradient는 첫 color stop, radius는 square corner, font resource는 프로젝트 기본 TMP font로 폴백하고 각각 경고를 남긴다. source asset 경로가 없는 raw JSON 검증에서는 상대 resource URI를 추측하지 않고 빈 Image와 경고를 사용한다. `bind`와 `on`의 symbolic ID는 임의 로직으로 실행하지 않고, 안전한 Unity/Udon binding manifest가 없다는 경고로 남는다.
 
 ## 최상위 구조
 

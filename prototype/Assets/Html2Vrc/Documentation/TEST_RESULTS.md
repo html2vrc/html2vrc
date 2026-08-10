@@ -17,11 +17,12 @@
 - shared `styleRefs`를 배열 순서대로 병합하고 inline `style`이 마지막에 덮어쓰는 것을 Node와 Unity 공유 fixture로 확인했다.
 - 공식 `settings.udom.json` 전체를 읽어 gradient·radius·font 폴백 진단, cross-axis 정렬, font weight, Image, Unity Toggle을 생성했다.
 - Toggle의 `bind.checked`와 `on.change`는 임의 코드로 실행하지 않고 binding manifest가 필요하다는 경고를 남긴다.
+- `CanonicalRelativeImage.udom.json`의 문서 상대 URI를 실제 Texture2D로 해석해 RawImage에 연결했다. `Assets/` 밖으로 나가는 상대 경로는 차단하는 회귀도 함께 확인했다.
 
 자동 검증 결과:
 
 - `npm run check`: UDOM conformance 15/15, React 4/4, TypeScript typecheck와 build 통과
-- Unity EditMode `Html2Vrc.Tests.UdomPrototypeTests`: **14/14 통과, 실패 0**
+- Unity EditMode `Html2Vrc.Tests.UdomPrototypeTests`: **15/15 통과, 실패 0**
 - Unity 종료 코드 0, C# 컴파일 오류 0
 - Windows CRLF에서 기존 HTML 재생성 테스트가 문자열을 교체하지 못하던 문제도 함께 수정했다.
 
@@ -51,7 +52,7 @@
 
 ## 자동 회귀 검증
 
-HTML2VRC 전용 Unity Test Framework 테스트 14개를 실행한다. 검증 범위는 다음과 같다.
+HTML2VRC 전용 Unity Test Framework 테스트 15개를 실행한다. 검증 범위는 다음과 같다.
 
 1. 샘플 UDOM Validation 성공과 잘못된 속성/중복 ID 거부
 2. Canvas, TextMeshProUGUI, Image, Button, ScrollRect, LayoutGroup과 VRChat용 `VRCUiShape` 생성
@@ -67,11 +68,12 @@ HTML2VRC 전용 Unity Test Framework 테스트 14개를 실행한다. 검증 범
 12. Unity가 구현하지 않은 canonical 요소를 묵시하지 않고 명확한 오류로 거부
 13. canonical shared style 배열 병합 순서와 inline style 우선순위를 실제 TextMeshPro 결과까지 확인
 14. 공식 canonical settings fixture의 시각 폴백 진단과 Unity Toggle 생성, 상징적 bind/on 비실행 보장
+15. UDOM source asset 기준 상대 image URI의 Texture2D/RawImage 연결과 `Assets/` 경계 탈출 차단
 
 최종 자동 테스트 결과:
 
-- 전체 14개
-- 통과 14개
+- 전체 15개
+- 통과 15개
 - 실패 0개
 - 건너뜀 0개
 - Unity 종료 코드 0

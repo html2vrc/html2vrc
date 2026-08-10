@@ -28,6 +28,7 @@ namespace Html2Vrc
         public string name;
         public string text;
         public string sprite;
+        public string texture;
         public bool interactable = true;
         public bool toggleValue;
         public UdomStyle style = new UdomStyle();

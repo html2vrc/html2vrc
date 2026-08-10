@@ -1,0 +1,53 @@
+{
+  "asset": {
+    "version": "0.1",
+    "generator": "HTML2VRC Unity relative-resource fixture"
+  },
+  "viewport": {
+    "width": 512,
+    "height": 512
+  },
+  "resources": [
+    {
+      "id": "image.emoji",
+      "type": "image",
+      "uri": "../../TextMesh Pro/Sprites/EmojiOne.png",
+      "mimeType": "image/png",
+      "width": 512,
+      "height": 512
+    }
+  ],
+  "root": {
+    "type": "element",
+    "id": "relative-resource-screen",
+    "name": "view",
+    "style": {
+      "layout": {
+        "mode": "flex",
+        "width": "100%",
+        "height": "100%",
+        "flex": {
+          "direction": "column",
+          "alignItems": "center"
+        }
+      }
+    },
+    "children": [
+      {
+        "type": "element",
+        "id": "relative-resource-image",
+        "name": "image",
+        "properties": {
+          "resource": "image.emoji",
+          "fit": "contain"
+        },
+        "style": {
+          "layout": {
+            "width": 256,
+            "height": 256
+          }
+        }
+      }
+    ]
+  }
+}

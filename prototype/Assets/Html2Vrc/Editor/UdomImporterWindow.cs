@@ -30,7 +30,9 @@ namespace Html2Vrc.Editor
         private static void ValidateSelectedAsset()
         {
             var selected = Selection.activeObject as TextAsset;
-            var validation = UdomValidator.Validate(selected != null ? selected.text : string.Empty);
+            var validation = UdomValidator.Validate(
+                selected != null ? selected.text : string.Empty,
+                selected != null ? AssetDatabase.GetAssetPath(selected) : null);
             if (validation.IsValid)
             {
                 Debug.Log($"HTML2VRC: '{selected.name}' validation passed.\n{validation.Format()}", selected);
@@ -117,7 +119,9 @@ namespace Html2Vrc.Editor
 
         private void ValidateSource()
         {
-            lastValidation = UdomValidator.Validate(source != null ? source.text : string.Empty);
+            lastValidation = UdomValidator.Validate(
+                source != null ? source.text : string.Empty,
+                source != null ? AssetDatabase.GetAssetPath(source) : null);
             status = lastValidation.IsValid
                 ? $"검증 성공: {lastValidation.Issues.Count}개 경고/정보"
                 : $"검증 실패\n{lastValidation.Format()}";
