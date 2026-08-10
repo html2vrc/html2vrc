@@ -125,18 +125,60 @@ namespace Html2Vrc.Tests
         }
 
         [Test]
+        public void CanonicalSettingsFixture_GeneratesToggleWithDiagnosedVisualFallbacks()
+        {
+            var json = LoadRepositoryFile(
+                "packages",
+                "udom",
+                "fixtures",
+                "valid",
+                "settings.udom.json");
+            var validation = UdomValidator.Validate(json);
+
+            Assert.That(validation.IsValid, Is.True, validation.Format());
+            Assert.That(validation.Format(), Does.Contain("linear-gradient"));
+            Assert.That(validation.Format(), Does.Contain("square corners"));
+            Assert.That(validation.Format(), Does.Contain("project default TMP font"));
+            Assert.That(validation.Format(), Does.Contain("Symbolic binding 'settings.musicEnabled'"));
+            Assert.That(validation.Format(), Does.Contain("Symbolic event 'settings.setMusicEnabled'"));
+
+            var document = validation.Document;
+            var titleNode = document.root.children[0];
+            var profileCard = document.root.children[1];
+            var toggleNode = profileCard.children[2];
+            Assert.That(document.root.style.backgroundColor, Is.EqualTo("#171A2BFF"));
+            Assert.That(profileCard.style.childAlignment, Is.EqualTo("MiddleLeft"));
+            Assert.That(titleNode.style.fontStyle, Is.EqualTo("Bold"));
+            Assert.That(toggleNode.type, Is.EqualTo("Toggle"));
+            Assert.That(toggleNode.toggleValue, Is.True);
+
+            var build = UdomBuilder.GenerateOrRegenerate(document);
+            var title = UdomBuilder.FindNode(build.Root, "settings-title").GetComponent<TextMeshProUGUI>();
+            var profileImage = UdomBuilder.FindNode(build.Root, "profile-image").GetComponent<Image>();
+            var toggle = UdomBuilder.FindNode(build.Root, "music-toggle").GetComponent<Toggle>();
+            var checkmark = UdomBuilder.FindNode(build.Root, "music-toggle::__toggle-checkmark");
+            Assert.That(title.text, Is.EqualTo("Settings"));
+            Assert.That((title.fontStyle & FontStyles.Bold) != 0, Is.True);
+            Assert.That(profileImage, Is.Not.Null);
+            Assert.That(toggle, Is.Not.Null);
+            Assert.That(toggle.isOn, Is.True);
+            Assert.That(checkmark, Is.Not.Null);
+            Assert.That(toggle.graphic, Is.SameAs(checkmark.GetComponent<Image>()));
+        }
+
+        [Test]
         public void CanonicalUdom_RejectsElementNotImplementedByUnityRenderer()
         {
             const string json = @"{
               ""asset"": { ""version"": ""0.1"" },
               ""viewport"": { ""width"": 400, ""height"": 300 },
-              ""root"": { ""type"": ""element"", ""id"": ""toggle"", ""name"": ""toggle"" }
+              ""root"": { ""type"": ""element"", ""id"": ""slider"", ""name"": ""slider"" }
             }";
 
             var validation = UdomValidator.Validate(json);
 
             Assert.That(validation.IsValid, Is.False);
-            Assert.That(validation.Format(), Does.Contain("canonical element 'toggle'"));
+            Assert.That(validation.Format(), Does.Contain("canonical element 'slider'"));
         }
 
         [Test]

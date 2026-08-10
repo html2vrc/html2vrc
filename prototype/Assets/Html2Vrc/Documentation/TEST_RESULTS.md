@@ -11,15 +11,17 @@
 - `packages/react/test/fixtures/basic.udom.json`을 바꾸지 않고 Unity 호환 계층에 직접 입력했다.
 - canonical `asset`, `viewport`, `element/view`, `text`, `image`, `button`, flex column과 gap이 Unity 내부 모델로 정규화되는 것을 확인했다.
 - 정규화된 문서가 실제 TextMeshProUGUI, Image, Button을 생성하는 것을 Unity Test Framework로 확인했다.
-- Unity 렌더러가 아직 구현하지 않은 canonical `toggle`을 명확한 검증 오류로 거부하는 회귀 테스트를 추가했다.
+- Unity 렌더러가 아직 구현하지 않은 canonical `slider`를 명확한 검증 오류로 거부하는 회귀 테스트를 유지한다.
 - 상대 image URI `assets/logo.png`는 Unity `Assets/` 경로가 아니므로 경고를 남기고 참조를 추측하지 않는다.
 - canonical `on.activate` 심볼은 임의 코드로 실행하지 않고, 안전한 binding이 없는 Button 경고로 유지한다.
 - shared `styleRefs`를 배열 순서대로 병합하고 inline `style`이 마지막에 덮어쓰는 것을 Node와 Unity 공유 fixture로 확인했다.
+- 공식 `settings.udom.json` 전체를 읽어 gradient·radius·font 폴백 진단, cross-axis 정렬, font weight, Image, Unity Toggle을 생성했다.
+- Toggle의 `bind.checked`와 `on.change`는 임의 코드로 실행하지 않고 binding manifest가 필요하다는 경고를 남긴다.
 
 자동 검증 결과:
 
 - `npm run check`: UDOM conformance 15/15, React 4/4, TypeScript typecheck와 build 통과
-- Unity EditMode `Html2Vrc.Tests.UdomPrototypeTests`: **13/13 통과, 실패 0**
+- Unity EditMode `Html2Vrc.Tests.UdomPrototypeTests`: **14/14 통과, 실패 0**
 - Unity 종료 코드 0, C# 컴파일 오류 0
 - Windows CRLF에서 기존 HTML 재생성 테스트가 문자열을 교체하지 못하던 문제도 함께 수정했다.
 
@@ -49,7 +51,7 @@
 
 ## 자동 회귀 검증
 
-HTML2VRC 전용 Unity Test Framework 테스트 13개를 실행한다. 검증 범위는 다음과 같다.
+HTML2VRC 전용 Unity Test Framework 테스트 14개를 실행한다. 검증 범위는 다음과 같다.
 
 1. 샘플 UDOM Validation 성공과 잘못된 속성/중복 ID 거부
 2. Canvas, TextMeshProUGUI, Image, Button, ScrollRect, LayoutGroup과 VRChat용 `VRCUiShape` 생성
@@ -64,11 +66,12 @@ HTML2VRC 전용 Unity Test Framework 테스트 13개를 실행한다. 검증 범
 11. React exporter의 canonical fixture를 Unity 내부 모델로 정규화하고 네이티브 UI 생성
 12. Unity가 구현하지 않은 canonical 요소를 묵시하지 않고 명확한 오류로 거부
 13. canonical shared style 배열 병합 순서와 inline style 우선순위를 실제 TextMeshPro 결과까지 확인
+14. 공식 canonical settings fixture의 시각 폴백 진단과 Unity Toggle 생성, 상징적 bind/on 비실행 보장
 
 최종 자동 테스트 결과:
 
-- 전체 13개
-- 통과 13개
+- 전체 14개
+- 통과 14개
 - 실패 0개
 - 건너뜀 0개
 - Unity 종료 코드 0

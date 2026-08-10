@@ -28,6 +28,8 @@ namespace Html2Vrc
         public string name;
         public string text;
         public string sprite;
+        public bool interactable = true;
+        public bool toggleValue;
         public UdomStyle style = new UdomStyle();
         public UdomBinding binding;
         public UdomEmbed embed;
@@ -47,6 +49,8 @@ namespace Html2Vrc
         public string textColor = "#FFFFFFFF";
         public float fontSize = 24f;
         public string alignment = "MiddleLeft";
+        public string fontStyle = "Normal";
+        public string childAlignment = "UpperLeft";
         public float flexibleWidth;
         public float flexibleHeight;
     }

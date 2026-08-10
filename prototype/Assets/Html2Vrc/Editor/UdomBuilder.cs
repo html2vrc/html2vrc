@@ -81,6 +81,16 @@ namespace Html2Vrc.Editor
         {
             return ColorUtility.TryParseHtmlString(value, out var color) ? color : fallback;
         }
+
+        public static bool TryParseFontStyle(string value, out FontStyles fontStyle)
+        {
+            return Enum.TryParse((value ?? "Normal").Trim(), true, out fontStyle);
+        }
+
+        public static bool TryParseChildAlignment(string value, out TextAnchor alignment)
+        {
+            return Enum.TryParse((value ?? "UpperLeft").Trim(), true, out alignment);
+        }
     }
 
     public static class UdomBuilder
@@ -88,11 +98,13 @@ namespace Html2Vrc.Editor
         private const string MarginSuffix = "::__margin";
         private const string ViewportSuffix = "::__viewport";
         private const string ContentSuffix = "::__content";
+        private const string ToggleCheckmarkSuffix = "::__toggle-checkmark";
 
         private static readonly Type[] ManagedComponentTypes =
         {
             typeof(Image),
             typeof(Button),
+            typeof(Toggle),
             typeof(ScrollRect),
             typeof(Mask),
             typeof(RectMask2D),
@@ -383,6 +395,10 @@ namespace Html2Vrc.Editor
                     ConfigureButton(nodeObject, node, style, documentPanel, context.Root);
                     BuildChildren(node, nodeObject.transform, panelForChildren, context);
                     break;
+                case "toggle":
+                    ConfigureToggle(nodeObject, node, style, context);
+                    BuildChildren(node, nodeObject.transform, panelForChildren, context);
+                    break;
                 case "scrollview":
                     ConfigureScrollView(nodeObject, node, style, panelForChildren, context);
                     break;
@@ -564,7 +580,11 @@ namespace Html2Vrc.Editor
                 Mathf.RoundToInt(padding.y),
                 Mathf.RoundToInt(padding.w));
             group.spacing = style.spacing;
-            group.childAlignment = TextAnchor.UpperLeft;
+            group.childAlignment = UdomBuilderUtility.TryParseChildAlignment(
+                style.childAlignment,
+                out var childAlignment)
+                ? childAlignment
+                : TextAnchor.UpperLeft;
             group.childControlWidth = false;
             group.childControlHeight = false;
             group.childForceExpandWidth = false;
@@ -587,6 +607,11 @@ namespace Html2Vrc.Editor
             if (UdomBuilderUtility.TryParseAlignment(style.alignment, out var alignment))
             {
                 text.alignment = alignment;
+            }
+
+            if (UdomBuilderUtility.TryParseFontStyle(style.fontStyle, out var fontStyle))
+            {
+                text.fontStyle = fontStyle;
             }
 
             if (font != null)
@@ -627,6 +652,7 @@ namespace Html2Vrc.Editor
             image.raycastTarget = true;
             button.targetGraphic = image;
             button.transition = Selectable.Transition.ColorTint;
+            button.interactable = node.interactable;
 
             var actionType = UdomActionType.None;
             var slot = string.Empty;
@@ -684,6 +710,46 @@ namespace Html2Vrc.Editor
             button.onClick.SetPersistentListenerState(
                 button.onClick.GetPersistentEventCount() - 1,
                 UnityEngine.Events.UnityEventCallState.EditorAndRuntime);
+        }
+
+        private static void ConfigureToggle(
+            GameObject target,
+            UdomNode node,
+            UdomStyle style,
+            BuildContext context)
+        {
+            var background = GetOrAdd<Image>(target);
+            var toggle = GetOrAdd<Toggle>(target);
+            Undo.RecordObjects(new UnityEngine.Object[] { background, toggle }, "Configure UDOM Toggle");
+            background.color = UdomBuilderUtility.ParseColor(style.backgroundColor, Color.gray);
+            background.raycastTarget = true;
+
+            var checkmarkId = node.id + ToggleCheckmarkSuffix;
+            var checkmark = UpsertGeneratedObject(checkmarkId, "ToggleCheckmark", true, target.transform, context);
+            context.DesiredIds.Add(checkmarkId);
+            checkmark.name = "Checkmark";
+            checkmark.transform.SetSiblingIndex(0);
+            var checkmarkRect = checkmark.GetComponent<RectTransform>();
+            Undo.RecordObject(checkmarkRect, "Configure UDOM Toggle checkmark");
+            checkmarkRect.anchorMin = new Vector2(0.25f, 0.25f);
+            checkmarkRect.anchorMax = new Vector2(0.75f, 0.75f);
+            checkmarkRect.pivot = new Vector2(0.5f, 0.5f);
+            checkmarkRect.anchoredPosition = Vector2.zero;
+            checkmarkRect.sizeDelta = Vector2.zero;
+            checkmarkRect.localScale = Vector3.one;
+            checkmarkRect.localRotation = Quaternion.identity;
+            RemoveIfPresent<LayoutElement>(checkmark);
+
+            var checkmarkImage = GetOrAdd<Image>(checkmark);
+            Undo.RecordObject(checkmarkImage, "Configure UDOM Toggle checkmark");
+            checkmarkImage.color = Color.white;
+            checkmarkImage.raycastTarget = false;
+
+            toggle.targetGraphic = background;
+            toggle.graphic = checkmarkImage;
+            toggle.transition = Selectable.Transition.ColorTint;
+            toggle.SetIsOnWithoutNotify(node.toggleValue);
+            toggle.interactable = node.interactable;
         }
 
         private static void ConfigureScrollView(

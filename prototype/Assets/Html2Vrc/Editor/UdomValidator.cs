@@ -63,6 +63,7 @@ namespace Html2Vrc.Editor
             "Text",
             "Image",
             "Button",
+            "Toggle",
             "ScrollView",
             "Embed"
         };
@@ -301,6 +302,16 @@ namespace Html2Vrc.Editor
             if (!UdomBuilderUtility.TryParseAlignment(style.alignment, out _))
             {
                 AddError(result, path + ".alignment", $"지원하지 않는 정렬 '{style.alignment}'.");
+            }
+
+            if (!UdomBuilderUtility.TryParseFontStyle(style.fontStyle, out _))
+            {
+                AddError(result, path + ".fontStyle", $"지원하지 않는 font style '{style.fontStyle}'.");
+            }
+
+            if (!UdomBuilderUtility.TryParseChildAlignment(style.childAlignment, out _))
+            {
+                AddError(result, path + ".childAlignment", $"지원하지 않는 child alignment '{style.childAlignment}'.");
             }
         }
 

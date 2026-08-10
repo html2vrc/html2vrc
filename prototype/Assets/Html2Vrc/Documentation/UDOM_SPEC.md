@@ -12,14 +12,15 @@ Unity Importer는 이 문서의 기존 형식과 함께 `packages/udom` JSON Sch
 | `text` | `Text` / TextMeshProUGUI |
 | `element/image` | `Image` |
 | `element/button` | `Button` |
+| `element/toggle` | `Toggle` |
 | `element/scroll` | `ScrollView` |
 | `element/embed` | `Embed` |
 | `layout.mode: flex` | `Vertical` 또는 `Horizontal` Layout Group |
 | `viewport.width`, `viewport.height` | Unity Canvas 크기 |
 
-Canonical 길이의 숫자와 부모 크기 기준 백분율, 기본 flex 방향과 간격, padding/margin, 단일 색상 배경, 기본 텍스트 스타일을 변환한다. `styleRefs`는 배열 순서대로 깊은 병합한 뒤 노드의 inline `style`로 마지막 덮어쓴다. `Assets/`로 시작하는 image/sprite resource URI는 Unity Sprite 경로로 연결한다.
+Canonical 길이의 숫자와 부모 크기 기준 백분율, 기본 flex 방향과 간격, cross-axis 정렬, padding/margin, 단일 색상 배경, 기본 텍스트 스타일과 font weight를 변환한다. `styleRefs`는 배열 순서대로 깊은 병합한 뒤 노드의 inline `style`로 마지막 덮어쓴다. `Assets/`로 시작하는 image/sprite resource URI는 Unity Sprite 경로로 연결한다.
 
-아직 지원하지 않는 canonical 기능은 묵시하지 않고 검증 오류로 반환한다. 현재 `toggle`, `slider`, `text-input`, data `bind`, 변환·그라데이션·테두리·그림자는 포함된다. 상대 image URI는 Unity 에셋 위치를 알 수 없어 경고를 남기고 빈 Image로 생성한다. `on.activate` 이벤트 이름은 임의 로직으로 실행하지 않고, 안전한 Unity/Udon binding이 없는 Button 경고로 남는다.
+아직 지원하지 않는 canonical 기능은 묵시하지 않고 검증 오류나 명시적 폴백 경고로 반환한다. 현재 `slider`, `text-input`, 변환·테두리·그림자는 오류로 거부한다. gradient는 첫 color stop, radius는 square corner, font resource는 프로젝트 기본 TMP font로 폴백하고 각각 경고를 남긴다. 상대 image URI는 Unity 에셋 위치를 알 수 없어 경고를 남기고 빈 Image로 생성한다. `bind`와 `on`의 symbolic ID는 임의 로직으로 실행하지 않고, 안전한 Unity/Udon binding manifest가 없다는 경고로 남는다.
 
 ## 최상위 구조
 

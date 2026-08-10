@@ -235,10 +235,16 @@ namespace Html2Vrc.Editor
                 throw new FormatException($"{path}.type: unsupported canonical node type '{canonicalType}'.");
             }
 
-            RejectNonEmptyObject(value, "bind", path + ".bind", "canonical data bindings are not supported yet");
+            ValidateBindingMap(canonicalType, elementName, value, path, warnings);
 
             var styleObject = ResolveStyle(value, path, styles);
-            var mappedStyle = MapStyle(styleObject, path + ".style", parentSize, fillParentByDefault);
+            var mappedStyle = MapStyle(
+                styleObject,
+                path + ".style",
+                parentSize,
+                fillParentByDefault,
+                resources,
+                warnings);
             var node = new UdomNode
             {
                 id = id,
@@ -266,7 +272,7 @@ namespace Html2Vrc.Editor
             }
 
             MapElementProperties(node, elementName, value, path, mappedStyle, resources, warnings);
-            ValidateEventMap(elementName, value, path);
+            ValidateEventMap(elementName, value, path, warnings);
 
             if (value.TryGetValue("children", out var childrenValue))
             {
@@ -383,11 +389,12 @@ namespace Html2Vrc.Editor
                     return "Image";
                 case "button":
                     return "Button";
+                case "toggle":
+                    return "Toggle";
                 case "scroll":
                     return "ScrollView";
                 case "embed":
                     return "Embed";
-                case "toggle":
                 case "slider":
                 case "text-input":
                     throw new FormatException($"{path}: canonical element '{elementName}' is not supported by the Unity renderer yet.");
@@ -458,15 +465,32 @@ namespace Html2Vrc.Editor
                         node.style.backgroundColor = "#FFFFFFFF";
                     }
 
+                    var imageFit = GetString(properties, "fit") ?? "fill";
+                    if (!string.Equals(imageFit, "contain", StringComparison.Ordinal)
+                        && !string.Equals(imageFit, "fill", StringComparison.Ordinal))
+                    {
+                        warnings.Add(new UdomParseWarning(
+                            path + ".properties.fit",
+                            $"Canonical image fit '{imageFit}' is approximated by the Unity Image preserve-aspect behavior."));
+                    }
+
+                    if (properties.ContainsKey("position"))
+                    {
+                        warnings.Add(new UdomParseWarning(
+                            path + ".properties.position",
+                            "Canonical image positioning is not applied by the Unity Image fallback."));
+                    }
+
                     break;
                 case "button":
                     if (properties != null)
                     {
                         EnsureOnlyKeys(properties, path + ".properties", "disabled");
-                        if (GetBoolean(properties, "disabled", false, path + ".properties.disabled"))
-                        {
-                            throw new FormatException($"{path}.properties.disabled: disabled canonical buttons are not supported yet.");
-                        }
+                        node.interactable = !GetBoolean(
+                            properties,
+                            "disabled",
+                            false,
+                            path + ".properties.disabled");
                     }
 
                     if (!mappedStyle.HasWidth)
@@ -482,6 +506,38 @@ namespace Html2Vrc.Editor
                     if (!mappedStyle.HasBackground)
                     {
                         node.style.backgroundColor = "#808080FF";
+                    }
+
+                    break;
+                case "toggle":
+                    if (properties != null)
+                    {
+                        EnsureOnlyKeys(properties, path + ".properties", "checked", "disabled");
+                        node.toggleValue = GetBoolean(
+                            properties,
+                            "checked",
+                            false,
+                            path + ".properties.checked");
+                        node.interactable = !GetBoolean(
+                            properties,
+                            "disabled",
+                            false,
+                            path + ".properties.disabled");
+                    }
+
+                    if (!mappedStyle.HasWidth)
+                    {
+                        node.style.size[0] = 88f;
+                    }
+
+                    if (!mappedStyle.HasHeight)
+                    {
+                        node.style.size[1] = 48f;
+                    }
+
+                    if (!mappedStyle.HasBackground)
+                    {
+                        node.style.backgroundColor = "#4A4A58FF";
                     }
 
                     break;
@@ -517,10 +573,45 @@ namespace Html2Vrc.Editor
             }
         }
 
+        private static void ValidateBindingMap(
+            string canonicalType,
+            string elementName,
+            Dictionary<string, object> value,
+            string path,
+            List<UdomParseWarning> warnings)
+        {
+            if (!value.TryGetValue("bind", out var bindValue))
+            {
+                return;
+            }
+
+            var bindings = RequireObject(bindValue, path + ".bind");
+            if (!string.Equals(canonicalType, "element", StringComparison.Ordinal)
+                || !string.Equals(elementName, "toggle", StringComparison.Ordinal))
+            {
+                if (bindings.Count > 0)
+                {
+                    throw new FormatException($"{path}.bind: canonical data bindings are not supported for this node yet.");
+                }
+
+                return;
+            }
+
+            EnsureOnlyKeys(bindings, path + ".bind", "checked");
+            if (bindings.TryGetValue("checked", out var checkedValue))
+            {
+                var binding = RequireString(checkedValue, path + ".bind.checked");
+                warnings.Add(new UdomParseWarning(
+                    path + ".bind.checked",
+                    $"Symbolic binding '{binding}' is not connected until a Unity/Udon binding manifest is supplied."));
+            }
+        }
+
         private static void ValidateEventMap(
             string elementName,
             Dictionary<string, object> value,
-            string path)
+            string path,
+            List<UdomParseWarning> warnings)
         {
             if (!value.TryGetValue("on", out var onValue))
             {
@@ -528,15 +619,27 @@ namespace Html2Vrc.Editor
             }
 
             var events = RequireObject(onValue, path + ".on");
-            if (!string.Equals(elementName, "button", StringComparison.Ordinal))
+            string supportedEvent;
+            if (string.Equals(elementName, "button", StringComparison.Ordinal))
             {
-                throw new FormatException($"{path}.on: canonical events are only accepted on buttons by this adapter.");
+                supportedEvent = "activate";
+            }
+            else if (string.Equals(elementName, "toggle", StringComparison.Ordinal))
+            {
+                supportedEvent = "change";
+            }
+            else
+            {
+                throw new FormatException($"{path}.on: canonical events are not supported for this element yet.");
             }
 
-            EnsureOnlyKeys(events, path + ".on", "activate");
-            if (events.TryGetValue("activate", out var activateValue))
+            EnsureOnlyKeys(events, path + ".on", supportedEvent);
+            if (events.TryGetValue(supportedEvent, out var eventValue))
             {
-                RequireString(activateValue, path + ".on.activate");
+                var eventId = RequireString(eventValue, path + ".on." + supportedEvent);
+                warnings.Add(new UdomParseWarning(
+                    path + ".on." + supportedEvent,
+                    $"Symbolic event '{eventId}' is not executed until a safe Unity/Udon binding manifest is supplied."));
             }
         }
 
@@ -544,7 +647,9 @@ namespace Html2Vrc.Editor
             Dictionary<string, object> value,
             string path,
             float[] parentSize,
-            bool fillParentByDefault)
+            bool fillParentByDefault,
+            Dictionary<string, ResourceInfo> resources,
+            List<UdomParseWarning> warnings)
         {
             var style = new UdomStyle();
             if (fillParentByDefault && parentSize != null && parentSize.Length == 2)
@@ -566,12 +671,21 @@ namespace Html2Vrc.Editor
 
             if (value.TryGetValue("paint", out var paintValue))
             {
-                MapPaint(RequireObject(paintValue, path + ".paint"), path + ".paint", result);
+                MapPaint(
+                    RequireObject(paintValue, path + ".paint"),
+                    path + ".paint",
+                    result,
+                    warnings);
             }
 
             if (value.TryGetValue("text", out var textValue))
             {
-                MapTextStyle(RequireObject(textValue, path + ".text"), path + ".text", style);
+                MapTextStyle(
+                    RequireObject(textValue, path + ".text"),
+                    path + ".text",
+                    style,
+                    resources,
+                    warnings);
             }
 
             RejectNonEmptyObject(value, "transform", path + ".transform", "canonical transforms are not supported yet");
@@ -728,7 +842,6 @@ namespace Html2Vrc.Editor
                 "columnGap");
             RequireDefaultString(flex, "wrap", "nowrap", path + ".flex.wrap");
             RequireDefaultString(flex, "justify", "start", path + ".flex.justify");
-            RequireDefaultString(flex, "alignItems", "start", path + ".flex.alignItems");
             RequireDefaultString(flex, "alignContent", "start", path + ".flex.alignContent");
 
             var direction = GetString(flex, "direction") ?? "row";
@@ -747,6 +860,10 @@ namespace Html2Vrc.Editor
             }
 
             result.Style.layout = isVertical ? "Vertical" : "Horizontal";
+            result.Style.childAlignment = MapChildAlignment(
+                isVertical,
+                GetString(flex, "alignItems") ?? "start",
+                path + ".flex.alignItems");
             var primaryGapKey = isVertical ? "rowGap" : "columnGap";
             var crossGapKey = isVertical ? "columnGap" : "rowGap";
             if (flex.TryGetValue(primaryGapKey, out var primaryGapValue)
@@ -768,7 +885,43 @@ namespace Html2Vrc.Editor
             }
         }
 
-        private static void MapPaint(Dictionary<string, object> value, string path, StyleMapping result)
+        private static string MapChildAlignment(bool isVertical, string alignItems, string path)
+        {
+            if (isVertical)
+            {
+                switch (alignItems)
+                {
+                    case "start":
+                    case "stretch":
+                        return "UpperLeft";
+                    case "center":
+                        return "UpperCenter";
+                    case "end":
+                        return "UpperRight";
+                    default:
+                        throw new FormatException($"{path}: unsupported cross-axis alignment '{alignItems}'.");
+                }
+            }
+
+            switch (alignItems)
+            {
+                case "start":
+                case "stretch":
+                    return "UpperLeft";
+                case "center":
+                    return "MiddleLeft";
+                case "end":
+                    return "LowerLeft";
+                default:
+                    throw new FormatException($"{path}: unsupported cross-axis alignment '{alignItems}'.");
+            }
+        }
+
+        private static void MapPaint(
+            Dictionary<string, object> value,
+            string path,
+            StyleMapping result,
+            List<UdomParseWarning> warnings)
         {
             EnsureOnlyKeys(value, path, "visible", "opacity", "backgrounds", "border", "radius", "shadows");
             if (!GetBoolean(value, "visible", true, path + ".visible"))
@@ -783,8 +936,14 @@ namespace Html2Vrc.Editor
             }
 
             RejectPresent(value, path, "border", "canonical borders are not supported yet");
-            RejectPresent(value, path, "radius", "canonical corner radii are not supported yet");
             RejectNonEmptyArray(value, "shadows", path + ".shadows", "canonical shadows are not supported yet");
+            if (value.TryGetValue("radius", out var radiusValue))
+            {
+                ValidateCornerRadius(RequireObject(radiusValue, path + ".radius"), path + ".radius");
+                warnings.Add(new UdomParseWarning(
+                    path + ".radius",
+                    "Canonical corner radii are rendered as square corners by the current Unity fallback."));
+            }
 
             if (!value.TryGetValue("backgrounds", out var backgroundsValue))
             {
@@ -799,22 +958,138 @@ namespace Html2Vrc.Editor
 
             if (backgrounds.Count != 1)
             {
-                throw new FormatException($"{path}.backgrounds: only one color background is supported yet.");
+                throw new FormatException($"{path}.backgrounds: only one background layer is supported yet.");
             }
 
             var background = RequireObject(backgrounds[0], path + ".backgrounds[0]");
-            EnsureOnlyKeys(background, path + ".backgrounds[0]", "type", "color");
             var type = RequireString(background, "type", path + ".backgrounds[0].type");
-            if (!string.Equals(type, "color", StringComparison.Ordinal))
+            if (string.Equals(type, "color", StringComparison.Ordinal))
             {
-                throw new FormatException($"{path}.backgrounds[0].type: only canonical color backgrounds are supported yet.");
+                EnsureOnlyKeys(background, path + ".backgrounds[0]", "type", "color");
+                result.Style.backgroundColor = RequireString(
+                    background,
+                    "color",
+                    path + ".backgrounds[0].color");
+            }
+            else if (string.Equals(type, "linear-gradient", StringComparison.Ordinal)
+                     || string.Equals(type, "radial-gradient", StringComparison.Ordinal)
+                     || string.Equals(type, "conic-gradient", StringComparison.Ordinal))
+            {
+                result.Style.backgroundColor = MapGradientFallback(
+                    background,
+                    path + ".backgrounds[0]",
+                    type);
+                warnings.Add(new UdomParseWarning(
+                    path + ".backgrounds[0]",
+                    $"Canonical {type} is approximated with its first stop color until a gradient backend is available."));
+            }
+            else
+            {
+                throw new FormatException($"{path}.backgrounds[0].type: unsupported canonical background '{type}'.");
             }
 
-            result.Style.backgroundColor = RequireString(background, "color", path + ".backgrounds[0].color");
             result.HasBackground = true;
         }
 
-        private static void MapTextStyle(Dictionary<string, object> value, string path, UdomStyle style)
+        private static void ValidateCornerRadius(Dictionary<string, object> value, string path)
+        {
+            EnsureOnlyKeys(value, path, "topLeft", "topRight", "bottomRight", "bottomLeft");
+            foreach (var pair in value)
+            {
+                if (TryResolveLength(pair.Value, 100f, path + "." + pair.Key, out var radius)
+                    && radius < 0f)
+                {
+                    throw new FormatException($"{path}.{pair.Key}: corner radius cannot be negative.");
+                }
+            }
+        }
+
+        private static string MapGradientFallback(
+            Dictionary<string, object> value,
+            string path,
+            string type)
+        {
+            if (string.Equals(type, "linear-gradient", StringComparison.Ordinal))
+            {
+                EnsureOnlyKeys(value, path, "type", "angle", "stops");
+                if (value.TryGetValue("angle", out var angleValue))
+                {
+                    RequireFloat(angleValue, path + ".angle");
+                }
+            }
+            else if (string.Equals(type, "radial-gradient", StringComparison.Ordinal))
+            {
+                EnsureOnlyKeys(value, path, "type", "center", "radius", "stops");
+                ValidateOptionalXyLength(value, "center", path + ".center");
+                ValidateOptionalXyLength(value, "radius", path + ".radius");
+            }
+            else
+            {
+                EnsureOnlyKeys(value, path, "type", "center", "angle", "stops");
+                ValidateOptionalXyLength(value, "center", path + ".center");
+                if (value.TryGetValue("angle", out var angleValue))
+                {
+                    RequireFloat(angleValue, path + ".angle");
+                }
+            }
+
+            var stops = RequireArray(RequireValue(value, "stops", path), path + ".stops");
+            if (stops.Count < 2)
+            {
+                throw new FormatException($"{path}.stops: a gradient requires at least two stops.");
+            }
+
+            var previousPosition = -1f;
+            string firstColor = null;
+            for (var index = 0; index < stops.Count; index++)
+            {
+                var stopPath = $"{path}.stops[{index}]";
+                var stop = RequireObject(stops[index], stopPath);
+                EnsureOnlyKeys(stop, stopPath, "position", "color");
+                var position = RequireFloat(RequireValue(stop, "position", stopPath), stopPath + ".position");
+                if (position < 0f || position > 1f || position < previousPosition)
+                {
+                    throw new FormatException($"{stopPath}.position: gradient stops must increase from 0 to 1.");
+                }
+
+                previousPosition = position;
+                var color = RequireString(stop, "color", stopPath + ".color");
+                if (index == 0)
+                {
+                    firstColor = color;
+                }
+            }
+
+            return firstColor;
+        }
+
+        private static void ValidateOptionalXyLength(
+            Dictionary<string, object> value,
+            string key,
+            string path)
+        {
+            if (!value.TryGetValue(key, out var raw))
+            {
+                return;
+            }
+
+            var xy = RequireObject(raw, path);
+            EnsureOnlyKeys(xy, path, "x", "y");
+            if (!xy.TryGetValue("x", out var xValue) || !xy.TryGetValue("y", out var yValue))
+            {
+                throw new FormatException($"{path}: both x and y are required.");
+            }
+
+            TryResolveLength(xValue, 100f, path + ".x", out _);
+            TryResolveLength(yValue, 100f, path + ".y", out _);
+        }
+
+        private static void MapTextStyle(
+            Dictionary<string, object> value,
+            string path,
+            UdomStyle style,
+            Dictionary<string, ResourceInfo> resources,
+            List<UdomParseWarning> warnings)
         {
             EnsureOnlyKeys(
                 value,
@@ -831,14 +1106,59 @@ namespace Html2Vrc.Editor
                 "wrap",
                 "overflow",
                 "preserveWhitespace");
-            RejectPresent(value, path, "font", "canonical font resources are not supported yet");
-            RejectPresent(value, path, "fontWeight", "font weight is not supported yet");
-            RequireDefaultString(value, "fontStyle", "normal", path + ".fontStyle");
             RejectPresent(value, path, "lineHeight", "line height is not supported yet");
             RejectPresent(value, path, "letterSpacing", "letter spacing is not supported yet");
             RequireDefaultString(value, "wrap", "wrap", path + ".wrap");
             RequireDefaultString(value, "overflow", "ellipsis", path + ".overflow");
             RejectPresent(value, path, "preserveWhitespace", "preserveWhitespace is not supported yet");
+
+            if (value.TryGetValue("font", out var fontValue))
+            {
+                var fontId = RequireString(fontValue, path + ".font");
+                if (!resources.TryGetValue(fontId, out var fontResource))
+                {
+                    throw new FormatException($"{path}.font: unknown canonical font resource '{fontId}'.");
+                }
+
+                if (!string.Equals(fontResource.Type, "font", StringComparison.Ordinal))
+                {
+                    throw new FormatException($"{path}.font: resource '{fontId}' is not a font.");
+                }
+
+                warnings.Add(new UdomParseWarning(
+                    path + ".font",
+                    $"Canonical font '{fontId}' ({fontResource.Uri}) uses the project default TMP font until font asset generation is implemented."));
+            }
+
+            var bold = false;
+            if (value.TryGetValue("fontWeight", out var fontWeightValue))
+            {
+                var fontWeight = RequireFloat(fontWeightValue, path + ".fontWeight");
+                if (fontWeight < 1f || fontWeight > 1000f || Math.Abs(fontWeight - Math.Round(fontWeight)) > 0.0001f)
+                {
+                    throw new FormatException($"{path}.fontWeight: font weight must be an integer from 1 to 1000.");
+                }
+
+                bold = fontWeight >= 600f;
+            }
+
+            var italic = false;
+            if (value.TryGetValue("fontStyle", out var fontStyleValue))
+            {
+                var canonicalFontStyle = RequireString(fontStyleValue, path + ".fontStyle");
+                if (string.Equals(canonicalFontStyle, "italic", StringComparison.Ordinal))
+                {
+                    italic = true;
+                }
+                else if (!string.Equals(canonicalFontStyle, "normal", StringComparison.Ordinal))
+                {
+                    throw new FormatException($"{path}.fontStyle: unsupported font style '{canonicalFontStyle}'.");
+                }
+            }
+
+            style.fontStyle = bold
+                ? (italic ? "BoldItalic" : "Bold")
+                : (italic ? "Italic" : "Normal");
 
             if (value.TryGetValue("fontSize", out var fontSizeValue))
             {
