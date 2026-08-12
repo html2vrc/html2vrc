@@ -120,6 +120,48 @@ namespace Html2Vrc.Editor
                 node.style = MapStyle(RequireObject(styleValue, path + ".style"), path + ".style");
             }
 
+            if (value.TryGetValue("textRuns", out var textRunsValue))
+            {
+                var textRuns = RequireArray(textRunsValue, path + ".textRuns");
+                node.textRuns = new UdomTextRun[textRuns.Count];
+                for (var index = 0; index < textRuns.Count; index++)
+                {
+                    var runPath = $"{path}.textRuns[{index}]";
+                    var runValue = RequireObject(textRuns[index], runPath);
+                    foreach (var key in runValue.Keys)
+                    {
+                        if (!string.Equals(key, "text", StringComparison.Ordinal)
+                            && !string.Equals(key, "bold", StringComparison.Ordinal)
+                            && !string.Equals(key, "italic", StringComparison.Ordinal)
+                            && !string.Equals(key, "fontScale", StringComparison.Ordinal))
+                        {
+                            throw new FormatException($"{runPath}: 지원하지 않는 text run 속성 '{key}'.");
+                        }
+                    }
+
+                    var run = new UdomTextRun
+                    {
+                        text = GetString(runValue, "text")
+                    };
+                    if (runValue.TryGetValue("bold", out var bold))
+                    {
+                        run.bold = GetBoolean(bold, runPath + ".bold");
+                    }
+
+                    if (runValue.TryGetValue("italic", out var italic))
+                    {
+                        run.italic = GetBoolean(italic, runPath + ".italic");
+                    }
+
+                    if (runValue.TryGetValue("fontScale", out var fontScale))
+                    {
+                        run.fontScale = GetFloat(fontScale, runPath + ".fontScale");
+                    }
+
+                    node.textRuns[index] = run;
+                }
+            }
+
             if (value.TryGetValue("binding", out var bindingValue))
             {
                 var bindingObject = RequireObject(bindingValue, path + ".binding");

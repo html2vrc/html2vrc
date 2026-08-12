@@ -60,7 +60,15 @@ namespace Html2Vrc.Editor
             writer.StringProperty("id", node.id);
             writer.StringProperty("type", node.type);
             writer.OptionalStringProperty("name", node.name);
-            writer.OptionalStringProperty("text", node.text);
+            if (string.Equals(node.type, "Text", StringComparison.OrdinalIgnoreCase))
+            {
+                writer.StringProperty("text", node.text);
+            }
+            else
+            {
+                writer.OptionalStringProperty("text", node.text);
+            }
+            WriteTextRuns(writer, node.textRuns);
             writer.OptionalStringProperty("sprite", node.sprite);
             writer.OptionalStringProperty("texture", node.texture);
             if (string.Equals(node.type, "Image", StringComparison.OrdinalIgnoreCase))
@@ -106,6 +114,36 @@ namespace Html2Vrc.Editor
             }
 
             writer.EndObject();
+        }
+
+        private static void WriteTextRuns(Writer writer, UdomTextRun[] textRuns)
+        {
+            if (textRuns == null || textRuns.Length == 0)
+            {
+                return;
+            }
+
+            writer.PropertyName("textRuns");
+            writer.BeginArray();
+            for (var index = 0; index < textRuns.Length; index++)
+            {
+                var run = textRuns[index];
+                writer.ArrayValuePrefix();
+                if (run == null)
+                {
+                    writer.Null();
+                    continue;
+                }
+
+                writer.BeginObject();
+                writer.StringProperty("text", run.text);
+                writer.BoolProperty("bold", run.bold);
+                writer.BoolProperty("italic", run.italic);
+                writer.FloatProperty("fontScale", run.fontScale);
+                writer.EndObject();
+            }
+
+            writer.EndArray();
         }
 
         private static void WriteStyle(Writer writer, UdomStyle style)

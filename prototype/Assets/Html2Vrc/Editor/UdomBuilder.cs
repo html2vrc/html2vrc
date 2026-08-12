@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 using TMPro;
 using UnityEditor;
 using UnityEditor.Events;
@@ -1745,7 +1746,11 @@ namespace Html2Vrc.Editor
             RemoveIfPresent<Image>(target);
             var text = GetOrAdd<TextMeshProUGUI>(target);
             Undo.RecordObject(text, "Configure UDOM Text");
-            text.text = node.text ?? string.Empty;
+            var textRuns = node.textRuns ?? Array.Empty<UdomTextRun>();
+            text.richText = textRuns.Length > 0;
+            text.text = textRuns.Length > 0
+                ? BuildSafeRichText(textRuns)
+                : node.text ?? string.Empty;
             text.fontSize = style.fontSize;
             text.color = UdomBuilderUtility.ParseColor(style.textColor, Color.white);
             text.raycastTarget = false;
@@ -1767,6 +1772,87 @@ namespace Html2Vrc.Editor
             }
 
             ConfigureTextMetrics(text, style);
+        }
+
+        private static string BuildSafeRichText(UdomTextRun[] runs)
+        {
+            var builder = new StringBuilder();
+            for (var index = 0; index < runs.Length; index++)
+            {
+                var run = runs[index];
+                if (run == null || string.IsNullOrEmpty(run.text))
+                {
+                    continue;
+                }
+
+                if (run.bold)
+                {
+                    builder.Append("<b>");
+                }
+
+                if (run.italic)
+                {
+                    builder.Append("<i>");
+                }
+
+                var hasScaledFont = Math.Abs(run.fontScale - 1f) > 0.0001f;
+                if (hasScaledFont)
+                {
+                    builder.Append("<size=");
+                    builder.Append((run.fontScale * 100f).ToString(
+                        "0.######",
+                        System.Globalization.CultureInfo.InvariantCulture));
+                    builder.Append("%>");
+                }
+
+                AppendSafeRichTextLiteral(builder, run.text);
+
+                if (hasScaledFont)
+                {
+                    builder.Append("</size>");
+                }
+
+                if (run.italic)
+                {
+                    builder.Append("</i>");
+                }
+
+                if (run.bold)
+                {
+                    builder.Append("</b>");
+                }
+            }
+
+            return builder.ToString();
+        }
+
+        private static void AppendSafeRichTextLiteral(StringBuilder builder, string value)
+        {
+            var start = 0;
+            for (var index = 0; index < value.Length; index++)
+            {
+                if (value[index] != '<')
+                {
+                    continue;
+                }
+
+                if (index > start)
+                {
+                    builder.Append("<noparse>");
+                    builder.Append(value, start, index - start);
+                    builder.Append("</noparse>");
+                }
+
+                builder.Append("<noparse><</noparse>");
+                start = index + 1;
+            }
+
+            if (start < value.Length)
+            {
+                builder.Append("<noparse>");
+                builder.Append(value, start, value.Length - start);
+                builder.Append("</noparse>");
+            }
         }
 
         private static void ConfigureImage(

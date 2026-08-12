@@ -80,7 +80,7 @@ Canonical `paint.shadows`는 `shadowOffsets`, `shadowBlurs`, `shadowSpreads`, `s
 
 Canonical text는 `lineHeight`, `letterSpacing`, `align: justify`, `verticalAlign`, `wrap`, `overflow`, `preserveWhitespace`를 내부 text metric과 flow 필드로 정규화한다. 숫자 line height는 TMP FontAsset의 face line height와 point size에서 필요한 추가 spacing을 계산해 baseline 간격을 design unit에 맞춘다. Letter spacing은 design unit을 TMP의 font-size-relative em 값으로 환산한다. `clip`은 TMP masking, `visible`은 overflow, `ellipsis`는 ellipsis 모드에 대응하며, whitespace 보존이 꺼져 있으면 연속 공백과 줄바꿈을 한 칸으로 축약한다. 생략된 canonical 기본값은 16px, 검정, top/start, wrap, clip이다.
 
-제한형 HTML의 `font-weight` normal·bold·1~1000 정수, `font-style` normal·italic, `line-height` normal·unitless·percentage·px, `letter-spacing` normal·signed px, `white-space` normal·nowrap·pre·pre-wrap·pre-line, `text-overflow` clip·ellipsis와 `text-align` start·end·justify를 위 내부 필드로 정규화한다. Weight 600 이상은 Bold이고 italic과 결합하면 validator와 TMP builder가 공유하는 `BoldItalic`이 된다. Line-height 상대값은 inline source-order와 무관하게 최종 font size에서 계산하고, direction을 지원하지 않는 subset의 start·end는 LTR left·right로 고정한다. Converter의 ordered mixed-content 목록은 인라인 태그 사이 텍스트와 `<br>` 위치를 보존하며, white-space 모드에 따라 원문 보존·줄별 축약·일반 축약을 선택한다. Button과 `li`의 안정 파생 Text에도 부모 font style과 text-flow 값을 복사하고, 스타일 기본값으로 돌아가도 같은 GameObject를 재사용한다. 인라인 semantic 태그는 아직 별도 styled run으로 정규화하지 않는다.
+제한형 HTML의 `font-weight` normal·bold·1~1000 정수, `font-style` normal·italic, `line-height` normal·unitless·percentage·px, `letter-spacing` normal·signed px, `white-space` normal·nowrap·pre·pre-wrap·pre-line, `text-overflow` clip·ellipsis와 `text-align` start·end·justify를 위 내부 필드로 정규화한다. Weight 600 이상은 Bold이고 italic과 결합하면 validator와 TMP builder가 공유하는 `BoldItalic`이 된다. `<strong>/<b>`, `<em>/<i>`, `<small>`은 각각 additive Bold, Italic, 5/6 font scale의 legacy `textRuns`로 정규화한다. Run은 중첩할 수 있고 평문 합계가 노드 `text`와 일치해야 한다. Builder는 run이 있을 때만 검증된 태그를 만들고 모든 run 평문을 TMP no-parse 구간으로 분리하므로 HTML entity로 만든 임의 TMP 태그는 실행되지 않는다. Canonical UDOM 0.1에는 rich text 표현이 없으므로 canonical text adapter는 `textRuns`를 만들지 않고 TMP rich text도 끈다. Line-height 상대값은 inline source-order와 무관하게 최종 font size에서 계산하고, direction을 지원하지 않는 subset의 start·end는 LTR left·right로 고정한다. Converter의 ordered mixed-content 목록은 인라인 태그 사이 텍스트와 `<br>` 위치를 보존하며, white-space 모드에 따라 원문 보존·줄별 축약·일반 축약을 선택한다. Button과 `li`의 안정 파생 Text에도 부모 font style·text-flow와 run을 복사하고, 스타일 기본값으로 돌아가도 같은 GameObject를 재사용한다.
 
 Canonical font resource URI가 기존 `.asset` TMP Font Asset을 가리키면 이를 Text와 TextInput의 text·placeholder에 직접 연결한다. `.ttf` 또는 `.otf` Unity Font를 가리키면 source GUID와 이름으로 `Assets/Html2VrcGenerated/Fonts` 아래의 dynamic TMP Font Asset을 한 번 생성해 문서와 노드 사이에서 공유한다. 동일 source는 재생성해도 같은 asset GUID를 유지한다. 누락되었거나 지원하지 않는 font 형식은 명시적 경고와 함께 TMP Settings의 기본 font로 폴백하며, 생성된 custom font가 기본 후보로 선택되지는 않는다.
 
@@ -129,6 +129,7 @@ Resource URI는 canonical 명세대로 UDOM TextAsset이 있는 폴더를 기준
 | `type` | `Panel`, `Text`, `Image`, `Button`, `Toggle`, `Slider`, `TextInput`, `ScrollView`, `Embed` |
 | `name` | Unity Hierarchy 표시 이름 |
 | `text` | Text 노드의 내용 |
+| `textRuns` | HTML 입력용 선택적 구조화 run 배열. 각 run은 `text`, additive `bold`, `italic`, 0 초과 100 이하 `fontScale`을 가지며 합친 평문은 `text`와 같아야 함 |
 | `sprite` | `Assets/`로 시작하는 Sprite 에셋 경로 |
 | `texture` | `Assets/`로 시작하는 Texture2D 에셋 경로 |
 | `imageFit` | Image의 `fill`, `contain`, `cover`, `none` 배치 방식 |

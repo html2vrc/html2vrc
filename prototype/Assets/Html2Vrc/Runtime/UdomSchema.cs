@@ -29,6 +29,7 @@ namespace Html2Vrc
         public string type;
         public string name;
         public string text;
+        public UdomTextRun[] textRuns = Array.Empty<UdomTextRun>();
         public string sprite;
         public string texture;
         public string imageFit = "fill";
@@ -53,6 +54,15 @@ namespace Html2Vrc
         public UdomBinding binding;
         public UdomEmbed embed;
         public UdomNode[] children = Array.Empty<UdomNode>();
+    }
+
+    [Serializable]
+    public sealed class UdomTextRun
+    {
+        public string text;
+        public bool bold;
+        public bool italic;
+        public float fontScale = 1f;
     }
 
     [Serializable]

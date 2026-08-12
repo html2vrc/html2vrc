@@ -82,7 +82,7 @@ namespace Html2Vrc.Editor
         {
             "schemaVersion", "id", "name", "canvas", "root",
             "renderMode", "size", "scale", "viewportPixelRatio", "viewportFit",
-            "type", "text", "sprite", "texture", "imageFit", "imagePositionX", "imagePositionY",
+            "type", "text", "textRuns", "bold", "italic", "fontScale", "sprite", "texture", "imageFit", "imagePositionX", "imagePositionY",
             "imageIntrinsicSize", "interactable", "toggleValue",
             "sliderValue", "sliderMin", "sliderMax", "sliderStep",
             "textInputValue", "textInputPlaceholder", "textInputMultiline", "textInputReadOnly",
@@ -239,6 +239,8 @@ namespace Html2Vrc.Editor
                 AddError(result, path + ".text", "Text 요소에는 text가 필요하다.");
             }
 
+            ValidateTextRuns(node, path, result);
+
             if (string.Equals(node.type, "Slider", StringComparison.OrdinalIgnoreCase))
             {
                 if (node.sliderMax <= node.sliderMin)
@@ -353,6 +355,58 @@ namespace Html2Vrc.Editor
             for (var index = 0; index < children.Length; index++)
             {
                 ValidateNode(children[index], $"{path}.children[{index}]", ids, result);
+            }
+        }
+
+        private static void ValidateTextRuns(
+            UdomNode node,
+            string path,
+            UdomValidationResult result)
+        {
+            var runs = node.textRuns ?? Array.Empty<UdomTextRun>();
+            if (runs.Length == 0)
+            {
+                return;
+            }
+
+            if (!string.Equals(node.type, "Text", StringComparison.OrdinalIgnoreCase))
+            {
+                AddError(result, path + ".textRuns", "textRuns는 Text 요소에서만 지원한다.");
+                return;
+            }
+
+            var combined = new StringBuilder();
+            for (var index = 0; index < runs.Length; index++)
+            {
+                var runPath = $"{path}.textRuns[{index}]";
+                var run = runs[index];
+                if (run == null)
+                {
+                    AddError(result, runPath, "text run은 null일 수 없다.");
+                    continue;
+                }
+
+                if (run.text == null)
+                {
+                    AddError(result, runPath + ".text", "text run에는 text가 필요하다.");
+                }
+                else
+                {
+                    combined.Append(run.text);
+                }
+
+                if (float.IsNaN(run.fontScale)
+                    || float.IsInfinity(run.fontScale)
+                    || run.fontScale <= 0f
+                    || run.fontScale > 100f)
+                {
+                    AddError(result, runPath + ".fontScale", "text run fontScale은 0 초과 100 이하의 유한한 값이어야 한다.");
+                }
+            }
+
+            if (!string.Equals(combined.ToString(), node.text ?? string.Empty, StringComparison.Ordinal))
+            {
+                AddError(result, path + ".textRuns", "textRuns를 합친 값은 Text의 text와 같아야 한다.");
             }
         }
 

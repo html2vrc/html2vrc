@@ -3816,7 +3816,9 @@ Second   line&#32;&#32;</p>
             var buttonLabel = UdomBuilder.FindNode(root, "html-text-button-label").GetComponent<TextMeshProUGUI>();
             var originalMetrics = metrics.gameObject;
             var originalButtonLabel = buttonLabel.gameObject;
-            Assert.That(metrics.text, Is.EqualTo("Alpha Beta Gamma\nDelta"));
+            metrics.ForceMeshUpdate();
+            buttonLabel.ForceMeshUpdate();
+            Assert.That(metrics.GetParsedText(), Is.EqualTo("Alpha Beta Gamma\nDelta"));
             Assert.That(metrics.characterSpacing, Is.EqualTo(12.5f).Within(0.001f));
             Assert.That(metrics.enableWordWrapping, Is.False);
             Assert.That(metrics.overflowMode, Is.EqualTo(TextOverflowModes.Masking));
@@ -3826,7 +3828,7 @@ Second   line&#32;&#32;</p>
             Assert.That(preserved.enableWordWrapping, Is.True);
             Assert.That(preserved.overflowMode, Is.EqualTo(TextOverflowModes.Ellipsis));
             Assert.That(preLine.text, Is.EqualTo("One two\nThree four"));
-            Assert.That(buttonLabel.text, Is.EqualTo("A  B  C"));
+            Assert.That(buttonLabel.GetParsedText(), Is.EqualTo("A  B  C"));
             Assert.That(buttonLabel.characterSpacing, Is.EqualTo(10f).Within(0.001f));
             Assert.That(buttonLabel.enableWordWrapping, Is.False);
             Assert.That(buttonLabel.overflowMode, Is.EqualTo(TextOverflowModes.Masking));
@@ -3997,6 +3999,188 @@ Second   line&#32;&#32;</p>
                 html.Replace("font-style: italic; font-weight: 700", "font-style: oblique; font-weight: 700"));
             Assert.That(obliqueStyle.IsValid, Is.False);
             Assert.That(obliqueStyle.Format(), Does.Contain("font-style"));
+        }
+
+        [Test]
+        public void HtmlConverter_InlineSemanticTextUsesSafeStructuredRuns()
+        {
+            const string html = @"
+              <main id=""html-inline-root"" data-canvas-size=""760 560""
+                style=""width: 760px; height: 560px; display: flex; flex-direction: column; align-items: flex-start; padding: 20px; gap: 12px"">
+                <p id=""html-inline-text"" style=""width: 700px; height: 80px; font-size: 24px"">Safe &lt;b&gt; &lt;/noparse&gt;&lt;color=red&gt; <strong>Bold <em>both</em></strong> <small>tiny</small> tail</p>
+                <p id=""html-inline-pre"" style=""width: 500px; height: 100px; white-space: pre-wrap"">A  <b>B<br><i>I</i></b>  Z</p>
+                <button id=""html-inline-button"" data-action=""ClosePanel""
+                  style=""width: 320px; height: 64px; font-style: italic"">Press <strong>now <em>safely</em></strong></button>
+                <ul id=""html-inline-list"" style=""width: 500px; height: 90px"">
+                  <li id=""html-inline-item"" style=""width: 500px; height: 64px"">Item <small><b>tiny</b></small></li>
+                </ul>
+              </main>";
+            const string expectedInline = "Safe <b> </noparse><color=red> Bold both tiny tail";
+
+            var conversion = HtmlToUdomConverter.Convert(html);
+
+            Assert.That(conversion.IsValid, Is.True, conversion.Format());
+            var inlineNode = conversion.Document.root.children[0];
+            var preNode = conversion.Document.root.children[1];
+            var buttonLabelNode = conversion.Document.root.children[2].children[0];
+            var listLabelNode = conversion.Document.root.children[3].children[0].children[0];
+            Assert.That(inlineNode.text, Is.EqualTo(expectedInline));
+            Assert.That(preNode.text, Is.EqualTo("A  B\nI  Z"));
+            Assert.That(buttonLabelNode.text, Is.EqualTo("Press now safely"));
+            Assert.That(buttonLabelNode.style.fontStyle, Is.EqualTo("Italic"));
+            Assert.That(listLabelNode.text, Is.EqualTo("Item tiny"));
+            Assert.That(inlineNode.textRuns.Length, Is.GreaterThan(0));
+            Assert.That(
+                string.Concat(inlineNode.textRuns.Select(run => run.text)),
+                Is.EqualTo(inlineNode.text));
+            Assert.That(inlineNode.textRuns.Any(run => run.bold && !run.italic), Is.True);
+            Assert.That(inlineNode.textRuns.Any(run => run.bold && run.italic), Is.True);
+            Assert.That(
+                inlineNode.textRuns.Any(run => run.fontScale < 1f && run.text.Contains("tiny")),
+                Is.True);
+            Assert.That(buttonLabelNode.textRuns.Any(run => run.bold && run.italic), Is.True);
+            Assert.That(
+                listLabelNode.textRuns.Any(run => run.bold && run.fontScale < 1f),
+                Is.True);
+            Assert.That(conversion.Json, Does.Contain("\"textRuns\""));
+            Assert.That(conversion.Json, Does.Not.Contain("<noparse>"));
+
+            var normalized = UdomValidator.Validate(conversion.Json);
+            Assert.That(normalized.IsValid, Is.True, normalized.Format());
+            Assert.That(normalized.Document.root.children[0].text, Is.EqualTo(expectedInline));
+            Assert.That(
+                string.Concat(normalized.Document.root.children[0].textRuns.Select(run => run.text)),
+                Is.EqualTo(expectedInline));
+
+            var build = UdomBuilder.GenerateOrRegenerate(conversion.Document);
+            var root = build.Root;
+            var inline = UdomBuilder.FindNode(root, "html-inline-text").GetComponent<TextMeshProUGUI>();
+            var pre = UdomBuilder.FindNode(root, "html-inline-pre").GetComponent<TextMeshProUGUI>();
+            var buttonLabel = UdomBuilder.FindNode(root, "html-inline-button-label").GetComponent<TextMeshProUGUI>();
+            var listLabel = UdomBuilder.FindNode(root, "html-inline-item-label").GetComponent<TextMeshProUGUI>();
+            var originalInline = inline.gameObject;
+            var originalButtonLabel = buttonLabel.gameObject;
+            var originalListLabel = listLabel.gameObject;
+            inline.ForceMeshUpdate();
+            pre.ForceMeshUpdate();
+            buttonLabel.ForceMeshUpdate();
+            listLabel.ForceMeshUpdate();
+            Assert.That(inline.richText, Is.True);
+            Assert.That(inline.GetParsedText(), Is.EqualTo(expectedInline));
+            Assert.That(pre.GetParsedText(), Is.EqualTo("A  B\nI  Z"));
+            Assert.That(buttonLabel.GetParsedText(), Is.EqualTo("Press now safely"));
+            Assert.That(listLabel.GetParsedText(), Is.EqualTo("Item tiny"));
+            var buttonPlainIndex = buttonLabel.GetParsedText().IndexOf("Press", System.StringComparison.Ordinal);
+            var buttonBoldIndex = buttonLabel.GetParsedText().IndexOf("now", System.StringComparison.Ordinal);
+            Assert.That(
+                buttonLabel.textInfo.characterInfo[buttonPlainIndex].style & (FontStyles.Bold | FontStyles.Italic),
+                Is.EqualTo(FontStyles.Italic));
+            Assert.That(
+                buttonLabel.textInfo.characterInfo[buttonBoldIndex].style & (FontStyles.Bold | FontStyles.Italic),
+                Is.EqualTo(FontStyles.Bold | FontStyles.Italic));
+
+            var literalBoldIndex = expectedInline.IndexOf("<b>", System.StringComparison.Ordinal);
+            var literalNoParseIndex = expectedInline.IndexOf("</noparse>", System.StringComparison.Ordinal);
+            var literalColorIndex = expectedInline.IndexOf("<color=red>", System.StringComparison.Ordinal);
+            var boldIndex = expectedInline.IndexOf("Bold", System.StringComparison.Ordinal);
+            var bothIndex = expectedInline.IndexOf("both", System.StringComparison.Ordinal);
+            var tinyIndex = expectedInline.IndexOf("tiny", System.StringComparison.Ordinal);
+            Assert.That(
+                inline.textInfo.characterInfo[literalBoldIndex].style & FontStyles.Bold,
+                Is.EqualTo(FontStyles.Normal));
+            Assert.That(
+                inline.textInfo.characterInfo[literalNoParseIndex].style & (FontStyles.Bold | FontStyles.Italic),
+                Is.EqualTo(FontStyles.Normal));
+            Assert.That(
+                inline.textInfo.characterInfo[literalColorIndex].style & (FontStyles.Bold | FontStyles.Italic),
+                Is.EqualTo(FontStyles.Normal));
+            Assert.That(
+                inline.textInfo.characterInfo[boldIndex].style & FontStyles.Bold,
+                Is.EqualTo(FontStyles.Bold));
+            Assert.That(
+                inline.textInfo.characterInfo[boldIndex].style & FontStyles.Italic,
+                Is.EqualTo(FontStyles.Normal));
+            Assert.That(
+                inline.textInfo.characterInfo[bothIndex].style & (FontStyles.Bold | FontStyles.Italic),
+                Is.EqualTo(FontStyles.Bold | FontStyles.Italic));
+            Assert.That(
+                inline.textInfo.characterInfo[tinyIndex].pointSize,
+                Is.LessThan(inline.textInfo.characterInfo[0].pointSize));
+
+            var plainHtml = html
+                .Replace("<strong>", string.Empty)
+                .Replace("</strong>", string.Empty)
+                .Replace("<em>", string.Empty)
+                .Replace("</em>", string.Empty)
+                .Replace("<small>", string.Empty)
+                .Replace("</small>", string.Empty)
+                .Replace("<b>", string.Empty)
+                .Replace("</b>", string.Empty)
+                .Replace("<i>", string.Empty)
+                .Replace("</i>", string.Empty);
+            var restored = HtmlToUdomConverter.Convert(plainHtml);
+            Assert.That(restored.IsValid, Is.True, restored.Format());
+            Assert.That(restored.Document.root.children[0].textRuns, Is.Empty);
+            Assert.That(restored.Document.root.children[2].children[0].textRuns, Is.Empty);
+            Assert.That(restored.Document.root.children[3].children[0].children[0].textRuns, Is.Empty);
+            UdomBuilder.GenerateOrRegenerate(restored.Document, root);
+            inline = UdomBuilder.FindNode(root, "html-inline-text").GetComponent<TextMeshProUGUI>();
+            buttonLabel = UdomBuilder.FindNode(root, "html-inline-button-label").GetComponent<TextMeshProUGUI>();
+            listLabel = UdomBuilder.FindNode(root, "html-inline-item-label").GetComponent<TextMeshProUGUI>();
+            Assert.That(inline.gameObject, Is.SameAs(originalInline));
+            Assert.That(buttonLabel.gameObject, Is.SameAs(originalButtonLabel));
+            Assert.That(listLabel.gameObject, Is.SameAs(originalListLabel));
+            Assert.That(inline.richText, Is.False);
+            Assert.That(buttonLabel.richText, Is.False);
+            Assert.That(listLabel.richText, Is.False);
+            Assert.That(inline.text, Is.EqualTo(expectedInline));
+            Object.DestroyImmediate(root.gameObject);
+
+            var mismatchedRuns = HtmlToUdomConverter.Convert(html).Document;
+            mismatchedRuns.root.children[0].textRuns[0].text += "x";
+            var mismatchValidation = UdomValidator.Validate(UdomJsonWriter.Write(mismatchedRuns));
+            Assert.That(mismatchValidation.IsValid, Is.False);
+            Assert.That(mismatchValidation.Format(), Does.Contain("textRuns"));
+
+            var unknownRunProperty = UdomValidator.Validate(
+                conversion.Json.Replace(
+                    "\"bold\": false",
+                    "\"runId\": \"ignored\", \"bold\": false"));
+            Assert.That(unknownRunProperty.IsValid, Is.False);
+            Assert.That(unknownRunProperty.Format(), Does.Contain("text run 속성"));
+
+            var invalidScale = HtmlToUdomConverter.Convert(html).Document;
+            invalidScale.root.children[0].textRuns[0].fontScale = 0f;
+            var scaleValidation = UdomValidator.Validate(UdomJsonWriter.Write(invalidScale));
+            Assert.That(scaleValidation.IsValid, Is.False);
+            Assert.That(scaleValidation.Format(), Does.Contain("fontScale"));
+
+            var excessiveScale = HtmlToUdomConverter.Convert(html).Document;
+            excessiveScale.root.children[0].textRuns[0].fontScale = 101f;
+            var excessiveScaleValidation = UdomValidator.Validate(UdomJsonWriter.Write(excessiveScale));
+            Assert.That(excessiveScaleValidation.IsValid, Is.False);
+            Assert.That(excessiveScaleValidation.Format(), Does.Contain("fontScale"));
+
+            var nestedBlock = HtmlToUdomConverter.Convert(
+                "<p id=\"nested-inline\">Before <strong><div id=\"nested-block\">bad</div></strong></p>");
+            Assert.That(nestedBlock.IsValid, Is.False);
+            Assert.That(nestedBlock.Format(), Does.Contain("텍스트 내부"));
+
+            var attributedInline = HtmlToUdomConverter.Convert(
+                "<p id=\"attributed-inline\">Before <span style=\"font-weight: bold\">styled</span></p>");
+            Assert.That(attributedInline.IsValid, Is.False);
+            Assert.That(attributedInline.Format(), Does.Contain("인라인 텍스트"));
+
+            var emptyText = HtmlToUdomConverter.Convert("<p id=\"empty-inline\"></p>");
+            Assert.That(emptyText.IsValid, Is.True, emptyText.Format());
+            Assert.That(emptyText.Document.root.text, Is.Empty);
+            Assert.That(emptyText.Json, Does.Contain("\"text\": \"\""));
+
+            var whitespaceText = HtmlToUdomConverter.Convert(
+                "<p id=\"whitespace-inline\" style=\"white-space: pre\">  </p>");
+            Assert.That(whitespaceText.IsValid, Is.True, whitespaceText.Format());
+            Assert.That(whitespaceText.Document.root.text, Is.EqualTo("  "));
+            Assert.That(UdomValidator.Validate(whitespaceText.Json).IsValid, Is.True);
         }
 
         [Test]

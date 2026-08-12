@@ -231,7 +231,9 @@ namespace Html2Vrc.Editor
             if (string.Equals(type, "Text", StringComparison.Ordinal))
             {
                 ValidateTextChildren(element, path, result);
-                node.text = GetText(element, whiteSpaceMode);
+                var textContent = GetTextContent(element, whiteSpaceMode);
+                node.text = textContent.Text;
+                node.textRuns = textContent.Runs;
             }
             else if (string.Equals(type, "Image", StringComparison.Ordinal))
             {
@@ -274,7 +276,7 @@ namespace Html2Vrc.Editor
                 ValidateTextChildren(element, path, result);
                 node.children = new[]
                 {
-                    CreateDerivedTextNode(node, GetText(element, whiteSpaceMode), "-label")
+                    CreateDerivedTextNode(node, GetTextContent(element, whiteSpaceMode), "-label")
                 };
             }
             else
@@ -329,11 +331,14 @@ namespace Html2Vrc.Editor
             };
             node.children = new[]
             {
-                CreateDerivedTextNode(node, GetText(element, whiteSpaceMode), "-label")
+                CreateDerivedTextNode(node, GetTextContent(element, whiteSpaceMode), "-label")
             };
         }
 
-        private static UdomNode CreateDerivedTextNode(UdomNode parent, string text, string suffix)
+        private static UdomNode CreateDerivedTextNode(
+            UdomNode parent,
+            HtmlTextContent content,
+            string suffix)
         {
             var width = Math.Max(1f, parent.style.size[0] - parent.style.padding[0] - parent.style.padding[2]);
             var height = Math.Max(1f, parent.style.size[1] - parent.style.padding[1] - parent.style.padding[3]);
@@ -342,7 +347,8 @@ namespace Html2Vrc.Editor
                 id = parent.id + suffix,
                 type = "Text",
                 name = parent.name + " Label",
-                text = text,
+                text = content.Text,
+                textRuns = content.Runs,
                 style = new UdomStyle
                 {
                     size = new[] { width, height },
@@ -4003,66 +4009,282 @@ namespace Html2Vrc.Editor
                     && !string.Equals(child.Tag, "span", StringComparison.OrdinalIgnoreCase))
                 {
                     AddError(result, path, $"텍스트 내부의 <{child.Tag}> 요소는 지원하지 않는다.");
+                    continue;
+                }
+
+                if (child.Attributes.Count > 0)
+                {
+                    AddError(
+                        result,
+                        path + "/" + child.Tag + "[" + index + "]",
+                        $"인라인 텍스트 <{child.Tag}>의 속성은 아직 지원하지 않는다.");
+                }
+
+                if (!string.Equals(child.Tag, "br", StringComparison.OrdinalIgnoreCase))
+                {
+                    ValidateTextChildren(child, path + "/" + child.Tag + "[" + index + "]", result);
                 }
             }
         }
 
-        private static string GetText(HtmlElement element, string whiteSpaceMode)
+        private static HtmlTextContent GetTextContent(HtmlElement element, string whiteSpaceMode)
         {
-            var segments = new List<StringBuilder> { new StringBuilder() };
-            AppendText(element, segments);
-            var normalizedSegments = segments
-                .Select(segment => segment.ToString()
-                    .Replace("\r\n", "\n")
-                    .Replace('\r', '\n'))
-                .ToArray();
+            var rawCharacters = new List<HtmlStyledCharacter>();
+            AppendText(element, rawCharacters, false, false, 1f);
+            var normalizedCharacters = NormalizeLineEndings(rawCharacters);
+            List<HtmlStyledCharacter> characters;
             if (whiteSpaceMode == "pre" || whiteSpaceMode == "pre-wrap")
             {
-                return string.Join("\n", normalizedSegments);
+                characters = normalizedCharacters;
             }
-
-            if (whiteSpaceMode == "pre-line")
+            else if (whiteSpaceMode == "pre-line")
             {
-                return CollapsePreLineWhitespace(string.Join("\n", normalizedSegments));
+                characters = NormalizePreLineWhitespace(normalizedCharacters);
+            }
+            else
+            {
+                characters = NormalizeCollapsibleWhitespace(normalizedCharacters);
             }
 
-            return string.Join(
-                "\n",
-                normalizedSegments.Select(CollapseWhitespace).ToArray());
+            var text = new string(characters.Select(character => character.Value).ToArray());
+            return new HtmlTextContent
+            {
+                Text = text,
+                Runs = BuildTextRuns(characters)
+            };
         }
 
-        private static void AppendText(HtmlElement element, List<StringBuilder> segments)
+        private static void AppendText(
+            HtmlElement element,
+            List<HtmlStyledCharacter> characters,
+            bool bold,
+            bool italic,
+            float fontScale)
         {
             for (var index = 0; index < element.Content.Count; index++)
             {
                 var part = element.Content[index];
                 if (part.Text != null)
                 {
-                    segments[segments.Count - 1].Append(part.Text);
+                    for (var characterIndex = 0; characterIndex < part.Text.Length; characterIndex++)
+                    {
+                        characters.Add(new HtmlStyledCharacter
+                        {
+                            Value = part.Text[characterIndex],
+                            Bold = bold,
+                            Italic = italic,
+                            FontScale = fontScale
+                        });
+                    }
+
                     continue;
                 }
 
                 var child = part.Child;
                 if (string.Equals(child.Tag, "br", StringComparison.OrdinalIgnoreCase))
                 {
-                    segments.Add(new StringBuilder());
+                    characters.Add(new HtmlStyledCharacter
+                    {
+                        Value = '\n',
+                        ForcedBreak = true,
+                        Bold = bold,
+                        Italic = italic,
+                        FontScale = fontScale
+                    });
                 }
                 else
                 {
-                    AppendText(child, segments);
+                    var childBold = bold
+                                    || string.Equals(child.Tag, "strong", StringComparison.OrdinalIgnoreCase)
+                                    || string.Equals(child.Tag, "b", StringComparison.OrdinalIgnoreCase);
+                    var childItalic = italic
+                                      || string.Equals(child.Tag, "em", StringComparison.OrdinalIgnoreCase)
+                                      || string.Equals(child.Tag, "i", StringComparison.OrdinalIgnoreCase);
+                    var childFontScale = string.Equals(child.Tag, "small", StringComparison.OrdinalIgnoreCase)
+                        ? fontScale * 5f / 6f
+                        : fontScale;
+                    AppendText(child, characters, childBold, childItalic, childFontScale);
                 }
             }
         }
 
-        private static string CollapsePreLineWhitespace(string value)
+        private static List<HtmlStyledCharacter> NormalizeLineEndings(
+            List<HtmlStyledCharacter> characters)
         {
-            var lines = value.Split('\n');
-            for (var index = 0; index < lines.Length; index++)
+            var result = new List<HtmlStyledCharacter>(characters.Count);
+            for (var index = 0; index < characters.Count; index++)
             {
-                lines[index] = Regex.Replace(lines[index], @"[ \t\f]+", " ").Trim(' ', '\t', '\f');
+                var character = characters[index];
+                if (!character.ForcedBreak && character.Value == '\r')
+                {
+                    character.Value = '\n';
+                    if (index + 1 < characters.Count
+                        && !characters[index + 1].ForcedBreak
+                        && characters[index + 1].Value == '\n')
+                    {
+                        index++;
+                    }
+                }
+
+                result.Add(character);
             }
 
-            return string.Join("\n", lines);
+            return result;
+        }
+
+        private static List<HtmlStyledCharacter> NormalizeCollapsibleWhitespace(
+            List<HtmlStyledCharacter> characters)
+        {
+            var result = new List<HtmlStyledCharacter>(characters.Count);
+            var line = new List<HtmlStyledCharacter>();
+            for (var index = 0; index < characters.Count; index++)
+            {
+                var character = characters[index];
+                if (character.ForcedBreak)
+                {
+                    AppendCollapsedLine(line, result, IsNormalCollapsibleWhitespace);
+                    character.ForcedBreak = false;
+                    character.Value = '\n';
+                    result.Add(character);
+                    line.Clear();
+                }
+                else
+                {
+                    line.Add(character);
+                }
+            }
+
+            AppendCollapsedLine(line, result, IsNormalCollapsibleWhitespace);
+            return result;
+        }
+
+        private static List<HtmlStyledCharacter> NormalizePreLineWhitespace(
+            List<HtmlStyledCharacter> characters)
+        {
+            var result = new List<HtmlStyledCharacter>(characters.Count);
+            var line = new List<HtmlStyledCharacter>();
+            for (var index = 0; index < characters.Count; index++)
+            {
+                var character = characters[index];
+                if (character.Value == '\n')
+                {
+                    AppendCollapsedLine(line, result, IsPreLineCollapsibleWhitespace);
+                    character.ForcedBreak = false;
+                    result.Add(character);
+                    line.Clear();
+                }
+                else
+                {
+                    line.Add(character);
+                }
+            }
+
+            AppendCollapsedLine(line, result, IsPreLineCollapsibleWhitespace);
+            return result;
+        }
+
+        private static void AppendCollapsedLine(
+            List<HtmlStyledCharacter> line,
+            List<HtmlStyledCharacter> result,
+            Func<char, bool> isWhitespace)
+        {
+            var hasContent = false;
+            var hasPendingWhitespace = false;
+            var pendingWhitespace = default(HtmlStyledCharacter);
+            for (var index = 0; index < line.Count; index++)
+            {
+                var character = line[index];
+                if (isWhitespace(character.Value))
+                {
+                    if (hasContent && !hasPendingWhitespace)
+                    {
+                        pendingWhitespace = character;
+                        pendingWhitespace.Value = ' ';
+                        pendingWhitespace.ForcedBreak = false;
+                        hasPendingWhitespace = true;
+                    }
+
+                    continue;
+                }
+
+                if (hasPendingWhitespace)
+                {
+                    result.Add(pendingWhitespace);
+                    hasPendingWhitespace = false;
+                }
+
+                result.Add(character);
+                hasContent = true;
+            }
+        }
+
+        private static bool IsNormalCollapsibleWhitespace(char value)
+        {
+            return value == ' ' || value == '\t' || value == '\n';
+        }
+
+        private static bool IsPreLineCollapsibleWhitespace(char value)
+        {
+            return value == ' ' || value == '\t' || value == '\f';
+        }
+
+        private static UdomTextRun[] BuildTextRuns(List<HtmlStyledCharacter> characters)
+        {
+            if (!characters.Any(character => character.Bold
+                                             || character.Italic
+                                             || Math.Abs(character.FontScale - 1f) > 0.0001f))
+            {
+                return Array.Empty<UdomTextRun>();
+            }
+
+            var runs = new List<UdomTextRun>();
+            var text = new StringBuilder();
+            var hasStyle = false;
+            var bold = false;
+            var italic = false;
+            var fontScale = 1f;
+            for (var index = 0; index < characters.Count; index++)
+            {
+                var character = characters[index];
+                var sameStyle = hasStyle
+                                && bold == character.Bold
+                                && italic == character.Italic
+                                && Math.Abs(fontScale - character.FontScale) <= 0.0001f;
+                if (!sameStyle && text.Length > 0)
+                {
+                    runs.Add(new UdomTextRun
+                    {
+                        text = text.ToString(),
+                        bold = bold,
+                        italic = italic,
+                        fontScale = fontScale
+                    });
+                    text.Length = 0;
+                }
+
+                if (!sameStyle)
+                {
+                    hasStyle = true;
+                    bold = character.Bold;
+                    italic = character.Italic;
+                    fontScale = character.FontScale;
+                }
+
+                text.Append(character.Value);
+            }
+
+            if (text.Length > 0)
+            {
+                runs.Add(new UdomTextRun
+                {
+                    text = text.ToString(),
+                    bold = bold,
+                    italic = italic,
+                    fontScale = fontScale
+                });
+            }
+
+            return runs.ToArray();
         }
 
         private static string CollapseWhitespace(string value)
@@ -4181,6 +4403,21 @@ namespace Html2Vrc.Editor
         {
             public string Text;
             public HtmlElement Child;
+        }
+
+        private sealed class HtmlTextContent
+        {
+            public string Text;
+            public UdomTextRun[] Runs = Array.Empty<UdomTextRun>();
+        }
+
+        private struct HtmlStyledCharacter
+        {
+            public char Value;
+            public bool ForcedBreak;
+            public bool Bold;
+            public bool Italic;
+            public float FontScale;
         }
 
         private sealed class HtmlElement
