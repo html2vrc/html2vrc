@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
+using UnityEditor;
 using UnityEngine;
 
 namespace Html2Vrc.Editor
@@ -225,7 +226,7 @@ namespace Html2Vrc.Editor
                 name = FirstNonEmpty(element.Get("data-name"), element.Get("aria-label"), id),
                 style = CreateDefaultStyle(element, type)
             };
-            ApplyStyle(element, node.style, path, result);
+            ApplyStyle(element, node, path, result);
 
             if (string.Equals(type, "Text", StringComparison.Ordinal))
             {
@@ -241,7 +242,18 @@ namespace Html2Vrc.Editor
                     AddError(result, path + "/@src", "이미지는 Unity 프로젝트의 Assets/ 경로만 지원한다.");
                 }
 
-                node.sprite = source;
+                if (!string.IsNullOrWhiteSpace(source)
+                    && source.StartsWith("Assets/", StringComparison.Ordinal))
+                {
+                    if (AssetDatabase.LoadAssetAtPath<Sprite>(source) != null)
+                    {
+                        node.sprite = source;
+                    }
+                    else
+                    {
+                        node.texture = source;
+                    }
+                }
             }
             else if (string.Equals(type, "Button", StringComparison.Ordinal))
             {
@@ -445,10 +457,11 @@ namespace Html2Vrc.Editor
 
         private static void ApplyStyle(
             HtmlElement element,
-            UdomStyle style,
+            UdomNode node,
             string path,
             HtmlToUdomResult result)
         {
+            var style = node.style;
             var declarations = ParseStyle(element.Get("style"), path, result);
             string display = null;
             string flexDirection = null;
@@ -690,6 +703,12 @@ namespace Html2Vrc.Editor
                     case "text-align":
                         style.alignment = TextAlignment(declaration.Value, path, result);
                         break;
+                    case "object-fit":
+                        SetObjectFit(declaration.Value, node, path, result);
+                        break;
+                    case "object-position":
+                        SetObjectPosition(declaration.Value, node, path, result);
+                        break;
                     case "transform-origin":
                         SetTransformOrigin(declaration.Value, path, result, style);
                         break;
@@ -840,6 +859,182 @@ namespace Html2Vrc.Editor
                 path,
                 result);
             UdomCanonicalAdapter.FinalizeCanonicalBoxSize(style);
+        }
+
+        private static void SetObjectFit(
+            string source,
+            UdomNode node,
+            string path,
+            HtmlToUdomResult result)
+        {
+            if (!string.Equals(node.type, "Image", StringComparison.Ordinal))
+            {
+                AddError(result, path + "/@style", "object-fit은 <img> 요소에서만 지원한다.");
+                return;
+            }
+
+            var value = source.Trim().ToLowerInvariant();
+            if (value != "fill" && value != "contain" && value != "cover" && value != "none")
+            {
+                AddError(
+                    result,
+                    path + "/@style",
+                    $"object-fit 값 '{source}'은 지원하지 않는다. fill, contain, cover, none만 사용할 수 있다.");
+                return;
+            }
+
+            node.imageFit = value;
+        }
+
+        private static void SetObjectPosition(
+            string source,
+            UdomNode node,
+            string path,
+            HtmlToUdomResult result)
+        {
+            if (!string.Equals(node.type, "Image", StringComparison.Ordinal))
+            {
+                AddError(result, path + "/@style", "object-position은 <img> 요소에서만 지원한다.");
+                return;
+            }
+
+            var parts = source.Split(
+                new[] { ' ', '\t', '\r', '\n' },
+                StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length < 1 || parts.Length > 2)
+            {
+                AddError(
+                    result,
+                    path + "/@style",
+                    "object-position은 1~2개의 px, percentage 또는 방향 키워드만 지원한다.");
+                return;
+            }
+
+            if (!TryNormalizeObjectPositionToken(parts[0], out var firstValue, out var firstAxis)
+                || (parts.Length == 2
+                    && !TryNormalizeObjectPositionToken(parts[1], out _, out _)))
+            {
+                AddError(
+                    result,
+                    path + "/@style",
+                    $"object-position 값 '{source}'을 해석할 수 없다.");
+                return;
+            }
+
+            if (parts.Length == 1)
+            {
+                if (firstAxis == ObjectPositionAxis.Vertical)
+                {
+                    node.imagePositionX = "50%";
+                    node.imagePositionY = firstValue;
+                }
+                else
+                {
+                    node.imagePositionX = firstValue;
+                    node.imagePositionY = "50%";
+                }
+
+                return;
+            }
+
+            TryNormalizeObjectPositionToken(parts[1], out var secondValue, out var secondAxis);
+            if ((firstAxis == ObjectPositionAxis.Horizontal
+                 && secondAxis == ObjectPositionAxis.Horizontal)
+                || (firstAxis == ObjectPositionAxis.Vertical
+                    && secondAxis == ObjectPositionAxis.Vertical))
+            {
+                AddError(
+                    result,
+                    path + "/@style",
+                    $"object-position 값 '{source}'은 같은 축을 두 번 지정한다.");
+                return;
+            }
+
+            if (firstAxis == ObjectPositionAxis.Horizontal)
+            {
+                node.imagePositionX = firstValue;
+                node.imagePositionY = secondValue;
+            }
+            else if (firstAxis == ObjectPositionAxis.Vertical)
+            {
+                node.imagePositionX = secondValue;
+                node.imagePositionY = firstValue;
+            }
+            else if (secondAxis == ObjectPositionAxis.Horizontal)
+            {
+                node.imagePositionX = secondValue;
+                node.imagePositionY = firstValue;
+            }
+            else if (secondAxis == ObjectPositionAxis.Vertical)
+            {
+                node.imagePositionX = firstValue;
+                node.imagePositionY = secondValue;
+            }
+            else
+            {
+                node.imagePositionX = firstValue;
+                node.imagePositionY = secondValue;
+            }
+        }
+
+        private static bool TryNormalizeObjectPositionToken(
+            string source,
+            out string value,
+            out ObjectPositionAxis axis)
+        {
+            switch (source.Trim().ToLowerInvariant())
+            {
+                case "left":
+                    value = "0%";
+                    axis = ObjectPositionAxis.Horizontal;
+                    return true;
+                case "right":
+                    value = "100%";
+                    axis = ObjectPositionAxis.Horizontal;
+                    return true;
+                case "top":
+                    value = "0%";
+                    axis = ObjectPositionAxis.Vertical;
+                    return true;
+                case "bottom":
+                    value = "100%";
+                    axis = ObjectPositionAxis.Vertical;
+                    return true;
+                case "center":
+                    value = "50%";
+                    axis = ObjectPositionAxis.Either;
+                    return true;
+            }
+
+            var normalized = source.Trim();
+            var isPercentage = normalized.EndsWith("%", StringComparison.Ordinal);
+            if (isPercentage)
+            {
+                normalized = normalized.Substring(0, normalized.Length - 1).Trim();
+            }
+            else if (normalized.EndsWith("px", StringComparison.OrdinalIgnoreCase))
+            {
+                normalized = normalized.Substring(0, normalized.Length - 2).Trim();
+            }
+
+            if (!TryParseNumber(normalized, out var number))
+            {
+                value = null;
+                axis = ObjectPositionAxis.Either;
+                return false;
+            }
+
+            value = number.ToString("0.########", CultureInfo.InvariantCulture)
+                    + (isPercentage ? "%" : string.Empty);
+            axis = ObjectPositionAxis.Either;
+            return true;
+        }
+
+        private enum ObjectPositionAxis
+        {
+            Either,
+            Horizontal,
+            Vertical
         }
 
         private static void ApplyFlexDirection(UdomStyle style, string direction)

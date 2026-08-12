@@ -55,6 +55,8 @@
 - `background-color`, `color`: `#RRGGBB` 또는 `#RRGGBBAA`
 - `font-size`
 - `text-align: left | center | right`
+- `object-fit: fill | contain | cover | none`: `<img>` 콘텐츠의 크기 맞춤
+- `object-position`: `<img>`의 1~2개 숫자, `px`, percentage 또는 `left | center | right | top | bottom` 위치
 - `flex-grow`, `flex-shrink`: 0 이상의 숫자
 - `flex-basis`: `auto`, 숫자, `px` 또는 percentage
 - `order`: 정수
@@ -65,7 +67,9 @@ HTML에서 만든 flex 트리도 canonical UDOM importer와 같은 크기·정�
 
 CSS transform 함수는 웹 규칙대로 선언의 오른쪽부터 좌표에 적용된다. Converter는 함수 목록을 역전해 array-order인 canonical transform wrapper에 저장한다. Translate는 숫자·`px`·percentage, rotate는 숫자·`deg`·`rad`·`grad`·`turn`, scale은 유한한 숫자를 지원한다. Transform을 `none`으로 바꾸면 원래 노드를 유지한 채 생성 wrapper만 제거한다.
 
-CSS 전체 호환은 목표가 아니다. `flex-basis`와 transform 이외의 percentage 길이, 양축이 모두 auto이거나 반대 고정 축·aspect-ratio가 없는 크기 auto, `aspect-ratio: auto`, `calc`, flex shorthand, transform의 matrix·skew·perspective와 3~4값 origin, `align-content: space-evenly`, `overflow: auto | scroll`, visible/hidden이 섞인 축별 overflow, Grid, 선택자, 외부 스타일시트, 애니메이션과 지원 목록 밖의 속성은 오류로 표시한다.
+`<img src>`는 Unity `Assets/` 안의 일반 Texture2D와 Sprite를 자동 구분한다. `object-position` 한 값은 CSS처럼 다른 축을 가운데로 두며, 두 값은 `bottom right`처럼 세로·가로 순서로 써도 각 축에 맞춰 정규화한다. Percentage는 이미지 박스에서 남는 공간을 기준으로 계산하므로 `cover`에서 음수가 되는 잘린 영역도 같은 규칙으로 정렬된다.
+
+CSS 전체 호환은 목표가 아니다. `flex-basis`, transform, object-position 이외의 percentage 길이, 양축이 모두 auto이거나 반대 고정 축·aspect-ratio가 없는 크기 auto, `aspect-ratio: auto`, `calc`, flex shorthand, transform의 matrix·skew·perspective와 3~4값 origin, `object-fit: scale-down`, object-position의 3~4값 edge offset, `align-content: space-evenly`, `overflow: auto | scroll`, visible/hidden이 섞인 축별 overflow, Grid, 선택자, 외부 스타일시트, 애니메이션과 지원 목록 밖의 속성은 오류로 표시한다.
 
 ## 안전한 버튼 동작
 
@@ -97,6 +101,6 @@ HTML 파일 자체가 생성 루트의 Source Asset으로 기록된다. 같은 H
 
 - 일반 웹사이트 URL, React, JavaScript, 외부 CSS를 읽지 않는다.
 - HTML5 오류 복구 전체를 구현한 브라우저급 파서가 아니다. 태그 짝과 따옴표가 올바른 정적 HTML을 전제로 한다.
-- `<img src>`는 인터넷 주소가 아니라 Unity의 `Assets/` 아래 Sprite 경로만 허용한다.
+- `<img src>`는 인터넷 주소가 아니라 Unity의 `Assets/` 아래 Texture2D 또는 Sprite 경로만 허용한다.
 - CSS 상속, class 선택자, 웹폰트, 반응형 레이아웃은 없다.
 - HTML 화면과 브라우저 픽셀 결과가 완전히 같다는 의미는 아니다.

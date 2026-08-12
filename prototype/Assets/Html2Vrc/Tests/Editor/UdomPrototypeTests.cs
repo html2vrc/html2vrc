@@ -2983,6 +2983,96 @@ namespace Html2Vrc.Tests
         }
 
         [Test]
+        public void HtmlConverter_ObjectFitAndPositionUseCanonicalImageContent()
+        {
+            const string html = @"
+              <main id=""html-image-root"" data-canvas-size=""1120 180""
+                style=""width: 1120px; height: 180px; display: flex; align-items: center; padding: 20px; gap: 12px"">
+                <img id=""html-image-fill"" src=""Assets/TextMesh Pro/Sprites/EmojiOne.png""
+                  style=""width: 200px; height: 100px; object-fit: fill"" />
+                <img id=""html-image-contain"" src=""Assets/TextMesh Pro/Sprites/EmojiOne.png""
+                  style=""width: 200px; height: 100px; object-fit: contain"" />
+                <img id=""html-image-cover"" src=""Assets/TextMesh Pro/Sprites/EmojiOne.png""
+                  style=""width: 200px; height: 100px; object-fit: cover; object-position: 25% 75%"" />
+                <img id=""html-image-none"" src=""Assets/TextMesh Pro/Sprites/EmojiOne.png""
+                  style=""width: 200px; height: 100px; object-fit: none; object-position: 10px top"" />
+                <img id=""html-image-keyword"" src=""Assets/TextMesh Pro/Sprites/EmojiOne.png""
+                  style=""width: 200px; height: 100px; object-fit: cover; object-position: bottom right"" />
+              </main>";
+
+            var conversion = HtmlToUdomConverter.Convert(html);
+
+            Assert.That(conversion.IsValid, Is.True, conversion.Format());
+            var fillNode = conversion.Document.root.children[0];
+            var containNode = conversion.Document.root.children[1];
+            var coverNode = conversion.Document.root.children[2];
+            var noneNode = conversion.Document.root.children[3];
+            var keywordNode = conversion.Document.root.children[4];
+            Assert.That(fillNode.texture, Is.EqualTo("Assets/TextMesh Pro/Sprites/EmojiOne.png"));
+            Assert.That(fillNode.sprite, Is.Null);
+            Assert.That(fillNode.imageFit, Is.EqualTo("fill"));
+            Assert.That(containNode.imageFit, Is.EqualTo("contain"));
+            Assert.That(coverNode.imageFit, Is.EqualTo("cover"));
+            Assert.That(coverNode.imagePositionX, Is.EqualTo("25%"));
+            Assert.That(coverNode.imagePositionY, Is.EqualTo("75%"));
+            Assert.That(noneNode.imageFit, Is.EqualTo("none"));
+            Assert.That(noneNode.imagePositionX, Is.EqualTo("10"));
+            Assert.That(noneNode.imagePositionY, Is.EqualTo("0%"));
+            Assert.That(keywordNode.imagePositionX, Is.EqualTo("100%"));
+            Assert.That(keywordNode.imagePositionY, Is.EqualTo("100%"));
+
+            var normalized = UdomValidator.Validate(conversion.Json);
+            Assert.That(normalized.IsValid, Is.True, normalized.Format());
+            Assert.That(normalized.Document.root.children[2].imagePositionX, Is.EqualTo("25%"));
+            Assert.That(normalized.Document.root.children[3].texture, Is.EqualTo(fillNode.texture));
+
+            var build = UdomBuilder.GenerateOrRegenerate(conversion.Document);
+            var root = build.Root;
+            AssertImageContent(root, "html-image-fill", new Vector2(200f, 100f), Vector2.zero);
+            AssertImageContent(root, "html-image-contain", new Vector2(100f, 100f), new Vector2(50f, 0f));
+            AssertImageContent(root, "html-image-cover", new Vector2(200f, 200f), new Vector2(0f, 75f));
+            AssertImageContent(root, "html-image-none", new Vector2(512f, 512f), new Vector2(10f, 0f));
+            AssertImageContent(root, "html-image-keyword", new Vector2(200f, 200f), new Vector2(0f, 100f));
+
+            var originalCoverContent = UdomBuilder.FindNode(root, "html-image-cover::__image-content");
+            var changed = HtmlToUdomConverter.Convert(
+                html.Replace("object-fit: cover; object-position: 25% 75%", "object-fit: contain; object-position: right center"));
+            Assert.That(changed.IsValid, Is.True, changed.Format());
+            UdomBuilder.GenerateOrRegenerate(changed.Document, root);
+            Assert.That(
+                UdomBuilder.FindNode(root, "html-image-cover::__image-content"),
+                Is.SameAs(originalCoverContent));
+            AssertImageContent(root, "html-image-cover", new Vector2(100f, 100f), new Vector2(100f, 0f));
+            Object.DestroyImmediate(root.gameObject);
+
+            var unsupportedFit = HtmlToUdomConverter.Convert(
+                html.Replace("object-fit: contain", "object-fit: scale-down"));
+            Assert.That(unsupportedFit.IsValid, Is.False);
+            Assert.That(unsupportedFit.Format(), Does.Contain("object-fit"));
+
+            var duplicateAxis = HtmlToUdomConverter.Convert(
+                html.Replace("object-position: bottom right", "object-position: left right"));
+            Assert.That(duplicateAxis.IsValid, Is.False);
+            Assert.That(duplicateAxis.Format(), Does.Contain("같은 축"));
+
+            var oneValue = HtmlToUdomConverter.Convert(
+                html.Replace("object-position: 10px top", "object-position: bottom"));
+            Assert.That(oneValue.IsValid, Is.True, oneValue.Format());
+            Assert.That(oneValue.Document.root.children[3].imagePositionX, Is.EqualTo("50%"));
+            Assert.That(oneValue.Document.root.children[3].imagePositionY, Is.EqualTo("100%"));
+
+            var edgeOffset = HtmlToUdomConverter.Convert(
+                html.Replace("object-position: bottom right", "object-position: right 10px bottom"));
+            Assert.That(edgeOffset.IsValid, Is.False);
+            Assert.That(edgeOffset.Format(), Does.Contain("1~2개"));
+
+            var nonImage = HtmlToUdomConverter.Convert(
+                @"<main id=""invalid-object-fit"" style=""object-fit: cover""></main>");
+            Assert.That(nonImage.IsValid, Is.False);
+            Assert.That(nonImage.Format(), Does.Contain("<img>"));
+        }
+
+        [Test]
         public void HtmlConverter_FlexCssUsesCanonicalSizingAlignmentAndStableHierarchy()
         {
             const string html = @"
