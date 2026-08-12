@@ -3109,6 +3109,98 @@ namespace Html2Vrc.Tests
         }
 
         [Test]
+        public void HtmlConverter_SizeConstraintsUseCanonicalFlexAndAspectResolution()
+        {
+            const string html = @"
+              <main id=""css-constraint-root"" data-canvas-size=""800 500""
+                style=""width: 800px; height: 500px; display: block"">
+                <section id=""css-constraint-row""
+                  style=""width: 640px; height: 220px; display: flex; align-items: flex-start; padding: 20px; gap: 20px"">
+                  <div id=""css-bounded-grow""
+                    style=""width: 100px; height: 80px; min-width: 200px; max-width: 260px; flex-grow: 1""></div>
+                  <div id=""css-remaining-grow""
+                    style=""width: 100px; height: 80px; max-width: none; flex-grow: 1""></div>
+                  <div id=""css-ratio-width""
+                    style=""width: 160px; height: auto; min-height: 90px; max-width: 200px; aspect-ratio: 16 / 9""></div>
+                </section>
+                <div id=""css-ratio-height""
+                  style=""width: auto; height: 90px; max-width: 110px; max-height: 85px; aspect-ratio: 4 / 3""></div>
+              </main>";
+
+            var conversion = HtmlToUdomConverter.Convert(html);
+
+            Assert.That(conversion.IsValid, Is.True, conversion.Format());
+            var row = conversion.Document.root.children[0];
+            var bounded = row.children[0];
+            var remaining = row.children[1];
+            var ratioWidth = row.children[2];
+            var ratioHeight = conversion.Document.root.children[1];
+            Assert.That(bounded.style.minSize, Is.EqualTo(new[] { 200f, 0f }));
+            Assert.That(bounded.style.maxSize, Is.EqualTo(new[] { 260f, -1f }));
+            Assert.That(bounded.style.size, Is.EqualTo(new[] { 250f, 80f }).Within(0.001f));
+            Assert.That(remaining.style.maxSize[0], Is.EqualTo(-1f));
+            Assert.That(remaining.style.size, Is.EqualTo(new[] { 150f, 80f }).Within(0.001f));
+            Assert.That(ratioWidth.style.aspectRatio, Is.EqualTo(16f / 9f).Within(0.001f));
+            Assert.That(ratioWidth.style.aspectRatioMode, Is.EqualTo("WidthControlsHeight"));
+            Assert.That(ratioWidth.style.autoSize, Is.EqualTo(new[] { false, true }));
+            Assert.That(ratioWidth.style.size, Is.EqualTo(new[] { 160f, 90f }).Within(0.001f));
+            Assert.That(ratioHeight.style.aspectRatio, Is.EqualTo(4f / 3f).Within(0.001f));
+            Assert.That(ratioHeight.style.aspectRatioMode, Is.EqualTo("HeightControlsWidth"));
+            Assert.That(ratioHeight.style.autoSize, Is.EqualTo(new[] { true, false }));
+            Assert.That(ratioHeight.style.maxSize, Is.EqualTo(new[] { 110f, 85f }));
+            Assert.That(ratioHeight.style.size, Is.EqualTo(new[] { 110f, 82.5f }).Within(0.001f));
+
+            var normalized = UdomValidator.Validate(conversion.Json);
+            Assert.That(normalized.IsValid, Is.True, normalized.Format());
+            Assert.That(normalized.Document.root.children[0].children[2].style.autoSize[1], Is.True);
+            Assert.That(normalized.Document.root.children[1].style.aspectRatioMode, Is.EqualTo("HeightControlsWidth"));
+
+            var build = UdomBuilder.GenerateOrRegenerate(conversion.Document);
+            var root = build.Root;
+            var rowRect = UdomBuilder.FindNode(root, "css-constraint-row").GetComponent<RectTransform>();
+            Canvas.ForceUpdateCanvases();
+            LayoutRebuilder.ForceRebuildLayoutImmediate(rowRect);
+            var boundedObject = UdomBuilder.FindNode(root, "css-bounded-grow").gameObject;
+            Assert.That(
+                boundedObject.GetComponent<RectTransform>().rect.size,
+                Is.EqualTo(new Vector2(250f, 80f)));
+            Assert.That(
+                UdomBuilder.FindNode(root, "css-remaining-grow").GetComponent<RectTransform>().rect.size,
+                Is.EqualTo(new Vector2(150f, 80f)));
+            Assert.That(
+                UdomBuilder.FindNode(root, "css-ratio-width").GetComponent<RectTransform>().rect.size,
+                Is.EqualTo(new Vector2(160f, 90f)));
+            Assert.That(
+                UdomBuilder.FindNode(root, "css-ratio-height").GetComponent<RectTransform>().rect.size,
+                Is.EqualTo(new Vector2(110f, 82.5f)));
+            Assert.That(boundedObject.GetComponent<LayoutElement>().minWidth, Is.EqualTo(200f));
+
+            var tighter = HtmlToUdomConverter.Convert(html.Replace("max-width: 260px", "max-width: 220px"));
+            Assert.That(tighter.IsValid, Is.True, tighter.Format());
+            Assert.That(tighter.Document.root.children[0].children[0].style.size[0], Is.EqualTo(220f));
+            Assert.That(tighter.Document.root.children[0].children[1].style.size[0], Is.EqualTo(180f));
+            UdomBuilder.GenerateOrRegenerate(tighter.Document, root);
+            Assert.That(UdomBuilder.FindNode(root, "css-bounded-grow").gameObject, Is.SameAs(boundedObject));
+            Object.DestroyImmediate(root.gameObject);
+
+            var bothAuto = HtmlToUdomConverter.Convert(html.Replace("width: 160px", "width: auto"));
+            Assert.That(bothAuto.IsValid, Is.False);
+            Assert.That(bothAuto.Format(), Does.Contain("aspect-ratio"));
+
+            var autoWithoutRatio = HtmlToUdomConverter.Convert(html.Replace("; aspect-ratio: 16 / 9", string.Empty));
+            Assert.That(autoWithoutRatio.IsValid, Is.False);
+            Assert.That(autoWithoutRatio.Format(), Does.Contain("auto"));
+
+            var invalidRatio = HtmlToUdomConverter.Convert(html.Replace("aspect-ratio: 16 / 9", "aspect-ratio: 0"));
+            Assert.That(invalidRatio.IsValid, Is.False);
+            Assert.That(invalidRatio.Format(), Does.Contain("aspect-ratio"));
+
+            var percentageConstraint = HtmlToUdomConverter.Convert(html.Replace("min-width: 200px", "min-width: 50%"));
+            Assert.That(percentageConstraint.IsValid, Is.False);
+            Assert.That(percentageConstraint.Format(), Does.Contain("min-width"));
+        }
+
+        [Test]
         public void HtmlConverter_FlexWrapCssUsesCanonicalMultiLineLayout()
         {
             const string html = @"

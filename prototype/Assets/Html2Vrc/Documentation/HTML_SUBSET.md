@@ -32,7 +32,11 @@
 
 ## 지원하는 인라인 CSS
 
-- `width`, `height`, `left`, `top`: 숫자 또는 `px`
+- `width`, `height`: 숫자 또는 `px`. `aspect-ratio`와 반대 축의 고정 크기가 있으면 한 축 `auto` 지원
+- `min-width`, `min-height`: 숫자 또는 `px`
+- `max-width`, `max-height`: 숫자, `px` 또는 `none`
+- `aspect-ratio`: 양수 또는 `width / height`
+- `left`, `top`: 숫자 또는 `px`
 - `display: flex | block | none`
 - `position: static | absolute`: absolute는 `left`, `top`을 부모 왼쪽 위 기준으로 적용
 - `overflow: visible | hidden`: 한 값 또는 x·y 순서의 두 값
@@ -55,9 +59,9 @@
 
 `data-layout="vertical|horizontal|none"`으로 레이아웃을 명시할 수도 있다.
 
-HTML에서 만든 flex 트리도 canonical UDOM importer와 같은 크기·정렬 해석기를 사용한다. 따라서 grow/shrink/basis의 비율 재분배, reverse 순서, justify의 남는 공간 분배, wrap line 분할, align-content, 축별 gap, align-self와 wrap/nowrap 전환 시 안정 GameObject 수명주기가 두 입력 경로에서 동일하다. 지원 값이 아닌 `baseline`, 임의 keyword, `calc(...)`, 소수 order와 음수 grow/shrink는 추측하지 않고 오류로 반환한다.
+HTML에서 만든 flex 트리도 canonical UDOM importer와 같은 크기·정렬 해석기를 사용한다. 따라서 grow/shrink/basis의 비율 재분배, min/max 고정과 남는 공간 재분배, 한 축 auto aspect ratio, reverse 순서, justify의 남는 공간 분배, wrap line 분할, align-content, 축별 gap, align-self와 wrap/nowrap 전환 시 안정 GameObject 수명주기가 두 입력 경로에서 동일하다. 지원 값이 아닌 `baseline`, 임의 keyword, `calc(...)`, 소수 order와 음수 grow/shrink는 추측하지 않고 오류로 반환한다.
 
-CSS 전체 호환은 목표가 아니다. `flex-basis` 이외의 percentage 길이, `calc`, flex shorthand, `align-content: space-evenly`, `overflow: auto | scroll`, visible/hidden이 섞인 축별 overflow, Grid, 선택자, 외부 스타일시트, 애니메이션과 지원 목록 밖의 속성은 오류로 표시한다.
+CSS 전체 호환은 목표가 아니다. `flex-basis` 이외의 percentage 길이, 양축이 모두 auto이거나 반대 고정 축·aspect-ratio가 없는 크기 auto, `aspect-ratio: auto`, `calc`, flex shorthand, `align-content: space-evenly`, `overflow: auto | scroll`, visible/hidden이 섞인 축별 overflow, Grid, 선택자, 외부 스타일시트, 애니메이션과 지원 목록 밖의 속성은 오류로 표시한다.
 
 ## 안전한 버튼 동작
 

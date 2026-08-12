@@ -457,6 +457,11 @@ namespace Html2Vrc.Editor
             float? top = null;
             float? rowGap = null;
             float? columnGap = null;
+            float? aspectRatio = null;
+            var widthDeclared = false;
+            var heightDeclared = false;
+            var widthAuto = false;
+            var heightAuto = false;
             var overflowX = "visible";
             var overflowY = "visible";
             foreach (var declaration in declarations)
@@ -464,10 +469,72 @@ namespace Html2Vrc.Editor
                 switch (declaration.Key)
                 {
                     case "width":
-                        SetPixelValue(declaration.Value, path, declaration.Key, result, value => style.size[0] = value);
+                        widthDeclared = true;
+                        SetDimension(
+                            declaration.Value,
+                            path,
+                            declaration.Key,
+                            result,
+                            value =>
+                            {
+                                style.size[0] = value;
+                                widthAuto = false;
+                            },
+                            () => widthAuto = true);
                         break;
                     case "height":
-                        SetPixelValue(declaration.Value, path, declaration.Key, result, value => style.size[1] = value);
+                        heightDeclared = true;
+                        SetDimension(
+                            declaration.Value,
+                            path,
+                            declaration.Key,
+                            result,
+                            value =>
+                            {
+                                style.size[1] = value;
+                                heightAuto = false;
+                            },
+                            () => heightAuto = true);
+                        break;
+                    case "min-width":
+                        SetPixelValue(
+                            declaration.Value,
+                            path,
+                            declaration.Key,
+                            result,
+                            value => style.minSize[0] = value);
+                        break;
+                    case "min-height":
+                        SetPixelValue(
+                            declaration.Value,
+                            path,
+                            declaration.Key,
+                            result,
+                            value => style.minSize[1] = value);
+                        break;
+                    case "max-width":
+                        SetMaximumSize(
+                            declaration.Value,
+                            path,
+                            declaration.Key,
+                            result,
+                            value => style.maxSize[0] = value);
+                        break;
+                    case "max-height":
+                        SetMaximumSize(
+                            declaration.Value,
+                            path,
+                            declaration.Key,
+                            result,
+                            value => style.maxSize[1] = value);
+                        break;
+                    case "aspect-ratio":
+                        SetAspectRatio(
+                            declaration.Value,
+                            path,
+                            declaration.Key,
+                            result,
+                            value => aspectRatio = value);
                         break;
                     case "left":
                         SetPixelValue(declaration.Value, path, declaration.Key, result, value => left = value);
@@ -752,6 +819,17 @@ namespace Html2Vrc.Editor
             {
                 style.position[1] = style.positionAbsolute ? top.Value : -top.Value;
             }
+
+            ConfigureAspectRatio(
+                style,
+                aspectRatio,
+                widthDeclared,
+                widthAuto,
+                heightDeclared,
+                heightAuto,
+                path,
+                result);
+            UdomCanonicalAdapter.FinalizeCanonicalBoxSize(style);
         }
 
         private static void ApplyFlexDirection(UdomStyle style, string direction)
@@ -1002,6 +1080,126 @@ namespace Html2Vrc.Editor
             }
 
             return declarations;
+        }
+
+        private static void SetDimension(
+            string source,
+            string path,
+            string property,
+            HtmlToUdomResult result,
+            Action<float> valueSetter,
+            Action autoSetter)
+        {
+            if (string.Equals(source.Trim(), "auto", StringComparison.OrdinalIgnoreCase))
+            {
+                autoSetter();
+                return;
+            }
+
+            SetPixelValue(source, path, property, result, valueSetter);
+        }
+
+        private static void SetMaximumSize(
+            string source,
+            string path,
+            string property,
+            HtmlToUdomResult result,
+            Action<float> setter)
+        {
+            if (string.Equals(source.Trim(), "none", StringComparison.OrdinalIgnoreCase))
+            {
+                setter(-1f);
+                return;
+            }
+
+            SetPixelValue(source, path, property, result, setter);
+        }
+
+        private static void SetAspectRatio(
+            string source,
+            string path,
+            string property,
+            HtmlToUdomResult result,
+            Action<float> setter)
+        {
+            var parts = source.Split('/');
+            if (parts.Length < 1 || parts.Length > 2
+                || !TryParseNumber(parts[0].Trim(), out var numerator)
+                || numerator <= 0f)
+            {
+                AddError(result, path + "/@style", $"{property}는 0보다 큰 숫자 또는 'width / height' 비율이어야 한다.");
+                return;
+            }
+
+            var denominator = 1f;
+            if (parts.Length == 2
+                && (!TryParseNumber(parts[1].Trim(), out denominator) || denominator <= 0f))
+            {
+                AddError(result, path + "/@style", $"{property}는 0보다 큰 숫자 또는 'width / height' 비율이어야 한다.");
+                return;
+            }
+
+            var ratio = numerator / denominator;
+            if (float.IsNaN(ratio) || float.IsInfinity(ratio) || ratio <= 0f)
+            {
+                AddError(result, path + "/@style", $"{property} 결과는 0보다 큰 유한한 비율이어야 한다.");
+                return;
+            }
+
+            setter(ratio);
+        }
+
+        private static void ConfigureAspectRatio(
+            UdomStyle style,
+            float? aspectRatio,
+            bool widthDeclared,
+            bool widthAuto,
+            bool heightDeclared,
+            bool heightAuto,
+            string path,
+            HtmlToUdomResult result)
+        {
+            if (!aspectRatio.HasValue)
+            {
+                if (widthAuto || heightAuto)
+                {
+                    AddError(
+                        result,
+                        path + "/@style",
+                        "width/height의 auto 값은 반대 축과 aspect-ratio가 함께 지정될 때만 지원한다.");
+                }
+
+                return;
+            }
+
+            var widthFixed = widthDeclared && !widthAuto;
+            var heightFixed = heightDeclared && !heightAuto;
+            style.aspectRatio = aspectRatio.Value;
+            if (widthFixed && heightFixed)
+            {
+                style.autoSize = new[] { false, false };
+                style.aspectRatioMode = "None";
+                return;
+            }
+
+            if (widthFixed && !heightFixed)
+            {
+                style.autoSize = new[] { false, true };
+                style.aspectRatioMode = "WidthControlsHeight";
+                return;
+            }
+
+            if (heightFixed && !widthFixed)
+            {
+                style.autoSize = new[] { true, false };
+                style.aspectRatioMode = "HeightControlsWidth";
+                return;
+            }
+
+            AddError(
+                result,
+                path + "/@style",
+                "aspect-ratio는 width 또는 height 중 정확히 한 축이 고정 크기일 때 auto 축을 계산할 수 있다.");
         }
 
         private static void SetPixelValue(

@@ -1554,7 +1554,7 @@ namespace Html2Vrc.Editor
             return resolved;
         }
 
-        private static void FinalizeCanonicalBoxSize(UdomStyle style)
+        internal static void FinalizeCanonicalBoxSize(UdomStyle style)
         {
             if (style == null || style.size == null || style.size.Length < 2)
             {
