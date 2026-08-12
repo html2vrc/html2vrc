@@ -230,6 +230,18 @@ namespace Html2Vrc.Editor
                     path + ".backgroundGradientColors");
             }
 
+            if (value.TryGetValue("cornerRadius", out var cornerRadius))
+            {
+                style.cornerRadius = GetFloatArray(cornerRadius, path + ".cornerRadius");
+            }
+
+            if (value.TryGetValue("cornerRadiusPercent", out var cornerRadiusPercent))
+            {
+                style.cornerRadiusPercent = GetFloatArray(
+                    cornerRadiusPercent,
+                    path + ".cornerRadiusPercent");
+            }
+
             if (value.TryGetValue("borderWidth", out var borderWidth))
             {
                 style.borderWidth = GetFloatArray(borderWidth, path + ".borderWidth");
@@ -263,6 +275,20 @@ namespace Html2Vrc.Editor
             if (value.TryGetValue("childAlignment", out _))
             {
                 style.childAlignment = GetString(value, "childAlignment");
+            }
+
+            if (value.TryGetValue("stretchChildrenWidth", out var stretchChildrenWidth))
+            {
+                style.stretchChildrenWidth = GetBoolean(
+                    stretchChildrenWidth,
+                    path + ".stretchChildrenWidth");
+            }
+
+            if (value.TryGetValue("stretchChildrenHeight", out var stretchChildrenHeight))
+            {
+                style.stretchChildrenHeight = GetBoolean(
+                    stretchChildrenHeight,
+                    path + ".stretchChildrenHeight");
             }
 
             if (value.TryGetValue("flexibleWidth", out var flexibleWidth))

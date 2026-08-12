@@ -90,7 +90,8 @@ namespace Html2Vrc.Editor
             "style", "binding", "embed", "children",
             "visible", "opacity", "position", "layout", "padding", "margin", "spacing", "backgroundColor",
             "backgroundType", "backgroundGradientAngle", "backgroundGradientPositions", "backgroundGradientColors",
-            "borderWidth", "borderColor", "textColor", "fontSize", "alignment", "fontStyle", "childAlignment",
+            "cornerRadius", "cornerRadiusPercent", "borderWidth", "borderColor", "textColor", "fontSize", "alignment", "fontStyle", "childAlignment",
+            "stretchChildrenWidth", "stretchChildrenHeight",
             "flexibleWidth", "flexibleHeight",
             "action", "targetSlot", "fallbackLabel"
         };
@@ -385,6 +386,14 @@ namespace Html2Vrc.Editor
                 result,
                 requirePositive: false,
                 requireNonNegative: true);
+            ValidateVector(
+                style.cornerRadius,
+                4,
+                path + ".cornerRadius",
+                result,
+                requirePositive: false,
+                requireNonNegative: true);
+            ValidateCornerRadiusPercent(style.cornerRadiusPercent, path + ".cornerRadiusPercent", result);
 
             if (style.opacity < 0f
                 || style.opacity > 1f
@@ -586,6 +595,28 @@ namespace Html2Vrc.Editor
             if (string.IsNullOrWhiteSpace(value) || !ColorUtility.TryParseHtmlString(value, out _))
             {
                 AddError(result, path, $"잘못된 색상 '{value}'. #RRGGBB 또는 #RRGGBBAA 형식을 사용한다.");
+            }
+        }
+
+        private static void ValidateCornerRadiusPercent(
+            float[] values,
+            string path,
+            UdomValidationResult result)
+        {
+            if (values == null || values.Length != 4)
+            {
+                AddError(result, path, "four percentage values are required in top-left, top-right, bottom-right, bottom-left order.");
+                return;
+            }
+
+            for (var index = 0; index < values.Length; index++)
+            {
+                if (float.IsNaN(values[index])
+                    || float.IsInfinity(values[index])
+                    || (values[index] < 0f && values[index] != -1f))
+                {
+                    AddError(result, $"{path}[{index}]", "radius percentage must be finite, non-negative, or -1 for an absolute radius.");
+                }
             }
         }
 

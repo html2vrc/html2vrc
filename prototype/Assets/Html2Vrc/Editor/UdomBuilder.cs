@@ -254,6 +254,7 @@ namespace Html2Vrc.Editor
             EditorUtility.SetDirty(root);
             PrefabUtility.RecordPrefabInstancePropertyModifications(root);
             Canvas.ForceUpdateCanvases();
+            RefreshPaintLayout(document.root, context);
             return result;
         }
 
@@ -524,7 +525,7 @@ namespace Html2Vrc.Editor
                     throw new InvalidOperationException($"Validated node type unexpectedly unsupported: {node.type}");
             }
 
-            ConfigureBackground(nodeObject, node.id, style, context);
+            ConfigureBackground(nodeObject, node, style, context);
             ConfigureBorder(nodeObject, node, style, context);
 
             return nodeObject;
@@ -724,20 +725,16 @@ namespace Html2Vrc.Editor
 
         private static void ConfigureBackground(
             GameObject target,
-            string stableId,
+            UdomNode node,
             UdomStyle style,
             BuildContext context)
         {
             var image = target.GetComponent<Image>();
-            if (!string.Equals(
-                    style.backgroundType,
-                    "linear-gradient",
-                    StringComparison.OrdinalIgnoreCase))
-            {
-                UdomGradientAssetUtility.Clear(image);
-                return;
-            }
-
+            var hasGradient = string.Equals(
+                style.backgroundType,
+                "linear-gradient",
+                StringComparison.OrdinalIgnoreCase);
+            var hasRadius = UdomRoundedCornerAssetUtility.HasRadius(style);
             if (image == null)
             {
                 return;
@@ -749,13 +746,106 @@ namespace Html2Vrc.Editor
                 boxSize = GetVector2(style.size, new Vector2(100f, 100f));
             }
 
-            Undo.RecordObject(image, "Configure UDOM linear gradient");
-            UdomGradientAssetUtility.Configure(
-                image,
-                style,
-                boxSize,
-                context.SourceAsset,
-                stableId);
+            Undo.RecordObject(image, "Configure UDOM background paint");
+            if (hasGradient)
+            {
+                UdomRoundedCornerAssetUtility.Clear(image);
+                UdomGradientAssetUtility.Configure(
+                    image,
+                    style,
+                    boxSize,
+                    context.SourceAsset,
+                    node.id);
+            }
+            else if (hasRadius)
+            {
+                UdomGradientAssetUtility.Clear(image);
+                UdomRoundedCornerAssetUtility.Configure(
+                    image,
+                    style,
+                    boxSize,
+                    context.SourceAsset,
+                    node.id);
+            }
+            else
+            {
+                UdomGradientAssetUtility.Clear(image);
+                UdomRoundedCornerAssetUtility.Clear(image);
+            }
+
+            var backgroundColor = UdomBuilderUtility.ParseColor(style.backgroundColor, Color.clear);
+            var showMaskGraphic = hasGradient || backgroundColor.a > 0f;
+            if (hasRadius && !showMaskGraphic)
+            {
+                image.color = Color.white;
+            }
+
+            ConfigureRadiusMask(target, node.type, hasRadius, showMaskGraphic);
+        }
+
+        private static void ConfigureRadiusMask(
+            GameObject target,
+            string nodeType,
+            bool hasRadius,
+            bool showMaskGraphic)
+        {
+            if (hasRadius)
+            {
+                RemoveIfPresent<RectMask2D>(target);
+                var mask = GetOrAdd<Mask>(target);
+                Undo.RecordObject(mask, "Configure UDOM rounded mask");
+                mask.showMaskGraphic = showMaskGraphic;
+                return;
+            }
+
+            RemoveIfPresent<Mask>(target);
+            if (string.Equals(nodeType, "Image", StringComparison.OrdinalIgnoreCase))
+            {
+                GetOrAdd<RectMask2D>(target);
+            }
+        }
+
+        private static void RefreshPaintLayout(UdomNode node, BuildContext context)
+        {
+            var style = node.style ?? new UdomStyle();
+            var marker = FindNode(context.Root, node.id);
+            if (marker != null)
+            {
+                var image = marker.GetComponent<Image>();
+                var material = image != null ? image.material : null;
+                var shaderName = material != null && material.shader != null
+                    ? material.shader.name
+                    : string.Empty;
+                var boxSize = marker.GetComponent<RectTransform>().rect.size;
+                if (string.Equals(shaderName, UdomGradientAssetUtility.ShaderName, StringComparison.Ordinal))
+                {
+                    UdomGradientAssetUtility.ApplyLayoutProperties(material, style, boxSize);
+                    SavePaintMaterial(material);
+                }
+                else if (string.Equals(
+                             shaderName,
+                             UdomRoundedCornerAssetUtility.ShaderName,
+                             StringComparison.Ordinal))
+                {
+                    UdomRoundedCornerAssetUtility.ApplyProperties(material, style, boxSize);
+                    SavePaintMaterial(material);
+                }
+            }
+
+            var children = node.children ?? Array.Empty<UdomNode>();
+            for (var index = 0; index < children.Length; index++)
+            {
+                RefreshPaintLayout(children[index], context);
+            }
+        }
+
+        private static void SavePaintMaterial(Material material)
+        {
+            EditorUtility.SetDirty(material);
+            if (!string.IsNullOrEmpty(AssetDatabase.GetAssetPath(material)))
+            {
+                AssetDatabase.SaveAssetIfDirty(material);
+            }
         }
 
         private static void ConfigureBorder(
@@ -930,10 +1020,10 @@ namespace Html2Vrc.Editor
                 out var childAlignment)
                 ? childAlignment
                 : TextAnchor.UpperLeft;
-            group.childControlWidth = false;
-            group.childControlHeight = false;
-            group.childForceExpandWidth = false;
-            group.childForceExpandHeight = false;
+            group.childControlWidth = style.stretchChildrenWidth;
+            group.childControlHeight = style.stretchChildrenHeight;
+            group.childForceExpandWidth = style.stretchChildrenWidth;
+            group.childForceExpandHeight = style.stretchChildrenHeight;
             group.childScaleWidth = false;
             group.childScaleHeight = false;
         }

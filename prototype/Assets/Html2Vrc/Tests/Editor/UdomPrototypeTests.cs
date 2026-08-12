@@ -10,6 +10,7 @@ using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
+using UnityEngine.TestTools.Utils;
 using UnityEngine.UI;
 
 #if UDONSHARP
@@ -49,6 +50,8 @@ namespace Html2Vrc.Tests
             if (sample != null)
             {
                 UdomGradientAssetUtility.DeleteGeneratedAssets(sample, "gradient-panel");
+                UdomGradientAssetUtility.DeleteGeneratedAssets(sample, "radius-panel");
+                UdomRoundedCornerAssetUtility.DeleteGeneratedAssets(sample, "radius-panel");
             }
         }
 
@@ -227,7 +230,7 @@ namespace Html2Vrc.Tests
 
             Assert.That(validation.IsValid, Is.True, validation.Format());
             Assert.That(validation.Format(), Does.Not.Contain("linear-gradient"));
-            Assert.That(validation.Format(), Does.Contain("square corners"));
+            Assert.That(validation.Format(), Does.Not.Contain("square corners"));
             Assert.That(validation.Format(), Does.Contain("project default TMP font"));
             Assert.That(validation.Format(), Does.Contain("Symbolic binding 'settings.musicEnabled'"));
             Assert.That(validation.Format(), Does.Contain("Symbolic event 'settings.setMusicEnabled'"));
@@ -235,6 +238,7 @@ namespace Html2Vrc.Tests
             var document = validation.Document;
             var titleNode = document.root.children[0];
             var profileCard = document.root.children[1];
+            var profileImageNode = profileCard.children[0];
             var toggleNode = profileCard.children[2];
             Assert.That(document.root.style.backgroundColor, Is.EqualTo("#171A2BFF"));
             Assert.That(document.root.style.backgroundType, Is.EqualTo("linear-gradient"));
@@ -243,7 +247,10 @@ namespace Html2Vrc.Tests
             Assert.That(
                 document.root.style.backgroundGradientColors,
                 Is.EqualTo(new[] { "#171A2BFF", "#35245DFF" }));
+            Assert.That(document.root.style.stretchChildrenWidth, Is.True);
             Assert.That(profileCard.style.childAlignment, Is.EqualTo("MiddleLeft"));
+            Assert.That(profileCard.style.cornerRadius, Is.EqualTo(new[] { 24f, 24f, 24f, 24f }));
+            Assert.That(profileImageNode.style.cornerRadius, Is.EqualTo(new[] { 52f, 52f, 52f, 52f }));
             Assert.That(titleNode.style.fontStyle, Is.EqualTo("Bold"));
             Assert.That(toggleNode.type, Is.EqualTo("Toggle"));
             Assert.That(toggleNode.toggleValue, Is.True);
@@ -254,13 +261,38 @@ namespace Html2Vrc.Tests
             var profileImage = UdomBuilder.FindNode(
                 build.Root,
                 "profile-image::__image-content").GetComponent<Image>();
+            var profileCardObject = UdomBuilder.FindNode(build.Root, "profile-card");
+            var profileImageObject = UdomBuilder.FindNode(build.Root, "profile-image");
             var toggle = UdomBuilder.FindNode(build.Root, "music-toggle").GetComponent<Toggle>();
             var checkmark = UdomBuilder.FindNode(build.Root, "music-toggle::__toggle-checkmark");
+            var rootLayout = UdomBuilder.FindNode(
+                build.Root,
+                "settings-screen").GetComponent<VerticalLayoutGroup>();
             Assert.That(rootImage.material.shader.name, Is.EqualTo(UdomGradientAssetUtility.ShaderName));
             Assert.That(rootImage.material.GetTexture("_GradientTex"), Is.Not.Null);
+            Assert.That(rootLayout.childControlWidth, Is.True);
+            Assert.That(rootLayout.childForceExpandWidth, Is.True);
             Assert.That(title.text, Is.EqualTo("Settings"));
             Assert.That((title.fontStyle & FontStyles.Bold) != 0, Is.True);
             Assert.That(profileImage, Is.Not.Null);
+            Assert.That(
+                profileCardObject.GetComponent<Image>().material.shader.name,
+                Is.EqualTo(UdomRoundedCornerAssetUtility.ShaderName));
+            var profileCardSize = profileCardObject.GetComponent<RectTransform>().rect.size;
+            var profileCardMaterialSize = profileCardObject.GetComponent<Image>().material.GetVector("_RectSize");
+            Assert.That(profileCardSize.x, Is.GreaterThan(100f));
+            Assert.That(profileCardMaterialSize.x, Is.EqualTo(profileCardSize.x).Within(0.001f));
+            Assert.That(profileCardMaterialSize.y, Is.EqualTo(profileCardSize.y).Within(0.001f));
+            Assert.That(profileCardObject.GetComponent<Mask>(), Is.Not.Null);
+            Assert.That(
+                profileImageObject.GetComponent<Image>().material.GetVector("_CornerRadii"),
+                Is.EqualTo(new Vector4(52f, 52f, 52f, 52f)).Using(Vector4ComparerWithEqualsOperator.Instance));
+            Assert.That(profileImageObject.GetComponent<Mask>(), Is.Not.Null);
+            Assert.That(profileImageObject.GetComponent<Mask>().showMaskGraphic, Is.False);
+            Assert.That(
+                profileImageObject.GetComponent<Image>().color,
+                Is.EqualTo(Color.white).Using(ColorComparer.Instance));
+            Assert.That(profileImageObject.GetComponent<RectMask2D>(), Is.Null);
             Assert.That(toggle, Is.Not.Null);
             Assert.That(toggle.isOn, Is.True);
             Assert.That(checkmark, Is.Not.Null);
@@ -855,6 +887,98 @@ namespace Html2Vrc.Tests
             Assert.That(
                 image.color,
                 Is.EqualTo(UdomBuilderUtility.ParseColor("#123456FF", Color.clear)).Using(ColorComparer.Instance));
+        }
+
+        [Test]
+        public void CanonicalCornerRadius_GeneratesMaskedMaterialAndRegeneratesStably()
+        {
+            var json = LoadRepositoryFile(
+                "packages",
+                "udom",
+                "fixtures",
+                "valid",
+                "unity-radius.udom.json");
+            var validation = UdomValidator.Validate(json);
+
+            Assert.That(validation.IsValid, Is.True, validation.Format());
+            Assert.That(validation.Issues, Is.Empty, validation.Format());
+            var panelNode = validation.Document.root.children.Single(node => node.id == "radius-panel");
+            Assert.That(panelNode.style.cornerRadius, Is.EqualTo(new[] { 64f, 32f, 48f, 0f }));
+            Assert.That(panelNode.style.cornerRadiusPercent, Is.EqualTo(new[] { -1f, -1f, -1f, 10f }));
+
+            var build = UdomBuilder.GenerateOrRegenerate(validation.Document, null, sample);
+            var root = build.Root;
+            var panel = UdomBuilder.FindNode(root, "radius-panel");
+            var image = panel.GetComponent<Image>();
+            var mask = panel.GetComponent<Mask>();
+            var material = image.material;
+            var materialPath = AssetDatabase.GetAssetPath(material);
+            var materialGuid = AssetDatabase.AssetPathToGUID(materialPath);
+            Assert.That(
+                image.color,
+                Is.EqualTo((Color)new Color32(0x31, 0x5D, 0x9F, 0xFF)).Using(ColorComparer.Instance));
+            Assert.That(material.shader.name, Is.EqualTo(UdomRoundedCornerAssetUtility.ShaderName));
+            Assert.That(materialPath, Does.StartWith("Assets/Html2VrcGenerated/RoundedCorners/"));
+            Assert.That(material.GetVector("_RectSize").x, Is.EqualTo(360f).Within(0.001f));
+            Assert.That(material.GetVector("_RectSize").y, Is.EqualTo(160f).Within(0.001f));
+            Assert.That(
+                material.GetVector("_CornerRadii"),
+                Is.EqualTo(new Vector4(64f, 32f, 48f, 16f)).Using(Vector4ComparerWithEqualsOperator.Instance));
+            Assert.That(mask, Is.Not.Null);
+            Assert.That(mask.showMaskGraphic, Is.True);
+            Assert.That(panel.GetComponent<RectMask2D>(), Is.Null);
+
+#if UDONSHARP
+            var validationClone = Object.Instantiate(panel.gameObject);
+            try
+            {
+                WorldValidation.RemoveIllegalComponents(
+                    new List<GameObject> { validationClone },
+                    WorldValidation.WhiteListConfiguration.VRCSDK3);
+                Assert.That(validationClone.GetComponent<Image>(), Is.Not.Null);
+                Assert.That(validationClone.GetComponent<Mask>(), Is.Not.Null);
+                Assert.That(
+                    validationClone.GetComponent<Image>().material.shader.name,
+                    Is.EqualTo(UdomRoundedCornerAssetUtility.ShaderName));
+            }
+            finally
+            {
+                Object.DestroyImmediate(validationClone);
+            }
+#endif
+
+            panelNode.style.cornerRadius = new[] { 0f, 0f, 0f, 0f };
+            panelNode.style.cornerRadiusPercent = new[] { 80f, 80f, 80f, 80f };
+            UdomBuilder.GenerateOrRegenerate(validation.Document, root, sample);
+            var regeneratedMaterial = image.material;
+            Assert.That(AssetDatabase.GetAssetPath(regeneratedMaterial), Is.EqualTo(materialPath));
+            Assert.That(AssetDatabase.AssetPathToGUID(materialPath), Is.EqualTo(materialGuid));
+            Assert.That(
+                regeneratedMaterial.GetVector("_CornerRadii"),
+                Is.EqualTo(new Vector4(80f, 80f, 80f, 80f)).Using(Vector4ComparerWithEqualsOperator.Instance));
+
+            panelNode.style.backgroundType = "linear-gradient";
+            panelNode.style.backgroundGradientAngle = 90f;
+            panelNode.style.backgroundGradientPositions = new[] { 0f, 1f };
+            panelNode.style.backgroundGradientColors = new[] { "#FF0000FF", "#0000FFFF" };
+            panelNode.style.cornerRadius = new[] { 40f, 40f, 40f, 40f };
+            panelNode.style.cornerRadiusPercent = new[] { -1f, -1f, -1f, -1f };
+            UdomBuilder.GenerateOrRegenerate(validation.Document, root, sample);
+            Assert.That(image.material.shader.name, Is.EqualTo(UdomGradientAssetUtility.ShaderName));
+            Assert.That(
+                image.material.GetVector("_CornerRadii"),
+                Is.EqualTo(new Vector4(40f, 40f, 40f, 40f)).Using(Vector4ComparerWithEqualsOperator.Instance));
+            Assert.That(panel.GetComponent<Mask>(), Is.Not.Null);
+
+            panelNode.style.backgroundType = "color";
+            panelNode.style.backgroundColor = "#123456FF";
+            panelNode.style.cornerRadius = new[] { 0f, 0f, 0f, 0f };
+            panelNode.style.cornerRadiusPercent = new[] { -1f, -1f, -1f, -1f };
+            UdomBuilder.GenerateOrRegenerate(validation.Document, root, sample);
+            Assert.That(image.material.shader.name, Is.Not.EqualTo(UdomRoundedCornerAssetUtility.ShaderName));
+            Assert.That(image.material.shader.name, Is.Not.EqualTo(UdomGradientAssetUtility.ShaderName));
+            Assert.That(panel.GetComponent<Mask>(), Is.Null);
+            Assert.That(panel.GetComponent<RectMask2D>(), Is.Null);
         }
 
         [Test]

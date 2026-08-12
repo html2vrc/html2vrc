@@ -130,6 +130,8 @@ namespace Html2Vrc.Editor
             writer.FloatProperty("backgroundGradientAngle", style.backgroundGradientAngle);
             writer.FloatArrayProperty("backgroundGradientPositions", style.backgroundGradientPositions);
             writer.StringArrayProperty("backgroundGradientColors", style.backgroundGradientColors);
+            writer.FloatArrayProperty("cornerRadius", style.cornerRadius);
+            writer.FloatArrayProperty("cornerRadiusPercent", style.cornerRadiusPercent);
             writer.FloatArrayProperty("borderWidth", style.borderWidth);
             writer.StringArrayProperty("borderColor", style.borderColor);
             writer.StringProperty("textColor", style.textColor);
@@ -137,6 +139,8 @@ namespace Html2Vrc.Editor
             writer.StringProperty("alignment", style.alignment);
             writer.StringProperty("fontStyle", style.fontStyle);
             writer.StringProperty("childAlignment", style.childAlignment);
+            writer.BoolProperty("stretchChildrenWidth", style.stretchChildrenWidth);
+            writer.BoolProperty("stretchChildrenHeight", style.stretchChildrenHeight);
             writer.FloatProperty("flexibleWidth", style.flexibleWidth);
             writer.FloatProperty("flexibleHeight", style.flexibleHeight);
             writer.EndObject();

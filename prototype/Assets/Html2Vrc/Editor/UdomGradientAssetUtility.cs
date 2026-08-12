@@ -70,11 +70,8 @@ namespace Html2Vrc.Editor
             }
 
             UpdateTexture(texture, style.backgroundGradientPositions, style.backgroundGradientColors);
-            var size = new Vector2(Mathf.Max(0.0001f, boxSize.x), Mathf.Max(0.0001f, boxSize.y));
-            var radians = style.backgroundGradientAngle * Mathf.Deg2Rad;
-            var axis = new Vector2(Mathf.Sin(radians) * size.x, Mathf.Cos(radians) * size.y);
             material.SetTexture("_GradientTex", texture);
-            material.SetVector("_GradientAxis", new Vector4(axis.x, axis.y, 0f, 0f));
+            ApplyLayoutProperties(material, style, boxSize);
             EditorUtility.SetDirty(texture);
             EditorUtility.SetDirty(material);
             if (!string.IsNullOrEmpty(AssetDatabase.GetAssetPath(material)))
@@ -85,6 +82,15 @@ namespace Html2Vrc.Editor
 
             image.color = Color.white;
             image.material = material;
+        }
+
+        public static void ApplyLayoutProperties(Material material, UdomStyle style, Vector2 boxSize)
+        {
+            var size = new Vector2(Mathf.Max(0.0001f, boxSize.x), Mathf.Max(0.0001f, boxSize.y));
+            var radians = style.backgroundGradientAngle * Mathf.Deg2Rad;
+            var axis = new Vector2(Mathf.Sin(radians) * size.x, Mathf.Cos(radians) * size.y);
+            material.SetVector("_GradientAxis", new Vector4(axis.x, axis.y, 0f, 0f));
+            UdomRoundedCornerAssetUtility.ApplyProperties(material, style, size);
         }
 
         public static void DeleteGeneratedAssets(TextAsset sourceAsset, string stableId)

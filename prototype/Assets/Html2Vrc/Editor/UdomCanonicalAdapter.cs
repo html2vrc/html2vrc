@@ -351,6 +351,15 @@ namespace Html2Vrc.Editor
                     node.style.backgroundGradientColors = Array.Empty<string>();
                 }
 
+                if (HasCornerRadius(node.style))
+                {
+                    warnings.Add(new UdomParseWarning(
+                        path + ".style.paint.radius",
+                        "Canonical corner radii on a text node use square corners because TMP text and its box background require separate graphics."));
+                    node.style.cornerRadius = new[] { 0f, 0f, 0f, 0f };
+                    node.style.cornerRadiusPercent = new[] { -1f, -1f, -1f, -1f };
+                }
+
                 if (!mappedStyle.HasWidth && !fillParentByDefault)
                 {
                     node.style.size[0] = parentSize != null && parentSize.Length >= 1
@@ -368,6 +377,16 @@ namespace Html2Vrc.Editor
 
             MapElementProperties(node, elementName, value, path, mappedStyle, resources, warnings);
             ValidateEventMap(elementName, value, path, warnings);
+
+            if (string.Equals(node.type, "Embed", StringComparison.OrdinalIgnoreCase)
+                && HasCornerRadius(node.style))
+            {
+                warnings.Add(new UdomParseWarning(
+                    path + ".style.paint.radius",
+                    "Canonical corner radii on an embed anchor use square corners because the external object owns its graphics."));
+                node.style.cornerRadius = new[] { 0f, 0f, 0f, 0f };
+                node.style.cornerRadiusPercent = new[] { -1f, -1f, -1f, -1f };
+            }
 
             if (value.TryGetValue("children", out var childrenValue))
             {
@@ -1192,10 +1211,14 @@ namespace Html2Vrc.Editor
             }
 
             result.Style.layout = isVertical ? "Vertical" : "Horizontal";
+            var alignItems = GetString(flex, "alignItems") ?? "stretch";
             result.Style.childAlignment = MapChildAlignment(
                 isVertical,
-                GetString(flex, "alignItems") ?? "start",
+                alignItems,
                 path + ".flex.alignItems");
+            var stretchesCrossAxis = string.Equals(alignItems, "stretch", StringComparison.Ordinal);
+            result.Style.stretchChildrenWidth = isVertical && stretchesCrossAxis;
+            result.Style.stretchChildrenHeight = !isVertical && stretchesCrossAxis;
             var primaryGapKey = isVertical ? "rowGap" : "columnGap";
             var crossGapKey = isVertical ? "columnGap" : "rowGap";
             if (flex.TryGetValue(primaryGapKey, out var primaryGapValue)
@@ -1281,10 +1304,10 @@ namespace Html2Vrc.Editor
             RejectNonEmptyArray(value, "shadows", path + ".shadows", "canonical shadows are not supported yet");
             if (value.TryGetValue("radius", out var radiusValue))
             {
-                ValidateCornerRadius(RequireObject(radiusValue, path + ".radius"), path + ".radius");
-                warnings.Add(new UdomParseWarning(
+                MapCornerRadius(
+                    RequireObject(radiusValue, path + ".radius"),
                     path + ".radius",
-                    "Canonical corner radii are rendered as square corners by the current Unity fallback."));
+                    result.Style);
             }
 
             if (!value.TryGetValue("backgrounds", out var backgroundsValue))
@@ -1396,17 +1419,73 @@ namespace Html2Vrc.Editor
             }
         }
 
-        private static void ValidateCornerRadius(Dictionary<string, object> value, string path)
+        private static void MapCornerRadius(
+            Dictionary<string, object> value,
+            string path,
+            UdomStyle style)
         {
             EnsureOnlyKeys(value, path, "topLeft", "topRight", "bottomRight", "bottomLeft");
-            foreach (var pair in value)
+            var keys = new[] { "topLeft", "topRight", "bottomRight", "bottomLeft" };
+            for (var index = 0; index < keys.Length; index++)
             {
-                if (TryResolveLength(pair.Value, 100f, path + "." + pair.Key, out var radius)
-                    && radius < 0f)
+                if (!value.TryGetValue(keys[index], out var radiusValue))
                 {
-                    throw new FormatException($"{path}.{pair.Key}: corner radius cannot be negative.");
+                    continue;
+                }
+
+                var radiusPath = path + "." + keys[index];
+                if (radiusValue is string radiusText
+                    && radiusText.EndsWith("%", StringComparison.Ordinal))
+                {
+                    if (!TryResolveLength(radiusValue, 100f, radiusPath, out var percentage)
+                        || percentage < 0f
+                        || float.IsNaN(percentage)
+                        || float.IsInfinity(percentage))
+                    {
+                        throw new FormatException($"{radiusPath}: corner radius percentage must be finite and non-negative.");
+                    }
+
+                    style.cornerRadius[index] = 0f;
+                    style.cornerRadiusPercent[index] = percentage;
+                    continue;
+                }
+
+                if (!TryResolveLength(radiusValue, 100f, radiusPath, out var radius))
+                {
+                    continue;
+                }
+
+                if (radius < 0f || float.IsNaN(radius) || float.IsInfinity(radius))
+                {
+                    throw new FormatException($"{radiusPath}: corner radius must be finite and non-negative.");
+                }
+
+                style.cornerRadius[index] = radius;
+                style.cornerRadiusPercent[index] = -1f;
+            }
+        }
+
+        private static bool HasCornerRadius(UdomStyle style)
+        {
+            if (style == null)
+            {
+                return false;
+            }
+
+            for (var index = 0; index < 4; index++)
+            {
+                if ((style.cornerRadius != null
+                     && index < style.cornerRadius.Length
+                     && style.cornerRadius[index] > 0f)
+                    || (style.cornerRadiusPercent != null
+                        && index < style.cornerRadiusPercent.Length
+                        && style.cornerRadiusPercent[index] > 0f))
+                {
+                    return true;
                 }
             }
+
+            return false;
         }
 
         private static string MapGradient(

@@ -15,7 +15,7 @@
 - 상대 image URI `assets/logo.png`는 Unity `Assets/` 경로가 아니므로 경고를 남기고 참조를 추측하지 않는다.
 - canonical `on.activate` 심볼은 임의 코드로 실행하지 않고, 안전한 binding이 없는 Button 경고로 유지한다.
 - shared `styleRefs`를 배열 순서대로 병합하고 inline `style`이 마지막에 덮어쓰는 것을 Node와 Unity 공유 fixture로 확인했다.
-- 공식 `settings.udom.json` 전체를 읽어 linear-gradient 렌더링과 radius·font 폴백 진단, cross-axis 정렬, font weight, Image, Unity Toggle을 생성했다.
+- 공식 `settings.udom.json` 전체를 읽어 linear-gradient와 per-corner radius 렌더링, 기본 `alignItems: stretch`의 실제 cross-axis 확장, font 폴백 진단, font weight, Image, Unity Toggle을 생성했다.
 - Toggle의 `bind.checked`와 `on.change`는 임의 코드로 실행하지 않고 binding manifest가 필요하다는 경고를 남긴다.
 - `CanonicalRelativeImage.udom.json`의 문서 상대 URI를 실제 Texture2D로 해석해 RawImage에 연결했다. `Assets/` 밖으로 나가는 상대 경로는 차단하는 회귀도 함께 확인했다.
 - canonical Slider의 min/max/value/step/disabled, `bind.value`, `on.change` 진단을 정규화하고 Unity Slider, fill, handle을 생성했다. min/max가 뒤집힌 공식 invalid fixture도 Unity importer가 거부한다.
@@ -27,11 +27,12 @@
 - canonical image의 fill/contain/cover/none 크기 계산, percentage·numeric·auto 위치, RectMask2D clipping, Texture2D 로딩과 안정 내부 콘텐츠 재생성을 확인했다.
 - canonical per-edge solid border의 비대칭 폭·색 정규화, 레이아웃 비간섭 overlay 생성, anchor/offset, draw order, 안정 재생성과 edge·overlay 정리를 확인했다.
 - canonical linear-gradient의 임의 각도와 다중 stop을 1025×1 LUT Texture와 UI Material로 생성하고, 에셋 경로·재사용·단색 전환 정리와 VRChat 허용 컴포넌트 검사 뒤 Image/Shader 보존을 확인했다.
+- canonical per-corner radius의 절대값·percentage 해석, SDF Material, 최종 Layout Rect 기반 갱신, 과도한 반지름 비율 정규화, gradient 합성, 투명 image 자식 stencil clipping, Material 안정 재사용·정리와 VRChat 허용 컴포넌트 검사를 확인했다.
 
 자동 검증 결과:
 
-- `npm run check`: UDOM conformance 23/23, React 5/5, TypeScript typecheck와 build 통과
-- Unity EditMode `Html2Vrc.Tests.UdomPrototypeTests`: **24/24 통과, 실패 0**
+- `npm run check`: UDOM conformance 24/24, React 5/5, TypeScript typecheck와 build 통과
+- Unity EditMode `Html2Vrc.Tests.UdomPrototypeTests`: **25/25 통과, 실패 0**
 - Unity 종료 코드 0, C# 컴파일 오류 0
 - Windows CRLF에서 기존 HTML 재생성 테스트가 문자열을 교체하지 못하던 문제도 함께 수정했다.
 
@@ -61,7 +62,7 @@
 
 ## 자동 회귀 검증
 
-HTML2VRC 전용 Unity Test Framework 테스트 24개를 실행한다. 검증 범위는 다음과 같다.
+HTML2VRC 전용 Unity Test Framework 테스트 25개를 실행한다. 검증 범위는 다음과 같다.
 
 1. 샘플 UDOM Validation 성공과 잘못된 속성/중복 ID 거부
 2. Canvas, TextMeshProUGUI, Image, Button, ScrollRect, LayoutGroup과 VRChat용 `VRCUiShape` 생성
@@ -76,7 +77,7 @@ HTML2VRC 전용 Unity Test Framework 테스트 24개를 실행한다. 검증 범
 11. React exporter의 canonical fixture를 Unity 내부 모델로 정규화하고 네이티브 UI 생성
 12. canonical 명세에 없는 요소를 묵시하지 않고 명확한 오류로 거부
 13. canonical shared style 배열 병합 순서와 inline style 우선순위를 실제 TextMeshPro 결과까지 확인
-14. 공식 canonical settings fixture의 시각 폴백 진단과 Unity Toggle 생성, 상징적 bind/on 비실행 보장
+14. 공식 canonical settings fixture의 gradient·radius 네이티브 렌더링과 남은 시각 폴백 진단, Unity Toggle 생성, 상징적 bind/on 비실행 보장
 15. UDOM source asset 기준 상대 image URI의 Texture2D/RawImage 연결과 `Assets/` 경계 탈출 차단
 16. canonical Slider의 native control/fill/handle 생성, 정수 step과 범위 검증, symbolic binding/event 비실행 보장
 17. canonical text-input의 단일행/다중행·읽기전용·비활성 상태와 native TMP_InputField 내부 구조, symbolic binding/event 비실행 보장
@@ -87,11 +88,12 @@ HTML2VRC 전용 Unity Test Framework 테스트 24개를 실행한다. 검증 범
 22. canonical image의 fill/contain/cover/none 원본 비율·크기 계산, percentage·numeric·auto 위치, clipping과 안정 내부 콘텐츠 재생성
 23. canonical per-edge solid border의 폭·색 보존, 레이아웃 비간섭 overlay, anchor/offset, draw order와 edge·overlay 재생성 수명주기
 24. canonical linear-gradient의 다중 stop LUT·각도 축, 영속 Material/Texture 안정 재사용, 단색 전환과 VRChat 허용 컴포넌트 검사
+25. canonical per-corner radius의 SDF Material, 인접 반지름 정규화, gradient 합성, stencil Mask 자식 clipping과 VRChat 허용 컴포넌트 검사
 
 최종 자동 테스트 결과:
 
-- 전체 24개
-- 통과 24개
+- 전체 25개
+- 통과 25개
 - 실패 0개
 - 건너뜀 0개
 - Unity 종료 코드 0

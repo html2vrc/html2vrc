@@ -1,10 +1,8 @@
-Shader "HTML2VRC/UI Linear Gradient"
+Shader "HTML2VRC/UI Rounded Corners"
 {
     Properties
     {
         [PerRendererData] _MainTex ("Sprite Texture", 2D) = "white" {}
-        _GradientTex ("Gradient LUT", 2D) = "white" {}
-        _GradientAxis ("Gradient Axis", Vector) = (0, 1, 0, 0)
         _RectSize ("Rect Size", Vector) = (100, 100, 0, 0)
         _CornerRadii ("Corner Radii", Vector) = (0, 0, 0, 0)
         _Color ("Tint", Color) = (1, 1, 1, 1)
@@ -75,9 +73,9 @@ Shader "HTML2VRC/UI Linear Gradient"
                 UNITY_VERTEX_OUTPUT_STEREO
             };
 
-            sampler2D _GradientTex;
+            sampler2D _MainTex;
             fixed4 _Color;
-            float4 _GradientAxis;
+            fixed4 _TextureSampleAdd;
             float4 _RectSize;
             float4 _CornerRadii;
             float4 _ClipRect;
@@ -113,11 +111,7 @@ Shader "HTML2VRC/UI Linear Gradient"
 
             fixed4 frag(v2f input) : SV_Target
             {
-                float2 localUv = input.localPosition / max(_RectSize.xy, float2(0.0001, 0.0001)) + 0.5;
-                float denominator = max(abs(_GradientAxis.x) + abs(_GradientAxis.y), 0.00001);
-                float position = saturate(
-                    0.5 + dot(localUv - float2(0.5, 0.5), _GradientAxis.xy) / denominator);
-                fixed4 color = tex2D(_GradientTex, float2(position, 0.5)) * input.color;
+                fixed4 color = (tex2D(_MainTex, input.texcoord) + _TextureSampleAdd) * input.color;
                 color.a *= RoundedRectAlpha(input.localPosition);
 
                 #ifdef UNITY_UI_CLIP_RECT

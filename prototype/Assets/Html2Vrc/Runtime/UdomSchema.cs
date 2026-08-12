@@ -71,6 +71,8 @@ namespace Html2Vrc
         public float backgroundGradientAngle = 180f;
         public float[] backgroundGradientPositions = Array.Empty<float>();
         public string[] backgroundGradientColors = Array.Empty<string>();
+        public float[] cornerRadius = { 0f, 0f, 0f, 0f };
+        public float[] cornerRadiusPercent = { -1f, -1f, -1f, -1f };
         public float[] borderWidth = { 0f, 0f, 0f, 0f };
         public string[] borderColor = { "#00000000", "#00000000", "#00000000", "#00000000" };
         public string textColor = "#FFFFFFFF";
@@ -78,6 +80,8 @@ namespace Html2Vrc
         public string alignment = "MiddleLeft";
         public string fontStyle = "Normal";
         public string childAlignment = "UpperLeft";
+        public bool stretchChildrenWidth;
+        public bool stretchChildrenHeight;
         public float flexibleWidth;
         public float flexibleHeight;
     }

@@ -108,6 +108,8 @@ Canonical `paint.border`의 왼쪽·위·오른쪽·아래 `solid` edge는 각 �
 
 Canonical `linear-gradient`는 임의 각도와 여러 color stop을 보존해 Unity UI 전용 Material로 생성됩니다. 색상은 1025×1 LUT Texture에 결정론적으로 기록되고, 노드 크기와 각도를 전달받는 VRChat 호환 Shader가 이를 렌더링합니다. UDOM TextAsset에서 생성할 때 Material과 LUT는 `Assets/Html2VrcGenerated/Gradients` 아래 안정 경로에 재사용되며, 월드 계층에는 별도 사용자 런타임 컴포넌트를 추가하지 않습니다.
 
+Canonical `paint.radius`는 네 모서리 값을 보존한 해상도 독립 SDF Material로 생성됩니다. 인접 radius 합이 박스 변보다 크면 비율을 유지한 채 자동 축소되며, image와 자식 콘텐츠는 Unity stencil `Mask`로 같은 곡선에 잘립니다. 단색과 `linear-gradient` 모두 radius를 함께 사용할 수 있고, 생성 Material은 `Assets/Html2VrcGenerated/RoundedCorners` 아래 안정 경로로 재사용됩니다.
+
 ## Embed
 
 Embed는 HTML2VRC 레이아웃에 기존 Unity GameObject나 VRChat 프리팹을 연결합니다. 연결된 오브젝트의 내부 구조는 HTML2VRC가 소유하지 않습니다.
