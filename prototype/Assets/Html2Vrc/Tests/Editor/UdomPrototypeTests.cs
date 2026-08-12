@@ -3186,6 +3186,128 @@ namespace Html2Vrc.Tests
         }
 
         [Test]
+        public void HtmlConverter_BoxShadowPreservesCssPaintOrderAndStableLayers()
+        {
+            const string html = @"
+              <main id=""html-shadow-root"" data-canvas-size=""520 320""
+                style=""width: 520px; height: 320px; display: flex; flex-direction: column; align-items: flex-start; padding: 60px 40px"">
+                <section id=""html-shadow-panel""
+                  style=""width: 360px; height: 140px; background-color: #315D9FFF; border-radius: 28px 24px 16px 8px;
+                    box-shadow: inset 10px -8px 12px 3px #081020B0, -6px 4px 0 -2px #FF8040A0, 16px 12px 18px 4px currentColor;
+                    color: #10204080"">
+                  <p id=""html-shadow-label"" style=""width: 240px; height: 48px"">Layered shadow</p>
+                </section>
+              </main>";
+
+            var conversion = HtmlToUdomConverter.Convert(html);
+
+            Assert.That(conversion.IsValid, Is.True, conversion.Format());
+            var panelNode = conversion.Document.root.children[0];
+            Assert.That(panelNode.style.shadowOffsets, Is.EqualTo(new[] { 16f, 12f, -6f, 4f, 10f, -8f }));
+            Assert.That(panelNode.style.shadowBlurs, Is.EqualTo(new[] { 18f, 0f, 12f }));
+            Assert.That(panelNode.style.shadowSpreads, Is.EqualTo(new[] { 4f, -2f, 3f }));
+            Assert.That(
+                panelNode.style.shadowColors,
+                Is.EqualTo(new[] { "#10204080", "#FF8040A0", "#081020B0" }));
+            Assert.That(panelNode.style.shadowInsets, Is.EqualTo(new[] { false, false, true }));
+
+            var normalized = UdomValidator.Validate(conversion.Json);
+            Assert.That(normalized.IsValid, Is.True, normalized.Format());
+            Assert.That(normalized.Document.root.children[0].style.shadowOffsets, Is.EqualTo(panelNode.style.shadowOffsets));
+            Assert.That(normalized.Document.root.children[0].style.shadowInsets, Is.EqualTo(panelNode.style.shadowInsets));
+
+            var build = UdomBuilder.GenerateOrRegenerate(conversion.Document);
+            var root = build.Root;
+            var layout = UdomBuilder.FindNode(root, "html-shadow-panel::__shadow-layout");
+            var shadow0 = UdomBuilder.FindNode(root, "html-shadow-panel::__shadow-0");
+            var shadow1 = UdomBuilder.FindNode(root, "html-shadow-panel::__shadow-1");
+            var insetShadow = UdomBuilder.FindNode(root, "html-shadow-panel::__shadow-2");
+            var panel = UdomBuilder.FindNode(root, "html-shadow-panel");
+            var label = UdomBuilder.FindNode(root, "html-shadow-label");
+            Assert.That(layout.GetComponent<RectTransform>().rect.size, Is.EqualTo(new Vector2(360f, 140f)));
+            Assert.That(shadow0.transform.parent, Is.SameAs(layout.transform));
+            Assert.That(shadow1.transform.parent, Is.SameAs(layout.transform));
+            Assert.That(panel.transform.parent, Is.SameAs(layout.transform));
+            Assert.That(insetShadow.transform.parent, Is.SameAs(panel.transform));
+            Assert.That(shadow0.transform.GetSiblingIndex(), Is.EqualTo(0));
+            Assert.That(shadow1.transform.GetSiblingIndex(), Is.EqualTo(1));
+            Assert.That(panel.transform.GetSiblingIndex(), Is.EqualTo(2));
+            Assert.That(insetShadow.transform.GetSiblingIndex(), Is.EqualTo(0));
+            Assert.That(label.transform.GetSiblingIndex(), Is.EqualTo(1));
+
+            var shadow0Rect = shadow0.GetComponent<RectTransform>();
+            var shadow1Rect = shadow1.GetComponent<RectTransform>();
+            var insetRect = insetShadow.GetComponent<RectTransform>();
+            var shadow0Image = shadow0.GetComponent<Image>();
+            var shadow1Image = shadow1.GetComponent<Image>();
+            var insetImage = insetShadow.GetComponent<Image>();
+            Assert.That(shadow0Rect.anchoredPosition, Is.EqualTo(new Vector2(16f, -12f)));
+            Assert.That(shadow0Rect.rect.size, Is.EqualTo(new Vector2(404f, 184f)));
+            Assert.That(shadow1Rect.anchoredPosition, Is.EqualTo(new Vector2(-6f, -4f)));
+            Assert.That(shadow1Rect.rect.size, Is.EqualTo(new Vector2(356f, 136f)));
+            Assert.That(insetRect.rect.size, Is.EqualTo(new Vector2(360f, 140f)));
+            Assert.That(shadow0Image.material.shader.name, Is.EqualTo(UdomShadowAssetUtility.ShaderName));
+            Assert.That(shadow1Image.material.shader.name, Is.EqualTo(UdomShadowAssetUtility.ShaderName));
+            Assert.That(insetImage.material.shader.name, Is.EqualTo(UdomShadowAssetUtility.ShaderName));
+            Assert.That(
+                shadow0Image.material.GetVector("_ShapeSize"),
+                Is.EqualTo(new Vector4(368f, 148f, 0f, 0f))
+                    .Using(Vector4ComparerWithEqualsOperator.Instance));
+            Assert.That(
+                insetImage.material.GetVector("_ShapeSize"),
+                Is.EqualTo(new Vector4(354f, 134f, 0f, 0f))
+                    .Using(Vector4ComparerWithEqualsOperator.Instance));
+            Assert.That(
+                insetImage.material.GetVector("_Offset"),
+                Is.EqualTo(new Vector4(10f, 8f, 0f, 0f))
+                    .Using(Vector4ComparerWithEqualsOperator.Instance));
+            Assert.That(
+                shadow0Image.color,
+                Is.EqualTo((Color)new Color32(0x10, 0x20, 0x40, 0x80)).Using(ColorComparer.Instance));
+
+            var originalPanel = panel.gameObject;
+            var withoutShadow = HtmlToUdomConverter.Convert(
+                html.Replace(
+                    "box-shadow: inset 10px -8px 12px 3px #081020B0, -6px 4px 0 -2px #FF8040A0, 16px 12px 18px 4px currentColor",
+                    "box-shadow: none"));
+            Assert.That(withoutShadow.IsValid, Is.True, withoutShadow.Format());
+            UdomBuilder.GenerateOrRegenerate(withoutShadow.Document, root);
+            panel = UdomBuilder.FindNode(root, "html-shadow-panel");
+            Assert.That(panel.gameObject, Is.SameAs(originalPanel));
+            Assert.That(panel.transform.parent, Is.SameAs(UdomBuilder.FindNode(root, "html-shadow-root").transform));
+            Assert.That(UdomBuilder.FindNode(root, "html-shadow-panel::__shadow-layout"), Is.Null);
+            Assert.That(UdomBuilder.FindNode(root, "html-shadow-panel::__shadow-0"), Is.Null);
+            Assert.That(UdomBuilder.FindNode(root, "html-shadow-panel::__shadow-1"), Is.Null);
+            Assert.That(UdomBuilder.FindNode(root, "html-shadow-panel::__shadow-2"), Is.Null);
+            Object.DestroyImmediate(root.gameObject);
+
+            var negativeBlur = HtmlToUdomConverter.Convert(
+                html.Replace("16px 12px 18px 4px currentColor", "16px 12px -1px 4px currentColor"));
+            Assert.That(negativeBlur.IsValid, Is.False);
+            Assert.That(negativeBlur.Format(), Does.Contain("blur radius"));
+
+            var missingOffset = HtmlToUdomConverter.Convert(
+                html.Replace("16px 12px 18px 4px currentColor", "16px"));
+            Assert.That(missingOffset.IsValid, Is.False);
+            Assert.That(missingOffset.Format(), Does.Contain("offset X"));
+
+            var percentage = HtmlToUdomConverter.Convert(
+                html.Replace("16px 12px 18px 4px currentColor", "16px 12px 10% currentColor"));
+            Assert.That(percentage.IsValid, Is.False);
+            Assert.That(percentage.Format(), Does.Contain("10%"));
+
+            var mixedNone = HtmlToUdomConverter.Convert(
+                html.Replace("16px 12px 18px 4px currentColor", "none"));
+            Assert.That(mixedNone.IsValid, Is.False);
+            Assert.That(mixedNone.Format(), Does.Contain("none"));
+
+            var duplicateInset = HtmlToUdomConverter.Convert(
+                html.Replace("inset 10px -8px", "inset 10px -8px inset"));
+            Assert.That(duplicateInset.IsValid, Is.False);
+            Assert.That(duplicateInset.Format(), Does.Contain("inset이 두 번"));
+        }
+
+        [Test]
         public void HtmlConverter_FlexCssUsesCanonicalSizingAlignmentAndStableHierarchy()
         {
             const string html = @"

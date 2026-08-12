@@ -485,6 +485,8 @@ namespace Html2Vrc.Editor
             var borderColors = new[] { "currentcolor", "currentcolor", "currentcolor", "currentcolor" };
             var borderStyles = new[] { "none", "none", "none", "none" };
             var hasBorderDeclaration = false;
+            List<CssBoxShadow> boxShadows = null;
+            var hasBoxShadowDeclaration = false;
             foreach (var declaration in declarations)
             {
                 switch (declaration.Key)
@@ -839,6 +841,10 @@ namespace Html2Vrc.Editor
                     case "border-bottom-left-radius":
                         SetBorderCornerRadius(declaration.Value, 3, path, declaration.Key, result, style);
                         break;
+                    case "box-shadow":
+                        hasBoxShadowDeclaration = true;
+                        boxShadows = ParseBoxShadows(declaration.Value, path, result);
+                        break;
                     case "color":
                         SetColor(declaration.Value, path, declaration.Key, result, value => style.textColor = value);
                         break;
@@ -910,6 +916,10 @@ namespace Html2Vrc.Editor
             if (hasBorderDeclaration)
             {
                 ApplyBorder(style, borderWidths, borderColors, borderStyles);
+            }
+            if (hasBoxShadowDeclaration && boxShadows != null)
+            {
+                ApplyBoxShadows(style, boxShadows);
             }
 
             ConfigureOverflow(style, overflowX, overflowY, path, result);
@@ -1434,6 +1444,192 @@ namespace Html2Vrc.Editor
             }
 
             return TryParseNumber(normalized, out value) && value >= 0f;
+        }
+
+        private static List<CssBoxShadow> ParseBoxShadows(
+            string source,
+            string path,
+            HtmlToUdomResult result)
+        {
+            var normalized = source.Trim();
+            if (string.Equals(normalized, "none", StringComparison.OrdinalIgnoreCase))
+            {
+                return new List<CssBoxShadow>();
+            }
+
+            var layers = normalized.Split(',');
+            var shadows = new List<CssBoxShadow>(layers.Length);
+            for (var index = 0; index < layers.Length; index++)
+            {
+                var layer = layers[index].Trim();
+                if (layer.Length == 0
+                    || string.Equals(layer, "none", StringComparison.OrdinalIgnoreCase))
+                {
+                    AddError(
+                        result,
+                        path + "/@style",
+                        "box-shadow의 none은 다른 shadow layer와 함께 사용할 수 없다.");
+                    return null;
+                }
+
+                if (!TryParseBoxShadowLayer(layer, index, path, result, out var shadow))
+                {
+                    return null;
+                }
+
+                shadows.Add(shadow);
+            }
+
+            return shadows;
+        }
+
+        private static bool TryParseBoxShadowLayer(
+            string source,
+            int layerIndex,
+            string path,
+            HtmlToUdomResult result,
+            out CssBoxShadow shadow)
+        {
+            shadow = null;
+            var parts = source.Split(
+                new[] { ' ', '\t', '\r', '\n' },
+                StringSplitOptions.RemoveEmptyEntries);
+            var lengths = new List<float>(4);
+            var inset = false;
+            var hasInset = false;
+            var color = "currentcolor";
+            var hasColor = false;
+            for (var index = 0; index < parts.Length; index++)
+            {
+                var part = parts[index];
+                if (string.Equals(part, "inset", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (hasInset)
+                    {
+                        AddBoxShadowError(result, path, layerIndex, "inset이 두 번 지정됐다.");
+                        return false;
+                    }
+
+                    inset = true;
+                    hasInset = true;
+                    continue;
+                }
+
+                if (TryParseSignedPixelValue(part, out var length))
+                {
+                    if (lengths.Count >= 4)
+                    {
+                        AddBoxShadowError(result, path, layerIndex, "length는 offset X/Y, blur, spread의 최대 4개다.");
+                        return false;
+                    }
+
+                    lengths.Add(length);
+                    continue;
+                }
+
+                if (TryNormalizeBorderColor(part, out var parsedColor))
+                {
+                    if (hasColor)
+                    {
+                        AddBoxShadowError(result, path, layerIndex, "color가 두 번 지정됐다.");
+                        return false;
+                    }
+
+                    color = parsedColor;
+                    hasColor = true;
+                    continue;
+                }
+
+                AddBoxShadowError(
+                    result,
+                    path,
+                    layerIndex,
+                    $"값 '{part}'은 지원하지 않는다. px length, inset, hex color만 사용할 수 있다.");
+                return false;
+            }
+
+            if (lengths.Count < 2)
+            {
+                AddBoxShadowError(result, path, layerIndex, "offset X와 offset Y 두 length가 필요하다.");
+                return false;
+            }
+
+            var blur = lengths.Count >= 3 ? lengths[2] : 0f;
+            if (blur < 0f)
+            {
+                AddBoxShadowError(result, path, layerIndex, "blur radius는 음수가 될 수 없다.");
+                return false;
+            }
+
+            shadow = new CssBoxShadow
+            {
+                OffsetX = lengths[0],
+                OffsetY = lengths[1],
+                Blur = blur,
+                Spread = lengths.Count >= 4 ? lengths[3] : 0f,
+                Color = color,
+                Inset = inset
+            };
+            return true;
+        }
+
+        private static void AddBoxShadowError(
+            HtmlToUdomResult result,
+            string path,
+            int layerIndex,
+            string message)
+        {
+            AddError(result, path + "/@style", $"box-shadow layer {layerIndex + 1}: {message}");
+        }
+
+        private static bool TryParseSignedPixelValue(string source, out float value)
+        {
+            var normalized = source.Trim();
+            if (normalized.EndsWith("%", StringComparison.Ordinal))
+            {
+                value = 0f;
+                return false;
+            }
+
+            if (normalized.EndsWith("px", StringComparison.OrdinalIgnoreCase))
+            {
+                normalized = normalized.Substring(0, normalized.Length - 2).Trim();
+            }
+
+            return TryParseNumber(normalized, out value);
+        }
+
+        private static void ApplyBoxShadows(UdomStyle style, List<CssBoxShadow> cssShadows)
+        {
+            var count = cssShadows.Count;
+            style.shadowOffsets = new float[count * 2];
+            style.shadowBlurs = new float[count];
+            style.shadowSpreads = new float[count];
+            style.shadowColors = new string[count];
+            style.shadowInsets = new bool[count];
+            for (var cssIndex = 0; cssIndex < count; cssIndex++)
+            {
+                var canonicalIndex = count - cssIndex - 1;
+                var shadow = cssShadows[cssIndex];
+                style.shadowOffsets[canonicalIndex * 2] = shadow.OffsetX;
+                style.shadowOffsets[canonicalIndex * 2 + 1] = shadow.OffsetY;
+                style.shadowBlurs[canonicalIndex] = shadow.Blur;
+                style.shadowSpreads[canonicalIndex] = shadow.Spread;
+                style.shadowColors[canonicalIndex] = shadow.Color == "currentcolor"
+                    ? style.textColor
+                    : shadow.Color;
+                style.shadowInsets[canonicalIndex] = shadow.Inset;
+            }
+        }
+
+        private sealed class CssBoxShadow
+        {
+            public float OffsetX;
+            public float OffsetY;
+            public float Blur;
+            public float Spread;
+            public string Color;
+            public bool Inset;
         }
 
         private static void SetObjectFit(
