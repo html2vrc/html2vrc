@@ -22,6 +22,8 @@ Unity Importer는 이 문서의 기존 형식과 함께 `packages/udom` JSON Sch
 
 Canonical 길이의 숫자와 부모 크기 기준 백분율, 기본 flex 방향과 간격, cross-axis 정렬, padding/margin, 단일 색상과 선형 gradient 배경, 기본 텍스트 스타일과 font weight를 변환한다. `styleRefs`는 배열 순서대로 깊은 병합한 뒤 노드의 inline `style`로 마지막 덮어쓴다. canonical `image` resource는 Texture2D/RawImage, `sprite` resource는 Sprite/Image로 생성한다.
 
+Canonical flex의 `row-reverse`, `column-reverse`와 정수 `flexItem.order`는 source children 배열을 바꾸지 않고 내부 `reverseChildren`, `flexOrder`로 보존한다. Unity 생성 시에만 `(order, 원본 자식 인덱스)`로 안정 정렬한 뒤 reverse main axis를 적용하므로 같은 order는 트리 순서를 유지한다. 실제 형제는 직접 노드 또는 margin·transform·shadow layout wrapper 단위로 재배치되며 안정 ID와 GameObject를 재생성 사이에 유지한다.
+
 Canonical image의 `fit`은 `fill`, `contain`, `cover`, `none`을 모두 지원하며 생략 시 `contain`이다. resource에 선언된 width/height를 원본 크기로 사용하고, 없으면 로드한 Texture2D 또는 Sprite 크기를 사용한다. 이미지 콘텐츠는 `<node-id>::__image-content` 안정 ID의 내부 자식에 배치한다. 사각형은 부모 RectMask2D, radius가 있으면 부모의 SDF Image와 stencil Mask로 자른다. `position.x/y`의 백분율은 `(박스 크기 - 콘텐츠 크기) × 백분율`, 숫자는 왼쪽·위 기준 design-unit 오프셋, `auto`는 남는 공간의 가운데로 해석한다.
 
 Canonical viewport 크기는 디자인 좌표계를 유지한다. UDOM Importer의 선택적 Renderer 목표 Canvas 크기가 다르면 `contain`은 작은 축 비율, `cover`는 큰 축 비율, `stretch`는 축별 비율, `none`은 1:1 scale을 적용한다. `cover`와 넘칠 수 있는 `none`은 생성기 소유의 안정적인 viewport wrapper에서 클리핑한다. 목표 크기 override를 끄면 Canvas는 디자인 viewport 크기로 돌아간다.
@@ -146,6 +148,7 @@ Resource URI는 canonical 명세대로 UDOM TextAsset이 있는 폴더를 기준
 - `lineHeight`, `letterSpacing`: canonical text의 design-unit baseline 간격과 글자 사이 간격. `lineHeight: -1`은 font의 normal metric을 뜻한다.
 - `textWrap`, `textOverflow`, `preserveWhitespace`: canonical wrap/nowrap, visible/clip/ellipsis와 whitespace 보존 여부.
 - `stretchChildrenWidth`, `stretchChildrenHeight`: canonical flex의 기본 `alignItems: stretch`를 Unity Layout Group의 cross-axis 제어로 보존하는 내부 플래그.
+- `reverseChildren`, `flexOrder`: canonical reverse main axis와 order-modified flex 순서를 보존하는 내부 플래그와 정수.
 - 색상: Unity HTML 색상 형식 `#RRGGBB` 또는 `#RRGGBBAA`.
 - `alignment`: `TopLeft`, `Top`, `TopRight`, `TopJustified`, `Left`, `Center`, `Right`, `Justified`, `BottomLeft`, `Bottom`, `BottomRight`, `BottomJustified`, `MiddleLeft`, `MiddleRight`.
 - `flexibleWidth`, `flexibleHeight`: 레이아웃 안에서 남는 공간을 차지하는 정도.

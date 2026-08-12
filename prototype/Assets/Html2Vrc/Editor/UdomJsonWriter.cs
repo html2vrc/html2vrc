@@ -121,6 +121,11 @@ namespace Html2Vrc.Editor
             writer.FloatProperty("opacity", style.opacity);
             writer.FloatArrayProperty("position", style.position);
             writer.FloatArrayProperty("size", style.size);
+            writer.FloatArrayProperty("minSize", style.minSize);
+            writer.FloatArrayProperty("maxSize", style.maxSize);
+            writer.BoolArrayProperty("autoSize", style.autoSize);
+            writer.FloatProperty("aspectRatio", style.aspectRatio);
+            writer.StringProperty("aspectRatioMode", style.aspectRatioMode);
             writer.StringProperty("layout", style.layout);
             writer.FloatArrayProperty("padding", style.padding);
             writer.FloatArrayProperty("margin", style.margin);
@@ -149,11 +154,20 @@ namespace Html2Vrc.Editor
             writer.BoolArrayProperty("shadowInsets", style.shadowInsets);
             writer.StringProperty("textColor", style.textColor);
             writer.FloatProperty("fontSize", style.fontSize);
+            writer.FloatProperty("lineHeight", style.lineHeight);
+            writer.FloatProperty("letterSpacing", style.letterSpacing);
+            writer.BoolProperty("textWrap", style.textWrap);
+            writer.StringProperty("textOverflow", style.textOverflow);
+            writer.BoolProperty("preserveWhitespace", style.preserveWhitespace);
             writer.StringProperty("alignment", style.alignment);
             writer.StringProperty("fontStyle", style.fontStyle);
             writer.StringProperty("childAlignment", style.childAlignment);
             writer.BoolProperty("stretchChildrenWidth", style.stretchChildrenWidth);
             writer.BoolProperty("stretchChildrenHeight", style.stretchChildrenHeight);
+            writer.BoolProperty("useResolvedChildrenWidth", style.useResolvedChildrenWidth);
+            writer.BoolProperty("useResolvedChildrenHeight", style.useResolvedChildrenHeight);
+            writer.BoolProperty("reverseChildren", style.reverseChildren);
+            writer.IntProperty("flexOrder", style.flexOrder);
             writer.FloatProperty("flexibleWidth", style.flexibleWidth);
             writer.FloatProperty("flexibleHeight", style.flexibleHeight);
             writer.FloatArrayProperty("transformOrigin", style.transformOrigin);
@@ -244,6 +258,13 @@ namespace Html2Vrc.Editor
             {
                 PropertyName(name);
                 AppendFloat(value);
+                needsComma = true;
+            }
+
+            public void IntProperty(string name, int value)
+            {
+                PropertyName(name);
+                builder.Append(value.ToString(CultureInfo.InvariantCulture));
                 needsComma = true;
             }
 

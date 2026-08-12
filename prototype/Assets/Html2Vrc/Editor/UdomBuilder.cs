@@ -666,9 +666,27 @@ namespace Html2Vrc.Editor
             BuildContext context)
         {
             var children = parentNode.children ?? Array.Empty<UdomNode>();
-            for (var index = 0; index < children.Length; index++)
+            var indexedChildren = children
+                .Select((child, sourceIndex) => new { Child = child, SourceIndex = sourceIndex });
+            var parentLayout = parentNode.style != null ? parentNode.style.layout : null;
+            var isFlexLayout = string.Equals(parentLayout, "Horizontal", StringComparison.OrdinalIgnoreCase)
+                               || string.Equals(parentLayout, "Vertical", StringComparison.OrdinalIgnoreCase);
+            var orderedChildren = isFlexLayout
+                ? indexedChildren
+                    .OrderBy(item => item.Child != null && item.Child.style != null
+                        ? item.Child.style.flexOrder
+                        : 0)
+                    .ThenBy(item => item.SourceIndex)
+                    .ToArray()
+                : indexedChildren.ToArray();
+            if (isFlexLayout && parentNode.style != null && parentNode.style.reverseChildren)
             {
-                BuildNode(children[index], parent, documentPanel, index, context);
+                Array.Reverse(orderedChildren);
+            }
+
+            for (var index = 0; index < orderedChildren.Length; index++)
+            {
+                BuildNode(orderedChildren[index].Child, parent, documentPanel, index, context);
             }
         }
 

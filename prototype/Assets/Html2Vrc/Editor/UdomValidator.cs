@@ -98,6 +98,7 @@ namespace Html2Vrc.Editor
             "alignment", "fontStyle", "childAlignment",
             "shadowOffsets", "shadowBlurs", "shadowSpreads", "shadowColors", "shadowInsets",
             "stretchChildrenWidth", "stretchChildrenHeight", "useResolvedChildrenWidth", "useResolvedChildrenHeight",
+            "reverseChildren", "flexOrder",
             "flexibleWidth", "flexibleHeight",
             "transformOrigin", "transformOriginIsPercent", "transformOperationTypes",
             "transformOperationValues", "transformOperationValuesArePercent",

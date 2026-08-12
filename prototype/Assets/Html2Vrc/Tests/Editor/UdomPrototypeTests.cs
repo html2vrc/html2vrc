@@ -873,6 +873,94 @@ namespace Html2Vrc.Tests
         }
 
         [Test]
+        public void CanonicalFlexOrder_AppliesStableOrderAndReverseDirections()
+        {
+            var json = LoadRepositoryFile(
+                "packages",
+                "udom",
+                "fixtures",
+                "valid",
+                "unity-flex-order.udom.json");
+            var validation = UdomValidator.Validate(json);
+
+            Assert.That(validation.IsValid, Is.True, validation.Format());
+            Assert.That(validation.Issues, Is.Empty, validation.Format());
+
+            var document = validation.Document;
+            var rowNode = document.root.children[0];
+            var columnNode = document.root.children[1];
+            Assert.That(rowNode.style.layout, Is.EqualTo("Horizontal"));
+            Assert.That(rowNode.style.reverseChildren, Is.True);
+            Assert.That(rowNode.style.childAlignment, Is.EqualTo("MiddleRight"));
+            Assert.That(rowNode.children.Select(child => child.id), Is.EqualTo(new[]
+            {
+                "order-a", "order-b", "order-c", "order-d"
+            }));
+            Assert.That(rowNode.children.Select(child => child.style.flexOrder), Is.EqualTo(new[]
+            {
+                2, -1, 2, 0
+            }));
+            Assert.That(columnNode.style.layout, Is.EqualTo("Vertical"));
+            Assert.That(columnNode.style.reverseChildren, Is.True);
+            Assert.That(columnNode.style.childAlignment, Is.EqualTo("LowerRight"));
+
+            var normalized = UdomJsonWriter.Write(document);
+            var roundTrip = UdomValidator.Validate(normalized);
+            Assert.That(roundTrip.IsValid, Is.True, roundTrip.Format());
+            Assert.That(roundTrip.Document.root.children[0].style.reverseChildren, Is.True);
+            Assert.That(roundTrip.Document.root.children[0].children[0].style.flexOrder, Is.EqualTo(2));
+            Assert.That(roundTrip.Document.root.children[0].children[0].style.minSize[0], Is.EqualTo(90f));
+            Assert.That(roundTrip.Document.root.children[0].children[0].style.maxSize[0], Is.EqualTo(110f));
+            Assert.That(roundTrip.Document.root.children[0].children[1].style.aspectRatio, Is.EqualTo(1.5f));
+            Assert.That(roundTrip.Document.root.children[0].children[1].style.autoSize[0], Is.True);
+            var roundTripText = roundTrip.Document.root.children[0].children[3].children[0].style;
+            Assert.That(roundTripText.lineHeight, Is.EqualTo(27f));
+            Assert.That(roundTripText.letterSpacing, Is.EqualTo(2f));
+            Assert.That(roundTripText.textWrap, Is.False);
+            Assert.That(roundTripText.textOverflow, Is.EqualTo("Clip"));
+            Assert.That(roundTripText.preserveWhitespace, Is.True);
+
+            var build = UdomBuilder.GenerateOrRegenerate(document);
+            var root = build.Root;
+            var row = UdomBuilder.FindNode(root, "row-reverse").gameObject;
+            var column = UdomBuilder.FindNode(root, "column-reverse").gameObject;
+            var orderAWrapper = UdomBuilder.FindNode(root, "order-a::__margin").gameObject;
+            var orderBWrapper = UdomBuilder.FindNode(root, "order-b::__transform-layout").gameObject;
+            var orderCWrapper = UdomBuilder.FindNode(root, "order-c::__shadow-layout").gameObject;
+            var orderD = UdomBuilder.FindNode(root, "order-d").gameObject;
+            var columnFirst = UdomBuilder.FindNode(root, "column-first").gameObject;
+            var columnSecond = UdomBuilder.FindNode(root, "column-second").gameObject;
+            Assert.That(row.GetComponent<HorizontalLayoutGroup>().childAlignment, Is.EqualTo(TextAnchor.MiddleRight));
+            Assert.That(orderCWrapper.transform.GetSiblingIndex(), Is.EqualTo(0));
+            Assert.That(orderAWrapper.transform.GetSiblingIndex(), Is.EqualTo(1));
+            Assert.That(orderD.transform.GetSiblingIndex(), Is.EqualTo(2));
+            Assert.That(orderBWrapper.transform.GetSiblingIndex(), Is.EqualTo(3));
+            Assert.That(column.GetComponent<VerticalLayoutGroup>().childAlignment, Is.EqualTo(TextAnchor.LowerRight));
+            Assert.That(columnSecond.transform.GetSiblingIndex(), Is.EqualTo(0));
+            Assert.That(columnFirst.transform.GetSiblingIndex(), Is.EqualTo(1));
+
+            rowNode.style.reverseChildren = false;
+            rowNode.style.childAlignment = "MiddleLeft";
+            rowNode.children[0].style.flexOrder = -2;
+            var regenerated = UdomBuilder.GenerateOrRegenerate(document, root);
+            Assert.That(regenerated.Created, Is.Zero);
+            Assert.That(UdomBuilder.FindNode(root, "order-a::__margin").gameObject, Is.SameAs(orderAWrapper));
+            Assert.That(UdomBuilder.FindNode(root, "order-b::__transform-layout").gameObject, Is.SameAs(orderBWrapper));
+            Assert.That(UdomBuilder.FindNode(root, "order-c::__shadow-layout").gameObject, Is.SameAs(orderCWrapper));
+            Assert.That(orderAWrapper.transform.GetSiblingIndex(), Is.EqualTo(0));
+            Assert.That(orderBWrapper.transform.GetSiblingIndex(), Is.EqualTo(1));
+            Assert.That(orderD.transform.GetSiblingIndex(), Is.EqualTo(2));
+            Assert.That(orderCWrapper.transform.GetSiblingIndex(), Is.EqualTo(3));
+            Assert.That(row.GetComponent<HorizontalLayoutGroup>().childAlignment, Is.EqualTo(TextAnchor.MiddleLeft));
+
+            Object.DestroyImmediate(root.gameObject);
+
+            var invalid = UdomValidator.Validate(json.Replace("\"order\": 2", "\"order\": 1.5"));
+            Assert.That(invalid.IsValid, Is.False);
+            Assert.That(invalid.Format(), Does.Contain("order"));
+        }
+
+        [Test]
         public void CanonicalBorder_RendersAsymmetricRoundedContourAndRegeneratesStably()
         {
             var json = LoadRepositoryFile(

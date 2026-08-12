@@ -1407,7 +1407,11 @@ namespace Html2Vrc.Editor
                 RejectPresent(flexItem, path + ".flexItem", "shrink", "flex shrink is not supported yet");
                 RejectPresent(flexItem, path + ".flexItem", "basis", "flex basis is not supported yet");
                 RejectPresent(flexItem, path + ".flexItem", "alignSelf", "flex alignSelf is not supported yet");
-                RejectPresent(flexItem, path + ".flexItem", "order", "flex order is not supported yet");
+                if (flexItem.TryGetValue("order", out var orderValue))
+                {
+                    result.Style.flexOrder = RequireInteger(orderValue, path + ".flexItem.order");
+                }
+
                 if (flexItem.TryGetValue("grow", out var growValue))
                 {
                     var grow = RequireFloat(growValue, path + ".flexItem.grow");
@@ -1828,15 +1832,13 @@ namespace Html2Vrc.Editor
                 throw new FormatException($"{path}.flex.direction: unsupported flex direction '{direction}'.");
             }
 
-            if (direction.EndsWith("-reverse", StringComparison.Ordinal))
-            {
-                throw new FormatException($"{path}.flex.direction: reverse flex directions are not supported yet.");
-            }
-
+            var reversesMainAxis = direction.EndsWith("-reverse", StringComparison.Ordinal);
             result.Style.layout = isVertical ? "Vertical" : "Horizontal";
+            result.Style.reverseChildren = reversesMainAxis;
             var alignItems = GetString(flex, "alignItems") ?? "stretch";
             result.Style.childAlignment = MapChildAlignment(
                 isVertical,
+                reversesMainAxis,
                 alignItems,
                 path + ".flex.alignItems");
             var stretchesCrossAxis = string.Equals(alignItems, "stretch", StringComparison.Ordinal);
@@ -1863,33 +1865,39 @@ namespace Html2Vrc.Editor
             }
         }
 
-        private static string MapChildAlignment(bool isVertical, string alignItems, string path)
+        private static string MapChildAlignment(
+            bool isVertical,
+            bool reversesMainAxis,
+            string alignItems,
+            string path)
         {
             if (isVertical)
             {
+                var vertical = reversesMainAxis ? "Lower" : "Upper";
                 switch (alignItems)
                 {
                     case "start":
                     case "stretch":
-                        return "UpperLeft";
+                        return vertical + "Left";
                     case "center":
-                        return "UpperCenter";
+                        return vertical + "Center";
                     case "end":
-                        return "UpperRight";
+                        return vertical + "Right";
                     default:
                         throw new FormatException($"{path}: unsupported cross-axis alignment '{alignItems}'.");
                 }
             }
 
+            var horizontal = reversesMainAxis ? "Right" : "Left";
             switch (alignItems)
             {
                 case "start":
                 case "stretch":
-                    return "UpperLeft";
+                    return "Upper" + horizontal;
                 case "center":
-                    return "MiddleLeft";
+                    return "Middle" + horizontal;
                 case "end":
-                    return "LowerLeft";
+                    return "Lower" + horizontal;
                 default:
                     throw new FormatException($"{path}: unsupported cross-axis alignment '{alignItems}'.");
             }
@@ -2788,6 +2796,21 @@ namespace Html2Vrc.Editor
             }
 
             throw new FormatException($"{path}: a number is required.");
+        }
+
+        private static int RequireInteger(object value, string path)
+        {
+            if (value is double number
+                && !double.IsNaN(number)
+                && !double.IsInfinity(number)
+                && number >= int.MinValue
+                && number <= int.MaxValue
+                && Math.Truncate(number) == number)
+            {
+                return (int)number;
+            }
+
+            throw new FormatException($"{path}: an integer is required.");
         }
 
         private static bool GetBoolean(

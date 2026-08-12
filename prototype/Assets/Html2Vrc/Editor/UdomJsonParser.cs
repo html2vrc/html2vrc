@@ -179,6 +179,31 @@ namespace Html2Vrc.Editor
                 style.size = GetFloatArray(size, path + ".size");
             }
 
+            if (value.TryGetValue("minSize", out var minSize))
+            {
+                style.minSize = GetFloatArray(minSize, path + ".minSize");
+            }
+
+            if (value.TryGetValue("maxSize", out var maxSize))
+            {
+                style.maxSize = GetFloatArray(maxSize, path + ".maxSize");
+            }
+
+            if (value.TryGetValue("autoSize", out var autoSize))
+            {
+                style.autoSize = GetBooleanArray(autoSize, path + ".autoSize");
+            }
+
+            if (value.TryGetValue("aspectRatio", out var aspectRatio))
+            {
+                style.aspectRatio = GetFloat(aspectRatio, path + ".aspectRatio");
+            }
+
+            if (value.TryGetValue("aspectRatioMode", out _))
+            {
+                style.aspectRatioMode = GetString(value, "aspectRatioMode");
+            }
+
             if (value.TryGetValue("layout", out _))
             {
                 style.layout = GetString(value, "layout");
@@ -319,6 +344,33 @@ namespace Html2Vrc.Editor
                 style.fontSize = GetFloat(fontSize, path + ".fontSize");
             }
 
+            if (value.TryGetValue("lineHeight", out var lineHeight))
+            {
+                style.lineHeight = GetFloat(lineHeight, path + ".lineHeight");
+            }
+
+            if (value.TryGetValue("letterSpacing", out var letterSpacing))
+            {
+                style.letterSpacing = GetFloat(letterSpacing, path + ".letterSpacing");
+            }
+
+            if (value.TryGetValue("textWrap", out var textWrap))
+            {
+                style.textWrap = GetBoolean(textWrap, path + ".textWrap");
+            }
+
+            if (value.TryGetValue("textOverflow", out _))
+            {
+                style.textOverflow = GetString(value, "textOverflow");
+            }
+
+            if (value.TryGetValue("preserveWhitespace", out var preserveWhitespace))
+            {
+                style.preserveWhitespace = GetBoolean(
+                    preserveWhitespace,
+                    path + ".preserveWhitespace");
+            }
+
             if (value.TryGetValue("alignment", out _))
             {
                 style.alignment = GetString(value, "alignment");
@@ -346,6 +398,32 @@ namespace Html2Vrc.Editor
                 style.stretchChildrenHeight = GetBoolean(
                     stretchChildrenHeight,
                     path + ".stretchChildrenHeight");
+            }
+
+            if (value.TryGetValue("useResolvedChildrenWidth", out var useResolvedChildrenWidth))
+            {
+                style.useResolvedChildrenWidth = GetBoolean(
+                    useResolvedChildrenWidth,
+                    path + ".useResolvedChildrenWidth");
+            }
+
+            if (value.TryGetValue("useResolvedChildrenHeight", out var useResolvedChildrenHeight))
+            {
+                style.useResolvedChildrenHeight = GetBoolean(
+                    useResolvedChildrenHeight,
+                    path + ".useResolvedChildrenHeight");
+            }
+
+            if (value.TryGetValue("reverseChildren", out var reverseChildren))
+            {
+                style.reverseChildren = GetBoolean(
+                    reverseChildren,
+                    path + ".reverseChildren");
+            }
+
+            if (value.TryGetValue("flexOrder", out var flexOrder))
+            {
+                style.flexOrder = GetInteger(flexOrder, path + ".flexOrder");
             }
 
             if (value.TryGetValue("flexibleWidth", out var flexibleWidth))
@@ -440,6 +518,21 @@ namespace Html2Vrc.Editor
             }
 
             throw new FormatException($"{path}: 숫자가 필요하다.");
+        }
+
+        private static int GetInteger(object value, string path)
+        {
+            if (value is double number
+                && !double.IsNaN(number)
+                && !double.IsInfinity(number)
+                && number >= int.MinValue
+                && number <= int.MaxValue
+                && Math.Truncate(number) == number)
+            {
+                return (int)number;
+            }
+
+            throw new FormatException($"{path}: an integer is required.");
         }
 
         private static bool GetBoolean(object value, string path)

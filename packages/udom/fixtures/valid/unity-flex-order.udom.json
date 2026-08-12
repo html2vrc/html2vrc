@@ -1,0 +1,240 @@
+{
+  "asset": {
+    "version": "0.1",
+    "generator": "@html2vrc/udom Unity flex order fixture"
+  },
+  "viewport": {
+    "width": 720,
+    "height": 480
+  },
+  "root": {
+    "type": "element",
+    "id": "flex-order-root",
+    "name": "view",
+    "style": {
+      "layout": {
+        "mode": "flex",
+        "width": "100%",
+        "height": "100%",
+        "padding": {
+          "top": 32,
+          "right": 32,
+          "bottom": 32,
+          "left": 32
+        },
+        "flex": {
+          "direction": "column",
+          "alignItems": "start",
+          "rowGap": 24
+        }
+      }
+    },
+    "children": [
+      {
+        "type": "element",
+        "id": "row-reverse",
+        "name": "view",
+        "style": {
+          "layout": {
+            "mode": "flex",
+            "width": 656,
+            "height": 140,
+            "flex": {
+              "direction": "row-reverse",
+              "alignItems": "center",
+              "columnGap": 12
+            }
+          },
+          "paint": {
+            "backgrounds": [
+              {
+                "type": "color",
+                "color": "#172033FF"
+              }
+            ]
+          }
+        },
+        "children": [
+          {
+            "type": "element",
+            "id": "order-a",
+            "name": "view",
+            "style": {
+              "layout": {
+                "width": 96,
+                "height": 64,
+                "minWidth": 90,
+                "maxWidth": 110,
+                "margin": {
+                  "left": 5,
+                  "right": 7
+                },
+                "flexItem": {
+                  "order": 2
+                }
+              },
+              "paint": {
+                "backgrounds": [
+                  {
+                    "type": "color",
+                    "color": "#E76F51FF"
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "type": "element",
+            "id": "order-b",
+            "name": "view",
+            "style": {
+              "layout": {
+                "height": 64,
+                "aspectRatio": 1.5,
+                "flexItem": {
+                  "order": -1
+                }
+              },
+              "paint": {
+                "backgrounds": [
+                  {
+                    "type": "color",
+                    "color": "#2A9D8FFF"
+                  }
+                ]
+              },
+              "transform": {
+                "operations": [
+                  {
+                    "type": "translate",
+                    "x": 4,
+                    "y": 0
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "type": "element",
+            "id": "order-c",
+            "name": "view",
+            "style": {
+              "layout": {
+                "width": 96,
+                "height": 64,
+                "flexItem": {
+                  "order": 2
+                }
+              },
+              "paint": {
+                "backgrounds": [
+                  {
+                    "type": "color",
+                    "color": "#E9C46AFF"
+                  }
+                ],
+                "shadows": [
+                  {
+                    "offsetX": 4,
+                    "offsetY": 4,
+                    "blur": 6,
+                    "color": "#00000066"
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "type": "element",
+            "id": "order-d",
+            "name": "view",
+            "style": {
+              "layout": {
+                "width": 96,
+                "height": 64
+              },
+              "paint": {
+                "backgrounds": [
+                  {
+                    "type": "color",
+                    "color": "#457B9DFF"
+                  }
+                ]
+              }
+            },
+            "children": [
+              {
+                "type": "text",
+                "id": "order-d-label",
+                "value": "Order D",
+                "style": {
+                  "layout": {
+                    "width": 90,
+                    "height": 40
+                  },
+                  "text": {
+                    "fontSize": 18,
+                    "lineHeight": 27,
+                    "letterSpacing": 2,
+                    "wrap": "nowrap",
+                    "overflow": "clip",
+                    "preserveWhitespace": true
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "type": "element",
+        "id": "column-reverse",
+        "name": "view",
+        "style": {
+          "layout": {
+            "mode": "flex",
+            "width": 220,
+            "height": 220,
+            "flex": {
+              "direction": "column-reverse",
+              "alignItems": "end",
+              "rowGap": 10
+            }
+          },
+          "paint": {
+            "backgrounds": [
+              {
+                "type": "color",
+                "color": "#27364FFF"
+              }
+            ]
+          }
+        },
+        "children": [
+          {
+            "type": "element",
+            "id": "column-first",
+            "name": "view",
+            "style": {
+              "layout": {
+                "width": 80,
+                "height": 60
+              }
+            }
+          },
+          {
+            "type": "element",
+            "id": "column-second",
+            "name": "view",
+            "style": {
+              "layout": {
+                "width": 80,
+                "height": 60
+              }
+            }
+          }
+        ]
+      }
+    ]
+  }
+}
