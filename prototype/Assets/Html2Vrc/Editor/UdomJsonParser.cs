@@ -221,6 +221,11 @@ namespace Html2Vrc.Editor
                 style.displayNone = GetBoolean(displayNone, path + ".displayNone");
             }
 
+            if (value.TryGetValue("clipContent", out var clipContent))
+            {
+                style.clipContent = GetBoolean(clipContent, path + ".clipContent");
+            }
+
             if (value.TryGetValue("layout", out _))
             {
                 style.layout = GetString(value, "layout");

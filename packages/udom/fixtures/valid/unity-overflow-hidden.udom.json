@@ -1,0 +1,80 @@
+{
+  "asset": {
+    "version": "0.1",
+    "generator": "@html2vrc/udom Unity overflow hidden fixture"
+  },
+  "viewport": {
+    "width": 420,
+    "height": 260
+  },
+  "root": {
+    "type": "element",
+    "id": "overflow-root",
+    "name": "view",
+    "style": {
+      "layout": {
+        "mode": "flex",
+        "width": "100%",
+        "height": "100%",
+        "padding": {
+          "top": 30,
+          "right": 30,
+          "bottom": 30,
+          "left": 30
+        },
+        "flex": {
+          "direction": "column",
+          "alignItems": "start"
+        }
+      }
+    },
+    "children": [
+      {
+        "type": "element",
+        "id": "clip-panel",
+        "name": "view",
+        "style": {
+          "layout": {
+            "mode": "absolute",
+            "width": 240,
+            "height": 140,
+            "overflowX": "hidden",
+            "overflowY": "hidden"
+          },
+          "paint": {
+            "backgrounds": [
+              {
+                "type": "color",
+                "color": "#18243AFF"
+              }
+            ]
+          }
+        },
+        "children": [
+          {
+            "type": "element",
+            "id": "overflow-child",
+            "name": "view",
+            "style": {
+              "layout": {
+                "position": "absolute",
+                "x": 190,
+                "y": 90,
+                "width": 100,
+                "height": 100
+              },
+              "paint": {
+                "backgrounds": [
+                  {
+                    "type": "color",
+                    "color": "#FF5577FF"
+                  }
+                ]
+              }
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

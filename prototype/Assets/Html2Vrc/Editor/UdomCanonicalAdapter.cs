@@ -1285,8 +1285,21 @@ namespace Html2Vrc.Editor
             {
                 result.Style.zIndex = RequireInteger(zIndexValue, path + ".zIndex");
             }
-            RequireDefaultString(value, "overflowX", "visible", path + ".overflowX");
-            RequireDefaultString(value, "overflowY", "visible", path + ".overflowY");
+            var overflowX = GetString(value, "overflowX") ?? "visible";
+            var overflowY = GetString(value, "overflowY") ?? "visible";
+            ValidateOverflowValue(overflowX, path + ".overflowX");
+            ValidateOverflowValue(overflowY, path + ".overflowY");
+            if (string.Equals(overflowX, "hidden", StringComparison.Ordinal)
+                && string.Equals(overflowY, "hidden", StringComparison.Ordinal))
+            {
+                result.Style.clipContent = true;
+            }
+            else if (!string.Equals(overflowX, "visible", StringComparison.Ordinal)
+                     || !string.Equals(overflowY, "visible", StringComparison.Ordinal))
+            {
+                throw new FormatException(
+                    $"{path}.overflowX/overflowY: Unity currently supports only matching 'visible' or 'hidden' overflow values (received '{overflowX}'/'{overflowY}').");
+            }
 
             var positionMode = GetString(value, "position") ?? "flow";
             if (string.Equals(positionMode, "absolute", StringComparison.Ordinal))
@@ -3876,22 +3889,16 @@ namespace Html2Vrc.Editor
             }
         }
 
-        private static void RequireDefaultString(
-            Dictionary<string, object> value,
-            string key,
-            string expected,
-            string path)
+        private static void ValidateOverflowValue(string value, string path)
         {
-            if (!value.TryGetValue(key, out var raw))
+            if (string.Equals(value, "visible", StringComparison.Ordinal)
+                || string.Equals(value, "hidden", StringComparison.Ordinal)
+                || string.Equals(value, "scroll", StringComparison.Ordinal))
             {
                 return;
             }
 
-            var actual = RequireString(raw, path);
-            if (!string.Equals(actual, expected, StringComparison.Ordinal))
-            {
-                throw new FormatException($"{path}: only '{expected}' is supported yet (received '{actual}').");
-            }
+            throw new FormatException($"{path}: unsupported canonical overflow value '{value}'.");
         }
     }
 }

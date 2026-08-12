@@ -1546,6 +1546,60 @@ namespace Html2Vrc.Tests
         }
 
         [Test]
+        public void CanonicalOverflowHidden_ClipsBothAxesAndRestoresVisibleContent()
+        {
+            var json = LoadRepositoryFile(
+                "packages",
+                "udom",
+                "fixtures",
+                "valid",
+                "unity-overflow-hidden.udom.json");
+            var validation = UdomValidator.Validate(json);
+
+            Assert.That(validation.IsValid, Is.True, validation.Format());
+            Assert.That(validation.Issues, Is.Empty, validation.Format());
+            var panelNode = validation.Document.root.children[0];
+            Assert.That(panelNode.style.clipContent, Is.True);
+
+            var normalized = UdomJsonWriter.Write(validation.Document);
+            var roundTrip = UdomValidator.Validate(normalized);
+            Assert.That(roundTrip.IsValid, Is.True, roundTrip.Format());
+            Assert.That(roundTrip.Document.root.children[0].style.clipContent, Is.True);
+
+            var build = UdomBuilder.GenerateOrRegenerate(validation.Document);
+            var root = build.Root;
+            var panel = UdomBuilder.FindNode(root, "clip-panel").gameObject;
+            var child = UdomBuilder.FindNode(root, "overflow-child").gameObject;
+            Assert.That(panel.GetComponent<RectMask2D>(), Is.Not.Null);
+            Assert.That(panel.GetComponent<Mask>(), Is.Null);
+
+            var repeated = UdomBuilder.GenerateOrRegenerate(roundTrip.Document, root);
+            Assert.That(repeated.Created, Is.Zero);
+            Assert.That(UdomBuilder.FindNode(root, "clip-panel").gameObject, Is.SameAs(panel));
+            Assert.That(UdomBuilder.FindNode(root, "overflow-child").gameObject, Is.SameAs(child));
+
+            var visibleJson = json.Replace("\"hidden\"", "\"visible\"");
+            var visibleValidation = UdomValidator.Validate(visibleJson);
+            Assert.That(visibleValidation.IsValid, Is.True, visibleValidation.Format());
+            Assert.That(visibleValidation.Document.root.children[0].style.clipContent, Is.False);
+            UdomBuilder.GenerateOrRegenerate(visibleValidation.Document, root);
+            Assert.That(UdomBuilder.FindNode(root, "clip-panel").gameObject, Is.SameAs(panel));
+            Assert.That(panel.GetComponent<RectMask2D>(), Is.Null);
+            Assert.That(UdomBuilder.FindNode(root, "overflow-child").gameObject, Is.SameAs(child));
+            Object.DestroyImmediate(root.gameObject);
+
+            var mixed = UdomValidator.Validate(json.Replace(
+                "\"overflowY\": \"hidden\"",
+                "\"overflowY\": \"visible\""));
+            Assert.That(mixed.IsValid, Is.False);
+            Assert.That(mixed.Format(), Does.Contain("overflowX/overflowY"));
+
+            var scroll = UdomValidator.Validate(json.Replace("\"hidden\"", "\"scroll\""));
+            Assert.That(scroll.IsValid, Is.False);
+            Assert.That(scroll.Format(), Does.Contain("overflowX/overflowY"));
+        }
+
+        [Test]
         public void CanonicalZIndex_SeparatesPaintOrderFromFlexAndAbsoluteLayout()
         {
             var json = LoadRepositoryFile(

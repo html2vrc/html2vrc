@@ -96,6 +96,10 @@
     "valid": true
   },
   {
+    "file": "valid/unity-overflow-hidden.udom.json",
+    "valid": true
+  },
+  {
     "file": "valid/unity-absolute-position.udom.json",
     "valid": true
   },

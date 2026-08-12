@@ -106,6 +106,8 @@ Canonical 2D transform은 `origin`과 배열 순서의 `translate`, `rotate`, `s
 
 Canonical layout의 `minWidth`, `minHeight`, `maxWidth`, `maxHeight`, `aspectRatio`를 지원합니다. 숫자와 percentage 제약은 부모의 design box에서 해석하고, 한 축이 `auto`인 aspect ratio는 반대 축과 min/max를 함께 만족하도록 계산합니다. 제약이 있는 flex 행·열은 max에 닿은 grow 공간을 남은 항목에 재분배하며, cross-axis stretch도 항목별 min/max를 지킨 고정 Unity Rect로 생성합니다.
 
+Canonical layout의 `overflowX`와 `overflowY`가 모두 `hidden`이면 VRChat-safe `RectMask2D`로 자식 콘텐츠를 양축에서 자릅니다. 다시 `visible`로 바꾸면 같은 GameObject를 유지한 채 마스크만 제거합니다. 한 축만 hidden인 조합과 일반 노드의 `scroll`은 Unity 기본 클리퍼로 정확히 표현할 수 없어 명시적 검증 오류로 반환합니다.
+
 Canonical flex item의 `grow`, 기본값 1인 `shrink`, 숫자·percentage·`auto` `basis`를 지원합니다. Basis에서 시작한 여유 공간은 grow 비율로, 부족한 공간은 `shrink × basis` 비율로 나누며 min/max에 닿은 항목을 고정한 뒤 나머지 항목에 재분배합니다. Margin과 gap은 줄이지 않고, 활성 Scroll 축은 콘텐츠 overflow를 유지합니다.
 
 Canonical flex의 `wrap`과 `wrap-reverse`, `alignContent`, `rowGap`과 `columnGap`도 지원합니다. Importer는 항목을 안정적으로 line에 나눈 뒤 line별 grow/shrink와 justify, 항목별 alignSelf, line 묶음의 교차축 정렬을 계산하고 최종 top-left Rect로 생성하므로 Unity 재생성 결과가 결정론적으로 유지됩니다.

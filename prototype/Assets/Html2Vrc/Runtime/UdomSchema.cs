@@ -70,6 +70,7 @@ namespace Html2Vrc
         public float aspectRatio;
         public string aspectRatioMode = "None";
         public bool displayNone;
+        public bool clipContent;
         public string layout = "None";
         public float[] padding = { 0f, 0f, 0f, 0f };
         public float[] margin = { 0f, 0f, 0f, 0f };

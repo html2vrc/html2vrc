@@ -1377,14 +1377,20 @@ namespace Html2Vrc.Editor
                 image.color = Color.white;
             }
 
-            ConfigureRadiusMask(target, node.type, hasRadius, showMaskGraphic);
+            ConfigureRadiusMask(
+                target,
+                node.type,
+                hasRadius,
+                showMaskGraphic,
+                style.clipContent);
         }
 
         private static void ConfigureRadiusMask(
             GameObject target,
             string nodeType,
             bool hasRadius,
-            bool showMaskGraphic)
+            bool showMaskGraphic,
+            bool clipContent)
         {
             if (hasRadius)
             {
@@ -1396,9 +1402,14 @@ namespace Html2Vrc.Editor
             }
 
             RemoveIfPresent<Mask>(target);
-            if (string.Equals(nodeType, "Image", StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(nodeType, "Image", StringComparison.OrdinalIgnoreCase)
+                || clipContent)
             {
                 GetOrAdd<RectMask2D>(target);
+            }
+            else
+            {
+                RemoveIfPresent<RectMask2D>(target);
             }
         }
 

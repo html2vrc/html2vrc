@@ -38,6 +38,8 @@ Canonical 정수 `zIndex`는 같은 부모가 만든 stacking context에서 낮�
 
 Canonical `layout.mode`의 생략 기본값은 `absolute`다. Explicit `mode: none`은 내부 `displayNone`으로 보존하고 해당 노드와 subtree를 flex 크기·gap 계산, GameObject 생성, paint 갱신과 신규 external slot 수집에서 제외한다. 이전 생성 결과가 있으면 안정 ID prune 단계에서 margin·transform·shadow wrapper와 모든 자식을 제거한다. 이미 사용자가 연결한 external slot entry와 target은 프로젝트 계약에 따라 보존하며 target을 삭제하거나 reparent하지 않는다. Root가 none이어도 생성기 root와 viewport wrapper는 유지되어 다음 재생성이 안전하다.
 
+Canonical layout의 `overflowX`와 `overflowY`가 모두 `hidden`이면 내부 `clipContent`로 보존하고 사각형 노드에 VRChat-safe `RectMask2D`를 추가한다. Radius가 있는 노드는 기존 stencil `Mask`가 같은 양축 clipping을 담당한다. Hidden에서 양축 `visible`로 전환하면 노드와 자식을 재사용하면서 생성기 소유 clip component만 제거한다. 한 축만 hidden인 조합과 일반 노드의 `scroll`은 `RectMask2D`가 축별 clip을 지원하지 않아 손실 없이 표현할 수 없으므로 검증 오류로 반환한다.
+
 Canonical image의 `fit`은 `fill`, `contain`, `cover`, `none`을 모두 지원하며 생략 시 `contain`이다. resource에 선언된 width/height를 원본 크기로 사용하고, 없으면 로드한 Texture2D 또는 Sprite 크기를 사용한다. 이미지 콘텐츠는 `<node-id>::__image-content` 안정 ID의 내부 자식에 배치한다. 사각형은 부모 RectMask2D, radius가 있으면 부모의 SDF Image와 stencil Mask로 자른다. `position.x/y`의 백분율은 `(박스 크기 - 콘텐츠 크기) × 백분율`, 숫자는 왼쪽·위 기준 design-unit 오프셋, `auto`는 남는 공간의 가운데로 해석한다.
 
 Canonical viewport 크기는 디자인 좌표계를 유지한다. UDOM Importer의 선택적 Renderer 목표 Canvas 크기가 다르면 `contain`은 작은 축 비율, `cover`는 큰 축 비율, `stretch`는 축별 비율, `none`은 1:1 scale을 적용한다. `cover`와 넘칠 수 있는 `none`은 생성기 소유의 안정적인 viewport wrapper에서 클리핑한다. 목표 크기 override를 끄면 Canvas는 디자인 viewport 크기로 돌아간다.

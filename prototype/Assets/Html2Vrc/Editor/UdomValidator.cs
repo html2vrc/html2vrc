@@ -88,7 +88,7 @@ namespace Html2Vrc.Editor
             "textInputValue", "textInputPlaceholder", "textInputMultiline", "textInputReadOnly",
             "scrollAxisExplicit", "scrollHorizontal", "scrollVertical", "scrollInitialOffset",
             "style", "binding", "embed", "children",
-            "visible", "opacity", "position", "positionAbsolute", "zIndex", "minSize", "maxSize", "autoSize", "aspectRatio", "aspectRatioMode", "displayNone",
+            "visible", "opacity", "position", "positionAbsolute", "zIndex", "minSize", "maxSize", "autoSize", "aspectRatio", "aspectRatioMode", "displayNone", "clipContent",
             "layout", "padding", "margin", "spacing", "backgroundColor",
             "backgroundType", "backgroundGradientAngle", "backgroundGradientPositions", "backgroundGradientColors",
             "backgroundGradientCenter", "backgroundGradientCenterIsPercent",
