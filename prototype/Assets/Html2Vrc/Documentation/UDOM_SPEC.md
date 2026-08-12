@@ -24,6 +24,8 @@ Canonical 길이의 숫자와 부모 크기 기준 백분율, 기본 flex 방향
 
 Canonical flex의 `row-reverse`, `column-reverse`와 정수 `flexItem.order`는 source children 배열을 바꾸지 않고 내부 `reverseChildren`, `flexOrder`로 보존한다. Unity 생성 시에만 `(order, 원본 자식 인덱스)`로 안정 정렬한 뒤 reverse main axis를 적용하므로 같은 order는 트리 순서를 유지한다. 실제 형제는 직접 노드 또는 margin·transform·shadow layout wrapper 단위로 재배치되며 안정 ID와 GameObject를 재생성 사이에 유지한다.
 
+Canonical flex의 `justify` 여섯 값은 내부 `justifyContent`와 main-axis를 포함한 `childAlignment`로 보존한다. `start`, `center`, `end`는 고정 gap을 유지한 채 물리 anchor를 선택한다. `space-between`은 남은 공간을 자식 사이에, `space-around`는 자식 수로, `space-evenly`는 자식 수+1로 나누어 기존 gap에 더한다. Around/evenly는 center anchor가 양끝의 절반 gap 또는 한 gap을 만들도록 하므로 별도 spacer GameObject가 필요 없다. Reverse 방향에서는 main-start와 main-end의 물리 anchor를 뒤집고 기존 안정 형제 재배치 규칙을 그대로 사용한다. Grow가 남은 공간을 모두 소비하거나 overflow가 있으면 분배 gap을 추가하지 않는다.
+
 Canonical `flexItem.grow`, 기본값 1의 `shrink`, 숫자·percentage·`auto` `basis`는 내부 `flexibleWidth/Height`, `flexShrink`, `flexBasis`, `flexBasisIsPercent`로 보존한다. 부모 content box에서 percentage basis를 해석하고 basis가 auto면 해당 주축 size를 사용한다. 양의 여유 공간은 grow 비율로 최대값까지, 부족한 공간은 `shrink × 초기 content size` 비율로 최소값까지 분배한다. Min/max에 닿은 항목은 고정하고 남은 공간을 활성 항목에 반복 재분배하며 margin과 gap은 축소하지 않는다. 결과가 0인 size는 canonical non-negative Length 의미에 따라 유효하다. ScrollView의 활성 축은 콘텐츠가 viewport보다 커야 하므로 main·cross axis shrink/stretch 선계산에서 overflow를 보존한다.
 
 Canonical `position: absolute`는 내부 `positionAbsolute`로 보존한다. 해당 항목은 부모 flex의 main-axis 크기 계산, grow 재분배와 gap 개수에서 제외하고 Unity `LayoutElement.ignoreLayout`을 켠다. 숫자와 percentage `x/y`는 부모 design box를 기준으로 미리 해석한 뒤 RectTransform의 top-left anchor와 pivot에서 `(x, -y)`로 적용한다. Margin이 있으면 margin wrapper가 좌표와 외곽 크기를 소유하고, transform·shadow wrapper는 그 안쪽 box를 채운다. Absolute/flow 전환 시에도 같은 wrapper와 노드를 재사용한다.
@@ -156,6 +158,7 @@ Resource URI는 canonical 명세대로 UDOM TextAsset이 있는 폴더를 기준
 - `positionAbsolute`: canonical 노드가 부모 flex 흐름에서 빠지고 top-left `x/y` 좌표를 사용하는지 나타내는 내부 플래그.
 - `displayNone`: canonical `layout.mode: none`으로 인해 노드와 subtree가 렌더링·레이아웃에서 제외되는지 나타내는 내부 플래그.
 - `stretchChildrenWidth`, `stretchChildrenHeight`: canonical flex의 기본 `alignItems: stretch`를 Unity Layout Group의 cross-axis 제어로 보존하는 내부 플래그.
+- `justifyContent`: canonical flex의 `start`, `center`, `end`, `space-between`, `space-around`, `space-evenly`를 보존하는 내부 enum 문자열.
 - `reverseChildren`, `flexOrder`: canonical reverse main axis와 order-modified flex 순서를 보존하는 내부 플래그와 정수.
 - `flexShrink`: canonical flex shrink 비율. `-1`은 shrink 선계산을 사용하지 않는 기존 내부 문서 sentinel이고 canonical 기본값은 `1`이다.
 - `flexBasis`, `flexBasisIsPercent`: canonical 주축 basis 값과 percentage 여부. `-1`은 `auto`를 뜻한다.

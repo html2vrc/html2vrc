@@ -398,6 +398,11 @@ namespace Html2Vrc.Editor
                 style.childAlignment = GetString(value, "childAlignment");
             }
 
+            if (value.TryGetValue("justifyContent", out _))
+            {
+                style.justifyContent = GetString(value, "justifyContent");
+            }
+
             if (value.TryGetValue("stretchChildrenWidth", out var stretchChildrenWidth))
             {
                 style.stretchChildrenWidth = GetBoolean(

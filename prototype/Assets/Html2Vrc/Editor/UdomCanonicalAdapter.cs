@@ -1757,6 +1757,8 @@ namespace Html2Vrc.Editor
                 deficit -= distributed;
             }
 
+            ApplyJustifiedSpacing(style, flowChildCount, remaining);
+
             for (var index = 0; index < children.Length; index++)
             {
                 var childStyle = children[index].style ?? new UdomStyle();
@@ -1816,6 +1818,30 @@ namespace Html2Vrc.Editor
                 {
                     style.useResolvedChildrenHeight = true;
                 }
+            }
+        }
+
+        private static void ApplyJustifiedSpacing(
+            UdomStyle style,
+            int flowChildCount,
+            float remaining)
+        {
+            if (remaining <= 0.0001f || flowChildCount <= 1)
+            {
+                return;
+            }
+
+            if (string.Equals(style.justifyContent, "SpaceBetween", StringComparison.Ordinal))
+            {
+                style.spacing += remaining / (flowChildCount - 1);
+            }
+            else if (string.Equals(style.justifyContent, "SpaceAround", StringComparison.Ordinal))
+            {
+                style.spacing += remaining / flowChildCount;
+            }
+            else if (string.Equals(style.justifyContent, "SpaceEvenly", StringComparison.Ordinal))
+            {
+                style.spacing += remaining / (flowChildCount + 1);
             }
         }
 
@@ -2001,7 +2027,6 @@ namespace Html2Vrc.Editor
                 "rowGap",
                 "columnGap");
             RequireDefaultString(flex, "wrap", "nowrap", path + ".flex.wrap");
-            RequireDefaultString(flex, "justify", "start", path + ".flex.justify");
             RequireDefaultString(flex, "alignContent", "start", path + ".flex.alignContent");
 
             var direction = GetString(flex, "direction") ?? "row";
@@ -2018,10 +2043,14 @@ namespace Html2Vrc.Editor
             result.Style.layout = isVertical ? "Vertical" : "Horizontal";
             result.Style.reverseChildren = reversesMainAxis;
             var alignItems = GetString(flex, "alignItems") ?? "stretch";
+            result.Style.justifyContent = MapJustifyContent(
+                GetString(flex, "justify") ?? "start",
+                path + ".flex.justify");
             result.Style.childAlignment = MapChildAlignment(
                 isVertical,
                 reversesMainAxis,
                 alignItems,
+                result.Style.justifyContent,
                 path + ".flex.alignItems");
             var stretchesCrossAxis = string.Equals(alignItems, "stretch", StringComparison.Ordinal);
             result.Style.stretchChildrenWidth = isVertical && stretchesCrossAxis;
@@ -2051,11 +2080,17 @@ namespace Html2Vrc.Editor
             bool isVertical,
             bool reversesMainAxis,
             string alignItems,
+            string justifyContent,
             string path)
         {
             if (isVertical)
             {
-                var vertical = reversesMainAxis ? "Lower" : "Upper";
+                var vertical = MapMainAlignment(
+                    reversesMainAxis,
+                    justifyContent,
+                    "Upper",
+                    "Middle",
+                    "Lower");
                 switch (alignItems)
                 {
                     case "start":
@@ -2070,7 +2105,12 @@ namespace Html2Vrc.Editor
                 }
             }
 
-            var horizontal = reversesMainAxis ? "Right" : "Left";
+            var horizontal = MapMainAlignment(
+                reversesMainAxis,
+                justifyContent,
+                "Left",
+                "Center",
+                "Right");
             switch (alignItems)
             {
                 case "start":
@@ -2083,6 +2123,45 @@ namespace Html2Vrc.Editor
                 default:
                     throw new FormatException($"{path}: unsupported cross-axis alignment '{alignItems}'.");
             }
+        }
+
+        private static string MapJustifyContent(string value, string path)
+        {
+            switch (value)
+            {
+                case "start":
+                    return "Start";
+                case "center":
+                    return "Center";
+                case "end":
+                    return "End";
+                case "space-between":
+                    return "SpaceBetween";
+                case "space-around":
+                    return "SpaceAround";
+                case "space-evenly":
+                    return "SpaceEvenly";
+                default:
+                    throw new FormatException($"{path}: unsupported flex justification '{value}'.");
+            }
+        }
+
+        private static string MapMainAlignment(
+            bool reversesMainAxis,
+            string justifyContent,
+            string physicalStart,
+            string physicalCenter,
+            string physicalEnd)
+        {
+            if (string.Equals(justifyContent, "Center", StringComparison.Ordinal)
+                || string.Equals(justifyContent, "SpaceAround", StringComparison.Ordinal)
+                || string.Equals(justifyContent, "SpaceEvenly", StringComparison.Ordinal))
+            {
+                return physicalCenter;
+            }
+
+            var usesMainEnd = string.Equals(justifyContent, "End", StringComparison.Ordinal);
+            return usesMainEnd != reversesMainAxis ? physicalEnd : physicalStart;
         }
 
         private static void MapPaint(

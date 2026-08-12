@@ -80,6 +80,10 @@
     "valid": true
   },
   {
+    "file": "valid/unity-flex-justify.udom.json",
+    "valid": true
+  },
+  {
     "file": "valid/unity-absolute-position.udom.json",
     "valid": true
   },

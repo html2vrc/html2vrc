@@ -164,6 +164,7 @@ namespace Html2Vrc.Editor
             writer.StringProperty("alignment", style.alignment);
             writer.StringProperty("fontStyle", style.fontStyle);
             writer.StringProperty("childAlignment", style.childAlignment);
+            writer.StringProperty("justifyContent", style.justifyContent);
             writer.BoolProperty("stretchChildrenWidth", style.stretchChildrenWidth);
             writer.BoolProperty("stretchChildrenHeight", style.stretchChildrenHeight);
             writer.BoolProperty("useResolvedChildrenWidth", style.useResolvedChildrenWidth);

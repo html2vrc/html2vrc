@@ -1,0 +1,297 @@
+{
+  "asset": {
+    "version": "0.1",
+    "generator": "@html2vrc/udom Unity flex justify fixture"
+  },
+  "viewport": {
+    "width": 720,
+    "height": 600
+  },
+  "styles": [
+    {
+      "id": "justify-row",
+      "style": {
+        "layout": {
+          "mode": "flex",
+          "width": 600,
+          "height": 70,
+          "padding": {
+            "right": 20,
+            "left": 20
+          },
+          "flex": {
+            "direction": "row",
+            "alignItems": "center",
+            "columnGap": 10
+          }
+        }
+      }
+    },
+    {
+      "id": "justify-item",
+      "style": {
+        "layout": {
+          "width": 100,
+          "height": 30
+        }
+      }
+    }
+  ],
+  "root": {
+    "type": "element",
+    "id": "justify-root",
+    "name": "view",
+    "style": {
+      "layout": {
+        "mode": "flex",
+        "width": "100%",
+        "height": "100%",
+        "padding": {
+          "top": 20,
+          "right": 20,
+          "bottom": 20,
+          "left": 20
+        },
+        "flex": {
+          "direction": "column",
+          "alignItems": "start",
+          "rowGap": 10
+        }
+      }
+    },
+    "children": [
+      {
+        "type": "element",
+        "id": "justify-start",
+        "name": "view",
+        "styleRefs": [
+          "justify-row"
+        ],
+        "style": {
+          "layout": {
+            "flex": {
+              "justify": "start"
+            }
+          }
+        },
+        "children": [
+          {
+            "type": "element",
+            "id": "start-a",
+            "name": "view",
+            "styleRefs": [
+              "justify-item"
+            ]
+          },
+          {
+            "type": "element",
+            "id": "start-b",
+            "name": "view",
+            "styleRefs": [
+              "justify-item"
+            ]
+          }
+        ]
+      },
+      {
+        "type": "element",
+        "id": "justify-center",
+        "name": "view",
+        "styleRefs": [
+          "justify-row"
+        ],
+        "style": {
+          "layout": {
+            "flex": {
+              "justify": "center"
+            }
+          }
+        },
+        "children": [
+          {
+            "type": "element",
+            "id": "center-a",
+            "name": "view",
+            "styleRefs": [
+              "justify-item"
+            ]
+          },
+          {
+            "type": "element",
+            "id": "center-b",
+            "name": "view",
+            "styleRefs": [
+              "justify-item"
+            ]
+          }
+        ]
+      },
+      {
+        "type": "element",
+        "id": "justify-end",
+        "name": "view",
+        "styleRefs": [
+          "justify-row"
+        ],
+        "style": {
+          "layout": {
+            "flex": {
+              "justify": "end"
+            }
+          }
+        },
+        "children": [
+          {
+            "type": "element",
+            "id": "end-a",
+            "name": "view",
+            "styleRefs": [
+              "justify-item"
+            ]
+          },
+          {
+            "type": "element",
+            "id": "end-b",
+            "name": "view",
+            "styleRefs": [
+              "justify-item"
+            ]
+          }
+        ]
+      },
+      {
+        "type": "element",
+        "id": "justify-between",
+        "name": "view",
+        "styleRefs": [
+          "justify-row"
+        ],
+        "style": {
+          "layout": {
+            "flex": {
+              "justify": "space-between"
+            }
+          }
+        },
+        "children": [
+          {
+            "type": "element",
+            "id": "between-a",
+            "name": "view",
+            "styleRefs": [
+              "justify-item"
+            ]
+          },
+          {
+            "type": "element",
+            "id": "between-b",
+            "name": "view",
+            "styleRefs": [
+              "justify-item"
+            ]
+          }
+        ]
+      },
+      {
+        "type": "element",
+        "id": "justify-around",
+        "name": "view",
+        "styleRefs": [
+          "justify-row"
+        ],
+        "style": {
+          "layout": {
+            "flex": {
+              "justify": "space-around"
+            }
+          }
+        },
+        "children": [
+          {
+            "type": "element",
+            "id": "around-a",
+            "name": "view",
+            "styleRefs": [
+              "justify-item"
+            ]
+          },
+          {
+            "type": "element",
+            "id": "around-b",
+            "name": "view",
+            "styleRefs": [
+              "justify-item"
+            ]
+          }
+        ]
+      },
+      {
+        "type": "element",
+        "id": "justify-evenly",
+        "name": "view",
+        "styleRefs": [
+          "justify-row"
+        ],
+        "style": {
+          "layout": {
+            "flex": {
+              "justify": "space-evenly"
+            }
+          }
+        },
+        "children": [
+          {
+            "type": "element",
+            "id": "evenly-a",
+            "name": "view",
+            "styleRefs": [
+              "justify-item"
+            ]
+          },
+          {
+            "type": "element",
+            "id": "evenly-b",
+            "name": "view",
+            "styleRefs": [
+              "justify-item"
+            ]
+          }
+        ]
+      },
+      {
+        "type": "element",
+        "id": "justify-reverse-end",
+        "name": "view",
+        "styleRefs": [
+          "justify-row"
+        ],
+        "style": {
+          "layout": {
+            "flex": {
+              "direction": "row-reverse",
+              "justify": "end"
+            }
+          }
+        },
+        "children": [
+          {
+            "type": "element",
+            "id": "reverse-a",
+            "name": "view",
+            "styleRefs": [
+              "justify-item"
+            ]
+          },
+          {
+            "type": "element",
+            "id": "reverse-b",
+            "name": "view",
+            "styleRefs": [
+              "justify-item"
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

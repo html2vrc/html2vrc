@@ -1105,6 +1105,131 @@ namespace Html2Vrc.Tests
         }
 
         [Test]
+        public void CanonicalFlexJustify_DistributesFreeSpaceAndSupportsReverseEnd()
+        {
+            var json = LoadRepositoryFile(
+                "packages",
+                "udom",
+                "fixtures",
+                "valid",
+                "unity-flex-justify.udom.json");
+            var validation = UdomValidator.Validate(json);
+
+            Assert.That(validation.IsValid, Is.True, validation.Format());
+            Assert.That(validation.Issues, Is.Empty, validation.Format());
+
+            var rows = validation.Document.root.children;
+            Assert.That(rows.Select(row => row.style.justifyContent), Is.EqualTo(new[]
+            {
+                "Start",
+                "Center",
+                "End",
+                "SpaceBetween",
+                "SpaceAround",
+                "SpaceEvenly",
+                "End"
+            }));
+            Assert.That(rows.Select(row => row.style.childAlignment), Is.EqualTo(new[]
+            {
+                "MiddleLeft",
+                "MiddleCenter",
+                "MiddleRight",
+                "MiddleLeft",
+                "MiddleCenter",
+                "MiddleCenter",
+                "MiddleLeft"
+            }));
+            Assert.That(rows.Select(row => row.style.spacing), Is.EqualTo(new[]
+            {
+                10f,
+                10f,
+                10f,
+                360f,
+                185f,
+                126.6667f,
+                10f
+            }).Within(0.001f));
+            Assert.That(rows[6].style.reverseChildren, Is.True);
+
+            var normalized = UdomJsonWriter.Write(validation.Document);
+            var roundTrip = UdomValidator.Validate(normalized);
+            Assert.That(roundTrip.IsValid, Is.True, roundTrip.Format());
+            Assert.That(roundTrip.Document.root.children[5].style.justifyContent, Is.EqualTo("SpaceEvenly"));
+            Assert.That(roundTrip.Document.root.children[5].style.spacing, Is.EqualTo(126.6667f).Within(0.001f));
+
+            var build = UdomBuilder.GenerateOrRegenerate(validation.Document);
+            var root = build.Root;
+            var rootRect = UdomBuilder.FindNode(root, "justify-root").GetComponent<RectTransform>();
+            var rowIds = new[]
+            {
+                "justify-start",
+                "justify-center",
+                "justify-end",
+                "justify-between",
+                "justify-around",
+                "justify-evenly",
+                "justify-reverse-end"
+            };
+            var pairIds = new[]
+            {
+                new[] { "start-a", "start-b" },
+                new[] { "center-a", "center-b" },
+                new[] { "end-a", "end-b" },
+                new[] { "between-a", "between-b" },
+                new[] { "around-a", "around-b" },
+                new[] { "evenly-a", "evenly-b" }
+            };
+            var expectedMidpoints = new[] { 125f, 300f, 475f, 300f, 300f, 300f };
+            var expectedDistances = new[] { 110f, 110f, 110f, 460f, 285f, 226.6667f };
+
+            Canvas.ForceUpdateCanvases();
+            LayoutRebuilder.ForceRebuildLayoutImmediate(rootRect);
+            for (var index = 0; index < pairIds.Length; index++)
+            {
+                var row = UdomBuilder.FindNode(root, rowIds[index]).gameObject;
+                LayoutRebuilder.ForceRebuildLayoutImmediate(row.GetComponent<RectTransform>());
+                var first = UdomBuilder.FindNode(root, pairIds[index][0]).GetComponent<RectTransform>();
+                var second = UdomBuilder.FindNode(root, pairIds[index][1]).GetComponent<RectTransform>();
+                Assert.That(
+                    (first.anchoredPosition.x + second.anchoredPosition.x) * 0.5f,
+                    Is.EqualTo(expectedMidpoints[index]).Within(0.001f),
+                    rowIds[index] + " midpoint");
+                Assert.That(
+                    second.anchoredPosition.x - first.anchoredPosition.x,
+                    Is.EqualTo(expectedDistances[index]).Within(0.001f),
+                    rowIds[index] + " distance");
+            }
+
+            var reverseRow = UdomBuilder.FindNode(root, rowIds[6]).gameObject;
+            LayoutRebuilder.ForceRebuildLayoutImmediate(reverseRow.GetComponent<RectTransform>());
+            var reverseA = UdomBuilder.FindNode(root, "reverse-a").GetComponent<RectTransform>();
+            var reverseB = UdomBuilder.FindNode(root, "reverse-b").GetComponent<RectTransform>();
+            Assert.That(reverseRow.GetComponent<HorizontalLayoutGroup>().childAlignment, Is.EqualTo(TextAnchor.MiddleLeft));
+            Assert.That(reverseB.transform.GetSiblingIndex(), Is.EqualTo(0));
+            Assert.That(reverseA.transform.GetSiblingIndex(), Is.EqualTo(1));
+            Assert.That(
+                (reverseA.anchoredPosition.x + reverseB.anchoredPosition.x) * 0.5f,
+                Is.EqualTo(125f).Within(0.001f));
+            Assert.That(
+                reverseA.anchoredPosition.x - reverseB.anchoredPosition.x,
+                Is.EqualTo(110f).Within(0.001f));
+
+            var originalAround = UdomBuilder.FindNode(root, "around-a").gameObject;
+            var repeatedValidation = UdomValidator.Validate(json);
+            var regenerated = UdomBuilder.GenerateOrRegenerate(repeatedValidation.Document, root);
+            Assert.That(regenerated.Created, Is.Zero);
+            Assert.That(UdomBuilder.FindNode(root, "around-a").gameObject, Is.SameAs(originalAround));
+
+            Object.DestroyImmediate(root.gameObject);
+
+            var invalid = UdomValidator.Validate(json.Replace(
+                "\"justify\": \"center\"",
+                "\"justify\": \"stretch\""));
+            Assert.That(invalid.IsValid, Is.False);
+            Assert.That(invalid.Format(), Does.Contain("justify"));
+        }
+
+        [Test]
         public void CanonicalAbsolutePosition_LeavesFlexFlowAndUsesTopLeftCoordinates()
         {
             var json = LoadRepositoryFile(

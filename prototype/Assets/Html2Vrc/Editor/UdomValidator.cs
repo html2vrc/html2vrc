@@ -95,7 +95,7 @@ namespace Html2Vrc.Editor
             "backgroundGradientRadius", "backgroundGradientRadiusIsPercent",
             "cornerRadius", "cornerRadiusPercent", "borderWidth", "borderColor", "textColor", "fontSize",
             "lineHeight", "letterSpacing", "textWrap", "textOverflow", "preserveWhitespace",
-            "alignment", "fontStyle", "childAlignment",
+            "alignment", "fontStyle", "childAlignment", "justifyContent",
             "shadowOffsets", "shadowBlurs", "shadowSpreads", "shadowColors", "shadowInsets",
             "stretchChildrenWidth", "stretchChildrenHeight", "useResolvedChildrenWidth", "useResolvedChildrenHeight",
             "reverseChildren", "flexOrder", "flexShrink", "flexBasis", "flexBasisIsPercent",
@@ -488,6 +488,16 @@ namespace Html2Vrc.Editor
             if (!UdomBuilderUtility.TryParseChildAlignment(style.childAlignment, out _))
             {
                 AddError(result, path + ".childAlignment", $"지원하지 않는 child alignment '{style.childAlignment}'.");
+            }
+
+            if (!string.Equals(style.justifyContent, "Start", StringComparison.Ordinal)
+                && !string.Equals(style.justifyContent, "Center", StringComparison.Ordinal)
+                && !string.Equals(style.justifyContent, "End", StringComparison.Ordinal)
+                && !string.Equals(style.justifyContent, "SpaceBetween", StringComparison.Ordinal)
+                && !string.Equals(style.justifyContent, "SpaceAround", StringComparison.Ordinal)
+                && !string.Equals(style.justifyContent, "SpaceEvenly", StringComparison.Ordinal))
+            {
+                AddError(result, path + ".justifyContent", $"지원하지 않는 flex justify '{style.justifyContent}'.");
             }
 
             if ((style.flexShrink < 0f && !Mathf.Approximately(style.flexShrink, -1f))

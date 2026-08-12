@@ -38,11 +38,12 @@
 - canonical `position: absolute`의 numeric·percentage `x/y`를 top-left RectTransform 좌표로 적용하고, 부모 flex grow·gap에서 제외했다. 직접 노드와 margin·transform·shadow wrapper, absolute/flow 전환, normalized JSON round-trip과 안정 재생성을 확인했다.
 - canonical `layout.mode: none` subtree의 flex·gap·GameObject·신규 slot 제외, visible 전환 후 wrapper 안정 재사용, none 복귀 시 전체 prune와 사용자 external target 보존, root none 안전 재생성을 확인했다.
 - canonical flex shrink 기본값·명시적 비율과 숫자·percentage·auto basis, scaled-shrink 분배, min/max 고정 재분배, margin 보존, 0 size, 양축 Scroll overflow와 normalized JSON round-trip을 확인했다.
+- canonical flex justify의 start·center·end·space-between·space-around·space-evenly 정렬과 gap 분배, row-reverse end의 물리 anchor·안정 형제 순서, 실제 RectTransform 좌표와 normalized JSON round-trip을 확인했다.
 
 자동 검증 결과:
 
-- `npm run check`: UDOM conformance 34/34, React 5/5, TypeScript typecheck와 build 통과
-- Unity EditMode `Html2Vrc.Tests.UdomPrototypeTests`: **35/35 통과, 실패 0**
+- `npm run check`: UDOM conformance 35/35, React 5/5, TypeScript typecheck와 build 통과
+- Unity EditMode `Html2Vrc.Tests.UdomPrototypeTests`: **36/36 통과, 실패 0**
 - Unity 종료 코드 0, C# 컴파일 오류 0
 - Windows CRLF에서 기존 HTML 재생성 테스트가 문자열을 교체하지 못하던 문제도 함께 수정했다.
 
@@ -72,7 +73,7 @@
 
 ## 자동 회귀 검증
 
-HTML2VRC 전용 Unity Test Framework 테스트 35개를 실행한다. 검증 범위는 다음과 같다.
+HTML2VRC 전용 Unity Test Framework 테스트 36개를 실행한다. 검증 범위는 다음과 같다.
 
 1. 샘플 UDOM Validation 성공과 잘못된 속성/중복 ID 거부
 2. Canvas, TextMeshProUGUI, Image, Button, ScrollRect, LayoutGroup과 VRChat용 `VRCUiShape` 생성
@@ -109,11 +110,12 @@ HTML2VRC 전용 Unity Test Framework 테스트 35개를 실행한다. 검증 범
 33. canonical absolute의 top-left numeric·percentage 좌표, flex flow 제외, margin·transform·shadow wrapper와 absolute/flow 전환, normalized 상태 round-trip
 34. canonical mode none subtree의 flex·생성·slot 제외, visible/none 전환 wrapper 수명주기, 외부 target 보존과 hidden document root
 35. canonical flex shrink·basis의 기본값과 mixed unit, scaled factor, min/max 고정 재분배, margin·zero size·Scroll overflow, normalized 상태 round-trip
+36. canonical flex justify 여섯 모드의 정렬·free-space gap 분배, reverse end anchor·형제 순서, 실제 Rect 좌표와 normalized 상태 round-trip
 
 최종 자동 테스트 결과:
 
-- 전체 35개
-- 통과 35개
+- 전체 36개
+- 통과 36개
 - 실패 0개
 - 건너뜀 0개
 - Unity 종료 코드 0
