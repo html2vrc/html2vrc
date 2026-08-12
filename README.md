@@ -116,7 +116,7 @@ Canonical `conic-gradient`는 기본 0°의 위쪽 선에서 시작해 시계 �
 
 Canonical `paint.radius`는 네 모서리 값을 보존한 해상도 독립 SDF Material로 생성됩니다. 인접 radius 합이 박스 변보다 크면 비율을 유지한 채 자동 축소되며, image와 자식 콘텐츠는 Unity stencil `Mask`로 같은 곡선에 잘립니다. 단색과 linear/radial/conic gradient 모두 radius를 함께 사용할 수 있고, 생성 Material은 `Assets/Html2VrcGenerated/RoundedCorners` 아래 안정 경로로 재사용됩니다.
 
-Canonical outer shadow는 여러 레이어의 offset, blur, spread, color를 radius와 함께 VRChat-safe SDF Material로 렌더링합니다. 안정 shadow wrapper가 원래 Layout 공간 밖에서 그려지고 transform을 함께 상속하므로 그림자가 flex 배치나 클릭 영역을 바꾸지 않습니다. `inset` shadow는 내부 모델에 보존하지만 현재 Unity 백엔드에서는 명시적 폴백 경고와 함께 렌더링하지 않습니다.
+Canonical shadow는 여러 outer·inset 레이어의 offset, blur, spread, color를 radius와 함께 VRChat-safe SDF Material로 렌더링합니다. Outer shadow의 안정 wrapper는 원래 Layout 공간 밖에서 그려지고 transform을 함께 상속하므로 flex 배치나 클릭 영역을 바꾸지 않습니다. Inset shadow는 노드 배경 위·콘텐츠 아래의 `ignoreLayout` 레이어로 생성되고 박스 radius 안에서 잘리며, transform과 opacity를 노드와 함께 상속합니다.
 
 ## Embed
 

@@ -25,14 +25,26 @@ namespace Html2Vrc.Editor
                 return false;
             }
 
-            if (style.shadowInsets != null
-                && index < style.shadowInsets.Length
-                && style.shadowInsets[index])
-            {
-                return false;
-            }
-
             return UdomBuilderUtility.ParseColor(style.shadowColors[index], Color.clear).a > 0f;
+        }
+
+        public static bool IsInset(UdomStyle style, int index)
+        {
+            return style != null
+                   && style.shadowInsets != null
+                   && index >= 0
+                   && index < style.shadowInsets.Length
+                   && style.shadowInsets[index];
+        }
+
+        public static bool IsOuterRenderable(UdomStyle style, int index)
+        {
+            return IsRenderable(style, index) && !IsInset(style, index);
+        }
+
+        public static bool IsInsetRenderable(UdomStyle style, int index)
+        {
+            return IsRenderable(style, index) && IsInset(style, index);
         }
 
         public static Vector2 GetOffset(UdomStyle style, int index)
@@ -55,6 +67,13 @@ namespace Html2Vrc.Editor
 
         public static Vector2 GetGeometrySize(UdomStyle style, int index, Vector2 boxSize)
         {
+            if (IsInset(style, index))
+            {
+                return new Vector2(
+                    Mathf.Max(0.0001f, boxSize.x),
+                    Mathf.Max(0.0001f, boxSize.y));
+            }
+
             var shapeSize = GetShapeSize(style, index, boxSize);
             var blur = GetBlur(style, index);
             return shapeSize + Vector2.one * (blur * 2f);
@@ -120,20 +139,29 @@ namespace Html2Vrc.Editor
             var safeBoxSize = new Vector2(
                 Mathf.Max(0.0001f, boxSize.x),
                 Mathf.Max(0.0001f, boxSize.y));
+            var inset = IsInset(style, index);
             var spread = GetSpread(style, index);
             var shapeSize = GetShapeSize(style, index, safeBoxSize);
             var baseRadii = UdomRoundedCornerAssetUtility.ResolveAndNormalizeRadii(style, safeBoxSize);
-            var expandedRadii = new[]
+            var radiusDelta = inset ? -spread : spread;
+            var shapeRadii = new[]
             {
-                Mathf.Max(0f, baseRadii.x + spread),
-                Mathf.Max(0f, baseRadii.y + spread),
-                Mathf.Max(0f, baseRadii.z + spread),
-                Mathf.Max(0f, baseRadii.w + spread)
+                Mathf.Max(0f, baseRadii.x + radiusDelta),
+                Mathf.Max(0f, baseRadii.y + radiusDelta),
+                Mathf.Max(0f, baseRadii.z + radiusDelta),
+                Mathf.Max(0f, baseRadii.w + radiusDelta)
             };
-            var radii = UdomRoundedCornerAssetUtility.NormalizeRadii(expandedRadii, shapeSize);
+            var radii = UdomRoundedCornerAssetUtility.NormalizeRadii(shapeRadii, shapeSize);
+            var offset = GetOffset(style, index);
             material.SetVector("_ShapeSize", new Vector4(shapeSize.x, shapeSize.y, 0f, 0f));
             material.SetVector("_CornerRadii", radii);
+            material.SetVector("_BoxSize", new Vector4(safeBoxSize.x, safeBoxSize.y, 0f, 0f));
+            material.SetVector("_BoxCornerRadii", baseRadii);
+            material.SetVector(
+                "_Offset",
+                inset ? new Vector4(offset.x, -offset.y, 0f, 0f) : Vector4.zero);
             material.SetFloat("_Blur", GetBlur(style, index));
+            material.SetFloat("_Inset", inset ? 1f : 0f);
         }
 
         public static bool IsShader(string shaderName)
@@ -167,9 +195,10 @@ namespace Html2Vrc.Editor
         private static Vector2 GetShapeSize(UdomStyle style, int index, Vector2 boxSize)
         {
             var spread = GetSpread(style, index);
+            var spreadScale = IsInset(style, index) ? -2f : 2f;
             return new Vector2(
-                Mathf.Max(0.0001f, boxSize.x + spread * 2f),
-                Mathf.Max(0.0001f, boxSize.y + spread * 2f));
+                Mathf.Max(0.0001f, boxSize.x + spread * spreadScale),
+                Mathf.Max(0.0001f, boxSize.y + spread * spreadScale));
         }
 
         private static float GetValue(float[] values, int index)

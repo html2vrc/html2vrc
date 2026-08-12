@@ -610,7 +610,7 @@ Radius는 `topLeft`, `topRight`, `bottomRight`, `bottomLeft`를 가진다. 값�
 | `color` | `#00000080` | shadow 색상 |
 | `inset` | `false` | 내부 shadow 여부 |
 
-여러 shadow는 배열 앞에서 뒤로 그리며, 뒤의 항목이 앞의 항목 위에 놓인다. 외부 shadow는 모두 해당 박스와 콘텐츠 뒤에 놓인다.
+여러 shadow는 배열 앞에서 뒤로 그리며, 뒤의 항목이 앞의 항목 위에 놓인다. 외부 shadow는 모두 해당 박스와 콘텐츠 뒤에 놓인다. 내부 shadow는 박스의 border edge 안에서 background 위, 콘텐츠와 border 아래에 놓인다.
 
 Renderer가 특정 Shadow를 정확히 표현할 수 없다면 조용히 제거하지 말고 폴백과 손실을 진단해야 한다.
 

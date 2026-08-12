@@ -585,7 +585,7 @@ AI는 특정 Unity 라이브러리 API보다 HTML, CSS, React와 일반적인 Un
 
 ### 4단계: 장식과 폴백
 
-- outer shadow (VRChat-safe SDF Material 구현), inset shadow와 outline
+- outer·inset shadow (VRChat-safe radius-aware SDF Material 구현), outline
 - blur
 - Gradient LUT 품질·성능 프로파일 확장
 - 부분 Texture Bake

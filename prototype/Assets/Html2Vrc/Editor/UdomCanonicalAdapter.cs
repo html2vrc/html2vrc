@@ -1494,8 +1494,7 @@ namespace Html2Vrc.Editor
                 MapShadows(
                     RequireArray(shadowsValue, path + ".shadows"),
                     path + ".shadows",
-                    result.Style,
-                    warnings);
+                    result.Style);
             }
             if (value.TryGetValue("radius", out var radiusValue))
             {
@@ -1566,8 +1565,7 @@ namespace Html2Vrc.Editor
         private static void MapShadows(
             List<object> values,
             string path,
-            UdomStyle style,
-            List<UdomParseWarning> warnings)
+            UdomStyle style)
         {
             var count = values.Count;
             style.shadowOffsets = new float[count * 2];
@@ -1621,12 +1619,6 @@ namespace Html2Vrc.Editor
                     "inset",
                     false,
                     shadowPath + ".inset");
-                if (style.shadowInsets[index])
-                {
-                    warnings.Add(new UdomParseWarning(
-                        shadowPath + ".inset",
-                        "Inset shadow is preserved but not rendered by the Unity compatibility backend."));
-                }
             }
         }
 

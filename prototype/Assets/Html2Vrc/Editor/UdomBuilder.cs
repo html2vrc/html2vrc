@@ -461,7 +461,9 @@ namespace Html2Vrc.Editor
             var actualParent = parent;
             var hasMargin = HasNonZero(style.margin);
             var hasTransform = HasTransform(style);
-            var hasShadows = HasRenderableShadow(style);
+            var hasOuterShadows = HasRenderableOuterShadow(style);
+            var hasSiblingInsetShadows = RequiresSiblingInsetShadow(node, style);
+            var hasStackedShadows = hasOuterShadows || hasSiblingInsetShadows;
 
             if (hasMargin)
             {
@@ -506,7 +508,7 @@ namespace Html2Vrc.Editor
                     style,
                     context);
             }
-            else if (hasShadows)
+            else if (hasStackedShadows)
             {
                 var shadowLayoutId = node.id + ShadowLayoutSuffix;
                 shadowLayout = UpsertGeneratedObject(
@@ -542,9 +544,19 @@ namespace Html2Vrc.Editor
                 visualSize = GetVector2(style.size, new Vector2(100f, 100f));
             }
 
-            if (hasShadows)
+            if (hasOuterShadows)
             {
-                ConfigureShadows(nodeParent, node, style, visualSize, context);
+                ConfigureOuterShadows(nodeParent, node, style, visualSize, context);
+            }
+            if (hasSiblingInsetShadows)
+            {
+                ConfigureInsetShadows(
+                    nodeParent,
+                    node,
+                    style,
+                    visualSize,
+                    CountRenderableOuterShadows(style),
+                    context);
             }
 
             var nodeObject = UpsertGeneratedObject(node.id, node.type, false, nodeParent, context);
@@ -556,7 +568,7 @@ namespace Html2Vrc.Editor
                 nodeObject.transform.SetAsLastSibling();
                 ConfigureTransformedNodeRect(nodeObject, style, visualSize);
             }
-            else if (hasShadows)
+            else if (hasStackedShadows)
             {
                 nodeObject.transform.SetAsLastSibling();
                 ConfigureStackedNodeRect(nodeObject, visualSize);
@@ -572,7 +584,7 @@ namespace Html2Vrc.Editor
                 ConfigureRect(nodeObject, style, parent);
             }
 
-            if (hasShadows)
+            if (hasStackedShadows)
             {
                 ConfigurePaint(visualLayout, style);
                 ConfigurePaint(nodeObject, null);
@@ -627,6 +639,16 @@ namespace Html2Vrc.Editor
             }
 
             ConfigureBackground(nodeObject, node, style, context);
+            if (!hasSiblingInsetShadows)
+            {
+                ConfigureInsetShadows(
+                    nodeObject.transform,
+                    node,
+                    style,
+                    visualSize,
+                    0,
+                    context);
+            }
             ConfigureBorder(nodeObject, node, style, context);
 
             return nodeObject;
@@ -885,7 +907,7 @@ namespace Html2Vrc.Editor
             RemoveIfPresent<LayoutElement>(target);
         }
 
-        private static void ConfigureShadows(
+        private static void ConfigureOuterShadows(
             Transform parent,
             UdomNode node,
             UdomStyle style,
@@ -897,7 +919,7 @@ namespace Html2Vrc.Editor
             var shadowCount = UdomShadowAssetUtility.GetCount(style);
             for (var index = 0; index < shadowCount; index++)
             {
-                if (!UdomShadowAssetUtility.IsRenderable(style, index))
+                if (!UdomShadowAssetUtility.IsOuterRenderable(style, index))
                 {
                     continue;
                 }
@@ -916,6 +938,46 @@ namespace Html2Vrc.Editor
 
                 var image = GetOrAdd<Image>(shadow);
                 Undo.RecordObject(image, "Configure UDOM shadow");
+                UdomShadowAssetUtility.Configure(
+                    image,
+                    style,
+                    index,
+                    size,
+                    context.SourceAsset,
+                    shadowId);
+            }
+        }
+
+        private static void ConfigureInsetShadows(
+            Transform parent,
+            UdomNode node,
+            UdomStyle style,
+            Vector2 size,
+            int siblingIndex,
+            BuildContext context)
+        {
+            var shadowCount = UdomShadowAssetUtility.GetCount(style);
+            for (var index = 0; index < shadowCount; index++)
+            {
+                if (!UdomShadowAssetUtility.IsInsetRenderable(style, index))
+                {
+                    continue;
+                }
+
+                var shadowId = node.id + ShadowSuffix + index;
+                var shadow = UpsertGeneratedObject(
+                    shadowId,
+                    "InsetShadow",
+                    true,
+                    parent,
+                    context);
+                context.DesiredIds.Add(shadowId);
+                shadow.name = $"Inset Shadow {index} [{node.id}]";
+                shadow.transform.SetSiblingIndex(siblingIndex++);
+                ConfigureInsetShadowRect(shadow, style, index, size);
+
+                var image = GetOrAdd<Image>(shadow);
+                Undo.RecordObject(image, "Configure UDOM inset shadow");
                 UdomShadowAssetUtility.Configure(
                     image,
                     style,
@@ -951,6 +1013,43 @@ namespace Html2Vrc.Editor
             if (image != null && image.material != null)
             {
                 Undo.RecordObject(image, "Refresh UDOM shadow");
+                image.color = UdomBuilderUtility.ParseColor(
+                    style.shadowColors[shadowIndex],
+                    Color.clear);
+                UdomShadowAssetUtility.ApplyProperties(
+                    image.material,
+                    style,
+                    shadowIndex,
+                    size);
+                SavePaintMaterial(image.material);
+            }
+        }
+
+        private static void ConfigureInsetShadowRect(
+            GameObject target,
+            UdomStyle style,
+            int shadowIndex,
+            Vector2 size)
+        {
+            var rect = target.GetComponent<RectTransform>();
+            Undo.RecordObject(rect, "Configure UDOM inset shadow rect");
+            rect.anchorMin = Vector2.zero;
+            rect.anchorMax = Vector2.one;
+            rect.pivot = new Vector2(0.5f, 0.5f);
+            rect.anchoredPosition = Vector2.zero;
+            rect.sizeDelta = Vector2.zero;
+            rect.localScale = Vector3.one;
+            rect.localRotation = Quaternion.identity;
+            rect.localPosition = new Vector3(rect.localPosition.x, rect.localPosition.y, 0f);
+
+            var layout = GetOrAdd<LayoutElement>(target);
+            Undo.RecordObject(layout, "Configure UDOM inset shadow layout");
+            layout.ignoreLayout = true;
+
+            var image = target.GetComponent<Image>();
+            if (image != null && image.material != null)
+            {
+                Undo.RecordObject(image, "Refresh UDOM inset shadow");
                 image.color = UdomBuilderUtility.ParseColor(
                     style.shadowColors[shadowIndex],
                     Color.clear);
@@ -1205,8 +1304,10 @@ namespace Html2Vrc.Editor
         {
             var style = node.style ?? new UdomStyle();
             var hasTransform = HasTransform(style);
-            var hasShadows = HasRenderableShadow(style);
-            if (hasTransform || hasShadows)
+            var hasOuterShadows = HasRenderableOuterShadow(style);
+            var hasSiblingInsetShadows = RequiresSiblingInsetShadow(node, style);
+            var hasStackedShadows = hasOuterShadows || hasSiblingInsetShadows;
+            if (hasTransform || hasStackedShadows)
             {
                 var layout = FindNode(
                     context.Root,
@@ -1255,7 +1356,7 @@ namespace Html2Vrc.Editor
                     var shadowCount = UdomShadowAssetUtility.GetCount(style);
                     for (var index = 0; index < shadowCount; index++)
                     {
-                        if (!UdomShadowAssetUtility.IsRenderable(style, index))
+                        if (!UdomShadowAssetUtility.IsOuterRenderable(style, index))
                         {
                             continue;
                         }
@@ -1265,6 +1366,48 @@ namespace Html2Vrc.Editor
                         {
                             ConfigureShadowRect(shadow.gameObject, style, index, size, baseCenter);
                         }
+                    }
+
+                    if (hasSiblingInsetShadows)
+                    {
+                        for (var index = 0; index < shadowCount; index++)
+                        {
+                            if (!UdomShadowAssetUtility.IsInsetRenderable(style, index))
+                            {
+                                continue;
+                            }
+
+                            var shadow = FindNode(context.Root, node.id + ShadowSuffix + index);
+                            if (shadow != null)
+                            {
+                                ConfigureInsetShadowRect(shadow.gameObject, style, index, size);
+                            }
+                        }
+                    }
+                }
+            }
+
+            var insetTarget = FindNode(context.Root, node.id);
+            if (!hasSiblingInsetShadows && insetTarget != null)
+            {
+                var insetSize = insetTarget.GetComponent<RectTransform>().rect.size;
+                if (insetSize.x <= 0f || insetSize.y <= 0f)
+                {
+                    insetSize = GetVector2(style.size, new Vector2(100f, 100f));
+                }
+
+                var shadowCount = UdomShadowAssetUtility.GetCount(style);
+                for (var index = 0; index < shadowCount; index++)
+                {
+                    if (!UdomShadowAssetUtility.IsInsetRenderable(style, index))
+                    {
+                        continue;
+                    }
+
+                    var shadow = FindNode(context.Root, node.id + ShadowSuffix + index);
+                    if (shadow != null)
+                    {
+                        ConfigureInsetShadowRect(shadow.gameObject, style, index, insetSize);
                     }
                 }
             }
@@ -2232,18 +2375,54 @@ namespace Html2Vrc.Editor
                    && style.transformOperationTypes.Length > 0;
         }
 
-        private static bool HasRenderableShadow(UdomStyle style)
+        private static bool HasRenderableOuterShadow(UdomStyle style)
         {
             var count = UdomShadowAssetUtility.GetCount(style);
             for (var index = 0; index < count; index++)
             {
-                if (UdomShadowAssetUtility.IsRenderable(style, index))
+                if (UdomShadowAssetUtility.IsOuterRenderable(style, index))
                 {
                     return true;
                 }
             }
 
             return false;
+        }
+
+        private static bool HasRenderableInsetShadow(UdomStyle style)
+        {
+            var count = UdomShadowAssetUtility.GetCount(style);
+            for (var index = 0; index < count; index++)
+            {
+                if (UdomShadowAssetUtility.IsInsetRenderable(style, index))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static int CountRenderableOuterShadows(UdomStyle style)
+        {
+            var count = 0;
+            var shadowCount = UdomShadowAssetUtility.GetCount(style);
+            for (var index = 0; index < shadowCount; index++)
+            {
+                if (UdomShadowAssetUtility.IsOuterRenderable(style, index))
+                {
+                    count++;
+                }
+            }
+
+            return count;
+        }
+
+        private static bool RequiresSiblingInsetShadow(UdomNode node, UdomStyle style)
+        {
+            return node != null
+                   && string.Equals(node.type, "Text", StringComparison.OrdinalIgnoreCase)
+                   && HasRenderableInsetShadow(style);
         }
 
         private static Vector2 GetVector2(float[] values, Vector2 fallback)

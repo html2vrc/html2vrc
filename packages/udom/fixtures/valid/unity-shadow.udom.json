@@ -64,10 +64,25 @@
                 "blur": 0,
                 "spread": -2,
                 "color": "#FF8040A0"
+              },
+              {
+                "offsetX": 10,
+                "offsetY": -8,
+                "blur": 12,
+                "spread": 3,
+                "color": "#081020B0",
+                "inset": true
               }
             ]
           }
-        }
+        },
+        "children": [
+          {
+            "type": "text",
+            "id": "shadow-label",
+            "value": "Inset shadow content"
+          }
+        ]
       }
     ]
   }

@@ -59,6 +59,7 @@ namespace Html2Vrc.Tests
                 UdomRoundedCornerAssetUtility.DeleteGeneratedAssets(sample, "shadow-panel");
                 UdomShadowAssetUtility.DeleteGeneratedAssets(sample, "shadow-panel::__shadow-0");
                 UdomShadowAssetUtility.DeleteGeneratedAssets(sample, "shadow-panel::__shadow-1");
+                UdomShadowAssetUtility.DeleteGeneratedAssets(sample, "shadow-panel::__shadow-2");
             }
         }
 
@@ -1333,7 +1334,7 @@ namespace Html2Vrc.Tests
         }
 
         [Test]
-        public void CanonicalShadow_RendersLayeredBlurAndRegeneratesStably()
+        public void CanonicalShadow_RendersOuterAndInsetLayersAndRegeneratesStably()
         {
             var json = LoadRepositoryFile(
                 "packages",
@@ -1346,11 +1347,12 @@ namespace Html2Vrc.Tests
             Assert.That(validation.IsValid, Is.True, validation.Format());
             Assert.That(validation.Issues, Is.Empty, validation.Format());
             var panelNode = validation.Document.root.children.Single(node => node.id == "shadow-panel");
-            Assert.That(panelNode.style.shadowOffsets, Is.EqualTo(new[] { 16f, 12f, -6f, 4f }));
-            Assert.That(panelNode.style.shadowBlurs, Is.EqualTo(new[] { 18f, 0f }));
-            Assert.That(panelNode.style.shadowSpreads, Is.EqualTo(new[] { 4f, -2f }));
-            Assert.That(panelNode.style.shadowColors, Is.EqualTo(new[] { "#10204080", "#FF8040A0" }));
-            Assert.That(panelNode.style.shadowInsets, Is.EqualTo(new[] { false, false }));
+            Assert.That(panelNode.style.shadowOffsets, Is.EqualTo(new[] { 16f, 12f, -6f, 4f, 10f, -8f }));
+            Assert.That(panelNode.style.shadowBlurs, Is.EqualTo(new[] { 18f, 0f, 12f }));
+            Assert.That(panelNode.style.shadowSpreads, Is.EqualTo(new[] { 4f, -2f, 3f }));
+            Assert.That(panelNode.style.shadowColors,
+                Is.EqualTo(new[] { "#10204080", "#FF8040A0", "#081020B0" }));
+            Assert.That(panelNode.style.shadowInsets, Is.EqualTo(new[] { false, false, true }));
 
             const string insetJson = @"{
               ""asset"": { ""version"": ""0.1"" },
@@ -1367,34 +1369,109 @@ namespace Html2Vrc.Tests
             Assert.That(inset.Document.root.style.shadowSpreads, Is.EqualTo(new[] { 0f }));
             Assert.That(inset.Document.root.style.shadowColors, Is.EqualTo(new[] { "#00000080" }));
             Assert.That(inset.Document.root.style.shadowInsets, Is.EqualTo(new[] { true }));
-            Assert.That(inset.Format(), Does.Contain("Inset shadow is preserved but not rendered"));
+            Assert.That(inset.Issues, Is.Empty, inset.Format());
+
+            var insetBuild = UdomBuilder.GenerateOrRegenerate(inset.Document);
+            try
+            {
+                var insetNode = UdomBuilder.FindNode(insetBuild.Root, "inset-shadow");
+                var insetLayer = UdomBuilder.FindNode(insetBuild.Root, "inset-shadow::__shadow-0");
+                Assert.That(insetNode, Is.Not.Null);
+                Assert.That(insetLayer, Is.Not.Null);
+                Assert.That(UdomBuilder.FindNode(insetBuild.Root, "inset-shadow::__shadow-layout"), Is.Null);
+                Assert.That(insetLayer.transform.parent, Is.SameAs(insetNode.transform));
+                Assert.That(insetLayer.GetComponent<LayoutElement>().ignoreLayout, Is.True);
+                Assert.That(insetLayer.GetComponent<Image>().raycastTarget, Is.False);
+                Assert.That(insetLayer.GetComponent<Image>().material.GetFloat("_Inset"), Is.EqualTo(1f));
+            }
+            finally
+            {
+                Object.DestroyImmediate(insetBuild.Root.gameObject);
+            }
+
+            const string textInsetJson = @"{
+              ""asset"": { ""version"": ""0.1"" },
+              ""viewport"": { ""width"": 200, ""height"": 100 },
+              ""root"": {
+                ""type"": ""element"", ""id"": ""text-inset-root"", ""name"": ""view"",
+                ""style"": { ""layout"": {
+                  ""mode"": ""flex"", ""width"": ""100%"", ""height"": ""100%"",
+                  ""flex"": { ""direction"": ""column"" }
+                } },
+                ""children"": [{
+                  ""type"": ""text"", ""id"": ""inset-text"", ""value"": ""Layered text"",
+                  ""style"": {
+                    ""layout"": { ""width"": 120, ""height"": 40 },
+                    ""paint"": {
+                      ""opacity"": 0.5,
+                      ""shadows"": [{ ""blur"": 4, ""inset"": true }]
+                    }
+                  }
+                }]
+              }
+            }";
+            var textInset = UdomValidator.Validate(textInsetJson);
+            Assert.That(textInset.IsValid, Is.True, textInset.Format());
+            Assert.That(textInset.Issues, Is.Empty, textInset.Format());
+            var textInsetBuild = UdomBuilder.GenerateOrRegenerate(textInset.Document);
+            try
+            {
+                var textLayout = UdomBuilder.FindNode(textInsetBuild.Root, "inset-text::__shadow-layout");
+                var textLayer = UdomBuilder.FindNode(textInsetBuild.Root, "inset-text::__shadow-0");
+                var textNode = UdomBuilder.FindNode(textInsetBuild.Root, "inset-text");
+                Assert.That(textLayout, Is.Not.Null);
+                Assert.That(textLayer.transform.parent, Is.SameAs(textLayout.transform));
+                Assert.That(textNode.transform.parent, Is.SameAs(textLayout.transform));
+                Assert.That(textLayer.transform.GetSiblingIndex(), Is.EqualTo(0));
+                Assert.That(textNode.transform.GetSiblingIndex(), Is.EqualTo(1));
+                Assert.That(textNode.GetComponent<TextMeshProUGUI>(), Is.Not.Null);
+                Assert.That(textNode.GetComponentInChildren<Image>(), Is.Null);
+                Assert.That(textLayout.GetComponent<CanvasGroup>().alpha, Is.EqualTo(0.5f));
+            }
+            finally
+            {
+                Object.DestroyImmediate(textInsetBuild.Root.gameObject);
+            }
 
             var build = UdomBuilder.GenerateOrRegenerate(validation.Document, null, sample);
             var root = build.Root;
             var layout = UdomBuilder.FindNode(root, "shadow-panel::__shadow-layout");
             var shadow0 = UdomBuilder.FindNode(root, "shadow-panel::__shadow-0");
             var shadow1 = UdomBuilder.FindNode(root, "shadow-panel::__shadow-1");
+            var insetShadow = UdomBuilder.FindNode(root, "shadow-panel::__shadow-2");
             var panel = UdomBuilder.FindNode(root, "shadow-panel");
+            var label = UdomBuilder.FindNode(root, "shadow-label");
             var documentRoot = UdomBuilder.FindNode(root, "shadow-root");
             Assert.That(layout, Is.Not.Null);
             Assert.That(shadow0, Is.Not.Null);
             Assert.That(shadow1, Is.Not.Null);
+            Assert.That(insetShadow, Is.Not.Null);
             Assert.That(panel, Is.Not.Null);
+            Assert.That(label, Is.Not.Null);
             Assert.That(layout.transform.parent, Is.SameAs(documentRoot.transform));
             Assert.That(shadow0.transform.parent, Is.SameAs(layout.transform));
             Assert.That(shadow1.transform.parent, Is.SameAs(layout.transform));
             Assert.That(panel.transform.parent, Is.SameAs(layout.transform));
+            Assert.That(insetShadow.transform.parent, Is.SameAs(panel.transform));
+            Assert.That(label.transform.parent, Is.SameAs(panel.transform));
             Assert.That(shadow0.transform.GetSiblingIndex(), Is.EqualTo(0));
             Assert.That(shadow1.transform.GetSiblingIndex(), Is.EqualTo(1));
             Assert.That(panel.transform.GetSiblingIndex(), Is.EqualTo(2));
+            Assert.That(insetShadow.transform.GetSiblingIndex(), Is.EqualTo(0));
+            Assert.That(label.transform.GetSiblingIndex(), Is.EqualTo(1));
 
             var layoutRect = layout.GetComponent<RectTransform>();
             var shadow0Rect = shadow0.GetComponent<RectTransform>();
             var shadow1Rect = shadow1.GetComponent<RectTransform>();
+            var insetRect = insetShadow.GetComponent<RectTransform>();
             var panelRect = panel.GetComponent<RectTransform>();
             var shadow0Image = shadow0.GetComponent<Image>();
             var shadow1Image = shadow1.GetComponent<Image>();
+            var insetImage = insetShadow.GetComponent<Image>();
             var shadow0Material = shadow0Image.material;
+            var insetMaterial = insetImage.material;
+            var insetMaterialPath = AssetDatabase.GetAssetPath(insetMaterial);
+            var insetMaterialGuid = AssetDatabase.AssetPathToGUID(insetMaterialPath);
             var shadow0MaterialPath = AssetDatabase.GetAssetPath(shadow0Material);
             var shadow0MaterialGuid = AssetDatabase.AssetPathToGUID(shadow0MaterialPath);
             Assert.That(layoutRect.rect.size, Is.EqualTo(new Vector2(440f, 140f)));
@@ -1405,10 +1482,15 @@ namespace Html2Vrc.Tests
             Assert.That(shadow0Rect.rect.size, Is.EqualTo(new Vector2(484f, 184f)));
             Assert.That(shadow1Rect.anchoredPosition, Is.EqualTo(new Vector2(-6f, -4f)));
             Assert.That(shadow1Rect.rect.size, Is.EqualTo(new Vector2(436f, 136f)));
+            Assert.That(insetRect.rect.size, Is.EqualTo(new Vector2(440f, 140f)));
+            Assert.That(insetRect.anchoredPosition, Is.EqualTo(Vector2.zero));
+            Assert.That(insetShadow.GetComponent<LayoutElement>().ignoreLayout, Is.True);
             Assert.That(shadow0Image.raycastTarget, Is.False);
             Assert.That(shadow1Image.raycastTarget, Is.False);
+            Assert.That(insetImage.raycastTarget, Is.False);
             Assert.That(shadow0Material.shader.name, Is.EqualTo(UdomShadowAssetUtility.ShaderName));
             Assert.That(shadow1Image.material.shader.name, Is.EqualTo(UdomShadowAssetUtility.ShaderName));
+            Assert.That(insetMaterial.shader.name, Is.EqualTo(UdomShadowAssetUtility.ShaderName));
             Assert.That(shadow0MaterialPath, Does.StartWith("Assets/Html2VrcGenerated/Shadows/"));
             Assert.That(shadow0Material.GetVector("_ShapeSize"),
                 Is.EqualTo(new Vector4(448f, 148f, 0f, 0f))
@@ -1417,6 +1499,23 @@ namespace Html2Vrc.Tests
                 Is.EqualTo(new Vector4(32f, 28f, 20f, 12f))
                     .Using(Vector4ComparerWithEqualsOperator.Instance));
             Assert.That(shadow0Material.GetFloat("_Blur"), Is.EqualTo(18f).Within(0.001f));
+            Assert.That(insetMaterial.GetVector("_ShapeSize"),
+                Is.EqualTo(new Vector4(434f, 134f, 0f, 0f))
+                    .Using(Vector4ComparerWithEqualsOperator.Instance));
+            Assert.That(insetMaterial.GetVector("_CornerRadii"),
+                Is.EqualTo(new Vector4(25f, 21f, 13f, 5f))
+                    .Using(Vector4ComparerWithEqualsOperator.Instance));
+            Assert.That(insetMaterial.GetVector("_BoxSize"),
+                Is.EqualTo(new Vector4(440f, 140f, 0f, 0f))
+                    .Using(Vector4ComparerWithEqualsOperator.Instance));
+            Assert.That(insetMaterial.GetVector("_BoxCornerRadii"),
+                Is.EqualTo(new Vector4(28f, 24f, 16f, 8f))
+                    .Using(Vector4ComparerWithEqualsOperator.Instance));
+            Assert.That(insetMaterial.GetVector("_Offset"),
+                Is.EqualTo(new Vector4(10f, 8f, 0f, 0f))
+                    .Using(Vector4ComparerWithEqualsOperator.Instance));
+            Assert.That(insetMaterial.GetFloat("_Blur"), Is.EqualTo(12f).Within(0.001f));
+            Assert.That(insetMaterial.GetFloat("_Inset"), Is.EqualTo(1f).Within(0.001f));
             Assert.That(
                 shadow0Image.color,
                 Is.EqualTo((Color)new Color32(0x10, 0x20, 0x40, 0x80)).Using(ColorComparer.Instance));
@@ -1429,10 +1528,10 @@ namespace Html2Vrc.Tests
                     new List<GameObject> { validationClone },
                     WorldValidation.WhiteListConfiguration.VRCSDK3);
                 var images = validationClone.GetComponentsInChildren<Image>(true);
-                Assert.That(images.Length, Is.EqualTo(3));
+                Assert.That(images.Length, Is.EqualTo(4));
                 Assert.That(
                     images.Count(image => image.material.shader.name == UdomShadowAssetUtility.ShaderName),
-                    Is.EqualTo(2));
+                    Is.EqualTo(3));
             }
             finally
             {
@@ -1443,28 +1542,38 @@ namespace Html2Vrc.Tests
             panelNode.style.shadowOffsets[0] = 24f;
             panelNode.style.shadowBlurs[0] = 10f;
             panelNode.style.shadowSpreads[0] = 8f;
+            panelNode.style.shadowOffsets[4] = -14f;
+            panelNode.style.shadowBlurs[2] = 20f;
+            panelNode.style.shadowSpreads[2] = -4f;
             UdomBuilder.GenerateOrRegenerate(validation.Document, root, sample);
             Assert.That(layout, Is.SameAs(UdomBuilder.FindNode(root, "shadow-panel::__shadow-layout")));
             Assert.That(shadow0, Is.SameAs(UdomBuilder.FindNode(root, "shadow-panel::__shadow-0")));
             Assert.That(shadow1, Is.SameAs(UdomBuilder.FindNode(root, "shadow-panel::__shadow-1")));
+            Assert.That(insetShadow, Is.SameAs(UdomBuilder.FindNode(root, "shadow-panel::__shadow-2")));
             Assert.That(panel, Is.SameAs(UdomBuilder.FindNode(root, "shadow-panel")));
             Assert.That(shadow0Rect.anchoredPosition, Is.EqualTo(new Vector2(24f, -12f)));
             Assert.That(shadow0Rect.rect.size, Is.EqualTo(new Vector2(476f, 176f)));
             Assert.That(AssetDatabase.GetAssetPath(shadow0Image.material), Is.EqualTo(shadow0MaterialPath));
             Assert.That(AssetDatabase.AssetPathToGUID(shadow0MaterialPath), Is.EqualTo(shadow0MaterialGuid));
+            Assert.That(AssetDatabase.GetAssetPath(insetImage.material), Is.EqualTo(insetMaterialPath));
+            Assert.That(AssetDatabase.AssetPathToGUID(insetMaterialPath), Is.EqualTo(insetMaterialGuid));
             Assert.That(shadow0Image.material.GetVector("_ShapeSize"),
                 Is.EqualTo(new Vector4(456f, 156f, 0f, 0f))
                     .Using(Vector4ComparerWithEqualsOperator.Instance));
             Assert.That(shadow0Image.material.GetFloat("_Blur"), Is.EqualTo(10f).Within(0.001f));
+            Assert.That(insetImage.material.GetVector("_ShapeSize"),
+                Is.EqualTo(new Vector4(448f, 148f, 0f, 0f))
+                    .Using(Vector4ComparerWithEqualsOperator.Instance));
+            Assert.That(insetImage.material.GetVector("_Offset"),
+                Is.EqualTo(new Vector4(-14f, 8f, 0f, 0f))
+                    .Using(Vector4ComparerWithEqualsOperator.Instance));
+            Assert.That(insetImage.material.GetFloat("_Blur"), Is.EqualTo(20f).Within(0.001f));
 
-            panelNode.style.shadowOffsets = panelNode.style.shadowOffsets.Take(2).ToArray();
-            panelNode.style.shadowBlurs = panelNode.style.shadowBlurs.Take(1).ToArray();
-            panelNode.style.shadowSpreads = panelNode.style.shadowSpreads.Take(1).ToArray();
-            panelNode.style.shadowColors = panelNode.style.shadowColors.Take(1).ToArray();
-            panelNode.style.shadowInsets = panelNode.style.shadowInsets.Take(1).ToArray();
+            panelNode.style.shadowColors[1] = "#00000000";
             UdomBuilder.GenerateOrRegenerate(validation.Document, root, sample);
             Assert.That(shadow0, Is.SameAs(UdomBuilder.FindNode(root, "shadow-panel::__shadow-0")));
             Assert.That(UdomBuilder.FindNode(root, "shadow-panel::__shadow-1"), Is.Null);
+            Assert.That(insetShadow, Is.SameAs(UdomBuilder.FindNode(root, "shadow-panel::__shadow-2")));
 
             panelNode.style.transformOperationTypes = new[] { "rotate" };
             panelNode.style.transformOperationValues = new[] { 15f, 0f };
@@ -1476,11 +1585,15 @@ namespace Html2Vrc.Tests
             Assert.That(rotate, Is.Not.Null);
             Assert.That(UdomBuilder.FindNode(root, "shadow-panel::__shadow-layout"), Is.Null);
             Assert.That(shadow0, Is.SameAs(UdomBuilder.FindNode(root, "shadow-panel::__shadow-0")));
+            Assert.That(insetShadow, Is.SameAs(UdomBuilder.FindNode(root, "shadow-panel::__shadow-2")));
             Assert.That(panel, Is.SameAs(UdomBuilder.FindNode(root, "shadow-panel")));
             Assert.That(shadow0.transform.parent, Is.SameAs(rotate.transform));
             Assert.That(panel.transform.parent, Is.SameAs(rotate.transform));
+            Assert.That(insetShadow.transform.parent, Is.SameAs(panel.transform));
             Assert.That(shadow0.transform.GetSiblingIndex(), Is.EqualTo(0));
             Assert.That(panel.transform.GetSiblingIndex(), Is.EqualTo(1));
+            Assert.That(insetShadow.transform.GetSiblingIndex(), Is.EqualTo(0));
+            Assert.That(label.transform.GetSiblingIndex(), Is.EqualTo(1));
             Assert.That(rotate.GetComponent<RectTransform>().localEulerAngles.z, Is.EqualTo(345f).Within(0.001f));
 
             panelNode.style.shadowOffsets = System.Array.Empty<float>();
@@ -1497,6 +1610,7 @@ namespace Html2Vrc.Tests
             Assert.That(UdomBuilder.FindNode(root, "shadow-panel::__shadow-layout"), Is.Null);
             Assert.That(UdomBuilder.FindNode(root, "shadow-panel::__transform-layout"), Is.Null);
             Assert.That(UdomBuilder.FindNode(root, "shadow-panel::__shadow-0"), Is.Null);
+            Assert.That(UdomBuilder.FindNode(root, "shadow-panel::__shadow-2"), Is.Null);
             Assert.That(panelRect.rect.size, Is.EqualTo(new Vector2(440f, 140f)));
         }
 

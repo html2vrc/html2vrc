@@ -5,7 +5,11 @@ Shader "HTML2VRC/UI Box Shadow"
         [PerRendererData] _MainTex ("Sprite Texture", 2D) = "white" {}
         _ShapeSize ("Shape Size", Vector) = (100, 100, 0, 0)
         _CornerRadii ("Corner Radii", Vector) = (0, 0, 0, 0)
+        _BoxSize ("Box Size", Vector) = (100, 100, 0, 0)
+        _BoxCornerRadii ("Box Corner Radii", Vector) = (0, 0, 0, 0)
+        _Offset ("Inset Offset", Vector) = (0, 0, 0, 0)
         _Blur ("Blur Radius", Float) = 0
+        _Inset ("Inset", Float) = 0
         _Color ("Tint", Color) = (1, 1, 1, 1)
         _StencilComp ("Stencil Comparison", Float) = 8
         _Stencil ("Stencil ID", Float) = 0
@@ -79,17 +83,24 @@ Shader "HTML2VRC/UI Box Shadow"
             fixed4 _TextureSampleAdd;
             float4 _ShapeSize;
             float4 _CornerRadii;
+            float4 _BoxSize;
+            float4 _BoxCornerRadii;
+            float4 _Offset;
             float _Blur;
+            float _Inset;
             float4 _ClipRect;
 
-            float RoundedRectDistance(float2 localPosition)
+            float RoundedRectDistance(
+                float2 localPosition,
+                float2 shapeSize,
+                float4 cornerRadii)
             {
                 float right = step(0.0, localPosition.x);
                 float top = step(0.0, localPosition.y);
-                float bottomRadius = lerp(_CornerRadii.w, _CornerRadii.z, right);
-                float topRadius = lerp(_CornerRadii.x, _CornerRadii.y, right);
+                float bottomRadius = lerp(cornerRadii.w, cornerRadii.z, right);
+                float topRadius = lerp(cornerRadii.x, cornerRadii.y, right);
                 float radius = lerp(bottomRadius, topRadius, top);
-                float2 halfSize = max(_ShapeSize.xy * 0.5, float2(0.0001, 0.0001));
+                float2 halfSize = max(shapeSize * 0.5, float2(0.0001, 0.0001));
                 float2 distanceToCorner = abs(localPosition) - halfSize + radius;
                 return length(max(distanceToCorner, 0.0))
                        + min(max(distanceToCorner.x, distanceToCorner.y), 0.0)
@@ -111,10 +122,22 @@ Shader "HTML2VRC/UI Box Shadow"
 
             fixed4 frag(v2f input) : SV_Target
             {
-                float distance = RoundedRectDistance(input.localPosition);
-                float antialiasWidth = max(fwidth(distance), 0.0001);
+                float shapeDistance = RoundedRectDistance(
+                    input.localPosition - _Offset.xy,
+                    _ShapeSize.xy,
+                    _CornerRadii);
+                float antialiasWidth = max(fwidth(shapeDistance), 0.0001);
                 float softness = max(_Blur, antialiasWidth);
-                float shadowAlpha = saturate(0.5 - distance / softness);
+                float outerAlpha = saturate(0.5 - shapeDistance / softness);
+
+                float boxDistance = RoundedRectDistance(
+                    input.localPosition,
+                    _BoxSize.xy,
+                    _BoxCornerRadii);
+                float boxAntialiasWidth = max(fwidth(boxDistance), 0.0001);
+                float boxAlpha = saturate(0.5 - boxDistance / boxAntialiasWidth);
+                float insetAlpha = saturate(0.5 + shapeDistance / softness) * boxAlpha;
+                float shadowAlpha = lerp(outerAlpha, insetAlpha, step(0.5, _Inset));
                 fixed4 color = (tex2D(_MainTex, input.texcoord) + _TextureSampleAdd) * input.color;
                 color.a *= shadowAlpha;
 
