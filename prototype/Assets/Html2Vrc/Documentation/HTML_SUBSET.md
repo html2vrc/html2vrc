@@ -40,6 +40,9 @@
 - `transform-origin`: 1~2개의 숫자, `px`, percentage 또는 `left | center | right | top | bottom`
 - `transform`: `translate`, `translateX/Y`, `rotate`, `scale`, `scaleX/Y` 함수 또는 `none`
 - `display: flex | block | none`
+- `visibility: visible | hidden`: Layout과 GameObject를 유지하고 hidden에서 입력 차단
+- `opacity`: 0~1 숫자 또는 0%~100%. 0이어도 CSS처럼 입력은 유지
+- `z-index`: `auto` 또는 정수. 같은 부모 안의 paint 순서에만 적용
 - `position: static | absolute`: absolute는 `left`, `top`을 부모 왼쪽 위 기준으로 적용
 - `overflow: visible | hidden`: 한 값 또는 x·y 순서의 두 값
 - `overflow-x`, `overflow-y: visible | hidden`: 최종 두 축이 같은 값일 때만 지원
@@ -83,7 +86,9 @@ Border shorthand와 longhand는 inline 선언의 source-order대로 합성한다
 
 `linear-gradient`의 생략된 첫·마지막 stop은 0%·100%이고 그 사이의 연속 생략 stop은 양옆 위치 사이에 균등 배치한다. 뒤 stop 위치가 앞보다 작으면 CSS 규칙대로 앞 위치까지 올린다. 결과는 canonical의 1025×1 LUT와 VRChat-safe UI Material을 사용하며 radius mask와 합성된다. `background-image: none`은 현재 단색 background-color를 유지하고 gradient 에셋만 제거한다.
 
-CSS 전체 호환은 목표가 아니다. `flex-basis`, transform, object-position 이외의 percentage 길이, 양축이 모두 auto이거나 반대 고정 축·aspect-ratio가 없는 크기 auto, `aspect-ratio: auto`, `calc`, flex shorthand, transform의 matrix·skew·perspective와 3~4값 origin, dashed/dotted/double border, percentage border width, percentage 및 `/` 타원형 radius, named/rgb/hsl color, percentage shadow length, linear-gradient의 corner 방향·px stop·color hint·double-position stop, radial/conic/repeating gradient와 다중 background, `object-fit: scale-down`, object-position의 3~4값 edge offset, `align-content: space-evenly`, `overflow: auto | scroll`, visible/hidden이 섞인 축별 overflow, Grid, 선택자, 외부 스타일시트, 애니메이션과 지원 목록 밖의 속성은 오류로 표시한다.
+Opacity는 CanvasGroup alpha로 자식 전체에 곱해진다. Visibility hidden도 GameObject를 비활성화하지 않아 flex 공간과 안정 ID를 유지하지만 CanvasGroup의 interactable·raycast를 끈다. Z-index가 형제마다 다르면 flex 좌표를 먼저 고정한 뒤 낮은 정수부터 높은 정수 순으로 가장 바깥 margin·transform·shadow wrapper를 배치한다. 모두 auto/0으로 돌아오면 native Layout Group을 복원한다.
+
+CSS 전체 호환은 목표가 아니다. `flex-basis`, transform, object-position 이외의 percentage 길이, 양축이 모두 auto이거나 반대 고정 축·aspect-ratio가 없는 크기 auto, `aspect-ratio: auto`, `calc`, flex shorthand, transform의 matrix·skew·perspective와 3~4값 origin, dashed/dotted/double border, percentage border width, percentage 및 `/` 타원형 radius, named/rgb/hsl color, percentage shadow length, linear-gradient의 corner 방향·px stop·color hint·double-position stop, radial/conic/repeating gradient와 다중 background, `visibility: collapse`와 hidden 부모 안에서 자식 visible로 다시 표시하는 override, 중첩 stacking context·isolation, `object-fit: scale-down`, object-position의 3~4값 edge offset, `align-content: space-evenly`, `overflow: auto | scroll`, visible/hidden이 섞인 축별 overflow, Grid, 선택자, 외부 스타일시트, 애니메이션과 지원 목록 밖의 속성은 오류로 표시하거나 계약 밖으로 둔다.
 
 ## 안전한 버튼 동작
 

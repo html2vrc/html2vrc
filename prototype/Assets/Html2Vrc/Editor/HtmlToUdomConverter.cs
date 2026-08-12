@@ -575,6 +575,15 @@ namespace Html2Vrc.Editor
                         }
 
                         break;
+                    case "visibility":
+                        SetVisibility(declaration.Value, path, result, style);
+                        break;
+                    case "opacity":
+                        SetOpacity(declaration.Value, path, result, style);
+                        break;
+                    case "z-index":
+                        SetZIndex(declaration.Value, path, result, style);
+                        break;
                     case "flex-direction":
                         flexDirection = declaration.Value.Trim().ToLowerInvariant();
                         if (flexDirection != "row"
@@ -1048,6 +1057,93 @@ namespace Html2Vrc.Editor
                 path,
                 result);
             UdomCanonicalAdapter.FinalizeCanonicalBoxSize(style);
+        }
+
+        private static void SetVisibility(
+            string source,
+            string path,
+            HtmlToUdomResult result,
+            UdomStyle style)
+        {
+            switch (source.Trim().ToLowerInvariant())
+            {
+                case "visible":
+                    style.visible = true;
+                    break;
+                case "hidden":
+                    style.visible = false;
+                    break;
+                default:
+                    AddError(
+                        result,
+                        path + "/@style",
+                        $"visibility 값 '{source}'은 지원하지 않는다. visible 또는 hidden만 사용할 수 있다.");
+                    break;
+            }
+        }
+
+        private static void SetOpacity(
+            string source,
+            string path,
+            HtmlToUdomResult result,
+            UdomStyle style)
+        {
+            var value = source.Trim();
+            var isPercentage = value.EndsWith("%", StringComparison.Ordinal);
+            if (isPercentage)
+            {
+                value = value.Substring(0, value.Length - 1).Trim();
+            }
+
+            if (!TryParseNumber(value, out var opacity))
+            {
+                AddError(
+                    result,
+                    path + "/@style",
+                    $"opacity 값 '{source}'은 0~1 숫자 또는 0%~100% percentage여야 한다.");
+                return;
+            }
+
+            if (isPercentage)
+            {
+                opacity /= 100f;
+            }
+
+            if (float.IsNaN(opacity)
+                || float.IsInfinity(opacity)
+                || opacity < 0f
+                || opacity > 1f)
+            {
+                AddError(
+                    result,
+                    path + "/@style",
+                    $"opacity 값 '{source}'은 0~1 범위여야 한다.");
+                return;
+            }
+
+            style.opacity = opacity;
+        }
+
+        private static void SetZIndex(
+            string source,
+            string path,
+            HtmlToUdomResult result,
+            UdomStyle style)
+        {
+            var value = source.Trim();
+            if (string.Equals(value, "auto", StringComparison.OrdinalIgnoreCase))
+            {
+                style.zIndex = 0;
+                return;
+            }
+
+            if (!int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var zIndex))
+            {
+                AddError(result, path + "/@style", $"z-index 값 '{source}'은 auto 또는 정수여야 한다.");
+                return;
+            }
+
+            style.zIndex = zIndex;
         }
 
         private static void SetBorderShorthand(

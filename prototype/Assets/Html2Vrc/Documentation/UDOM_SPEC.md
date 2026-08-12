@@ -48,6 +48,8 @@ Canonical viewport 크기는 디자인 좌표계를 유지한다. UDOM Importer�
 
 Canonical `paint.visible`과 0~1 `paint.opacity`는 CanvasGroup으로 노드와 자식 결과 전체에 적용한다. `visible: false`는 GameObject를 비활성화하지 않아 Flex/Layout 공간을 유지하지만 interactable과 raycast는 차단한다. `opacity: 0`은 시각적으로만 투명하므로 canonical 의미대로 입력 상태는 유지한다. 사용자가 이미 추가한 CanvasGroup은 원래 alpha와 입력 설정을 캡처해 canonical opacity를 곱하고, 해당 스타일이 사라지면 원래 설정으로 복원한다.
 
+제한형 HTML의 `visibility: visible|hidden`과 0~1 숫자·percentage `opacity`는 같은 CanvasGroup paint state로 정규화한다. `z-index: auto|integer`는 같은 부모의 canonical zIndex가 되어 flex 배치를 먼저 top-left Rect로 고정한 뒤 가장 바깥 wrapper의 paint 순서만 바꾼다. 기본값으로 복원하면 생성 CanvasGroup·paint state를 제거하고 native Layout Group으로 돌아가면서 원본 GameObject를 재사용한다.
+
 Canonical `paint.border`는 왼쪽·위·오른쪽·아래 edge별 `width`, `color`, `solid` style을 보존한다. Unity 생성기는 `<node-id>::__border` overlay 아래에 각 edge를 Image로 만들며 LayoutGroup에서 제외한다. 위·아래 edge가 전체 폭을 차지하고 왼쪽·오른쪽 edge는 그 사이를 채우므로 네 색과 폭이 겹치지 않는다. 폭이 0이거나 완전히 투명한 edge는 만들지 않고, 모든 edge가 사라지면 overlay도 제거한다.
 
 Canonical `linear-gradient`는 임의 각도와 두 개 이상의 color stop을 보존한다. Unity 생성기는 1025×1 RGBA LUT Texture와 UI stencil·clip을 지원하는 Material을 만들고, 노드 크기를 반영한 축으로 LUT를 샘플링한다. canonical 각도 `0`은 아래에서 위, `90`은 왼쪽에서 오른쪽이다. source TextAsset이 있으면 생성 에셋은 `Assets/Html2VrcGenerated/Gradients` 아래에서 source GUID와 node ID 기반 안정 경로로 갱신되고, raw document 생성은 저장되지 않는 임시 에셋을 사용한다. 결과 GameObject에는 VRChat 검사를 통과하지 못할 사용자 런타임 컴포넌트를 추가하지 않는다.

@@ -3432,6 +3432,140 @@ namespace Html2Vrc.Tests
         }
 
         [Test]
+        public void HtmlConverter_PaintStateAndZIndexPreserveLayoutAndInputSemantics()
+        {
+            const string html = @"
+              <main id=""html-paint-root"" data-canvas-size=""640 500""
+                style=""width: 640px; height: 500px; display: flex; flex-direction: column; align-items: flex-start;
+                  padding: 20px; gap: 20px; opacity: 50%"">
+                <section id=""html-z-row""
+                  style=""width: 520px; height: 200px; display: flex; align-items: flex-start; padding: 20px; gap: 10px"">
+                  <div id=""html-paint-high""
+                    style=""width: 100px; height: 60px; order: 2; z-index: -10; transform: rotate(4deg)""></div>
+                  <div id=""html-paint-low""
+                    style=""width: 100px; height: 60px; margin: 0 5px; order: 0; z-index: 10""></div>
+                  <div id=""html-paint-mid""
+                    style=""width: 100px; height: 60px; order: 1; z-index: auto; opacity: 25%""></div>
+                  <div id=""html-paint-overlay""
+                    style=""width: 120px; height: 80px; position: absolute; left: 60px; top: 80px;
+                      z-index: 5; visibility: hidden""></div>
+                </section>
+                <button id=""html-transparent-button"" data-action=""ClosePanel""
+                  style=""width: 200px; height: 64px; opacity: 0"">Transparent action</button>
+              </main>";
+
+            var conversion = HtmlToUdomConverter.Convert(html);
+
+            Assert.That(conversion.IsValid, Is.True, conversion.Format());
+            var document = conversion.Document;
+            var row = document.root.children[0];
+            var high = row.children[0];
+            var low = row.children[1];
+            var mid = row.children[2];
+            var overlay = row.children[3];
+            var button = document.root.children[1];
+            Assert.That(document.root.style.opacity, Is.EqualTo(0.5f));
+            Assert.That(row.style.useResolvedChildPositions, Is.True);
+            Assert.That(high.style.zIndex, Is.EqualTo(-10));
+            Assert.That(low.style.zIndex, Is.EqualTo(10));
+            Assert.That(mid.style.zIndex, Is.Zero);
+            Assert.That(mid.style.opacity, Is.EqualTo(0.25f));
+            Assert.That(overlay.style.zIndex, Is.EqualTo(5));
+            Assert.That(overlay.style.visible, Is.False);
+            Assert.That(overlay.style.displayNone, Is.False);
+            Assert.That(button.style.opacity, Is.Zero);
+            Assert.That(high.style.position, Is.EqualTo(new[] { 250f, 20f }));
+            Assert.That(low.style.position, Is.EqualTo(new[] { 20f, 20f }));
+            Assert.That(mid.style.position, Is.EqualTo(new[] { 140f, 20f }));
+            Assert.That(overlay.style.position, Is.EqualTo(new[] { 60f, 80f }));
+
+            var normalized = UdomValidator.Validate(conversion.Json);
+            Assert.That(normalized.IsValid, Is.True, normalized.Format());
+            Assert.That(normalized.Document.root.style.opacity, Is.EqualTo(0.5f));
+            Assert.That(normalized.Document.root.children[0].children[3].style.visible, Is.False);
+            Assert.That(normalized.Document.root.children[0].children[1].style.zIndex, Is.EqualTo(10));
+
+            var build = UdomBuilder.GenerateOrRegenerate(document);
+            var root = build.Root;
+            var rootObject = UdomBuilder.FindNode(root, "html-paint-root").gameObject;
+            var rowObject = UdomBuilder.FindNode(root, "html-z-row").gameObject;
+            var highWrapper = UdomBuilder.FindNode(root, "html-paint-high::__transform-layout").gameObject;
+            var lowWrapper = UdomBuilder.FindNode(root, "html-paint-low::__margin").gameObject;
+            var midObject = UdomBuilder.FindNode(root, "html-paint-mid").gameObject;
+            var overlayObject = UdomBuilder.FindNode(root, "html-paint-overlay").gameObject;
+            var buttonObject = UdomBuilder.FindNode(root, "html-transparent-button").gameObject;
+            var rootGroup = rootObject.GetComponent<CanvasGroup>();
+            var midGroup = midObject.GetComponent<CanvasGroup>();
+            var overlayGroup = overlayObject.GetComponent<CanvasGroup>();
+            var buttonGroup = buttonObject.GetComponent<CanvasGroup>();
+            Assert.That(rootGroup.alpha, Is.EqualTo(0.5f));
+            Assert.That(midGroup.alpha, Is.EqualTo(0.25f));
+            Assert.That(overlayObject.activeSelf, Is.True);
+            Assert.That(overlayGroup.alpha, Is.Zero);
+            Assert.That(overlayGroup.interactable, Is.False);
+            Assert.That(overlayGroup.blocksRaycasts, Is.False);
+            Assert.That(buttonGroup.alpha, Is.Zero);
+            Assert.That(buttonGroup.interactable, Is.True);
+            Assert.That(buttonGroup.blocksRaycasts, Is.True);
+            Assert.That(rowObject.GetComponent<HorizontalLayoutGroup>(), Is.Null);
+            AssertResolvedTopLeftRect(root, "html-paint-high::__transform-layout", new Vector2(250f, 20f), new Vector2(100f, 60f));
+            AssertResolvedTopLeftRect(root, "html-paint-low::__margin", new Vector2(20f, 20f), new Vector2(110f, 60f));
+            AssertResolvedTopLeftRect(root, "html-paint-mid", new Vector2(140f, 20f), new Vector2(100f, 60f));
+            AssertResolvedTopLeftRect(root, "html-paint-overlay", new Vector2(60f, 80f), new Vector2(120f, 80f));
+            Assert.That(highWrapper.transform.GetSiblingIndex(), Is.EqualTo(0));
+            Assert.That(midObject.transform.GetSiblingIndex(), Is.EqualTo(1));
+            Assert.That(overlayObject.transform.GetSiblingIndex(), Is.EqualTo(2));
+            Assert.That(lowWrapper.transform.GetSiblingIndex(), Is.EqualTo(3));
+
+            var restored = HtmlToUdomConverter.Convert(
+                html.Replace("opacity: 50%", "opacity: 1")
+                    .Replace("opacity: 25%", "opacity: 1")
+                    .Replace("opacity: 0", "opacity: 1")
+                    .Replace("visibility: hidden", "visibility: visible")
+                    .Replace("z-index: -10", "z-index: auto")
+                    .Replace("z-index: 10", "z-index: auto")
+                    .Replace("z-index: 5", "z-index: auto"));
+            Assert.That(restored.IsValid, Is.True, restored.Format());
+            Assert.That(restored.Document.root.children[0].style.useResolvedChildPositions, Is.False);
+            UdomBuilder.GenerateOrRegenerate(restored.Document, root);
+            Assert.That(UdomBuilder.FindNode(root, "html-paint-root").gameObject, Is.SameAs(rootObject));
+            Assert.That(UdomBuilder.FindNode(root, "html-z-row").gameObject, Is.SameAs(rowObject));
+            Assert.That(UdomBuilder.FindNode(root, "html-paint-high::__transform-layout").gameObject, Is.SameAs(highWrapper));
+            Assert.That(UdomBuilder.FindNode(root, "html-paint-low::__margin").gameObject, Is.SameAs(lowWrapper));
+            Assert.That(UdomBuilder.FindNode(root, "html-transparent-button").gameObject, Is.SameAs(buttonObject));
+            Assert.That(rootObject.GetComponent<CanvasGroup>(), Is.Null);
+            Assert.That(midObject.GetComponent<CanvasGroup>(), Is.Null);
+            Assert.That(overlayObject.GetComponent<CanvasGroup>(), Is.Null);
+            Assert.That(buttonObject.GetComponent<CanvasGroup>(), Is.Null);
+            Assert.That(rootObject.GetComponent<UdomPaintState>(), Is.Null);
+            Assert.That(midObject.GetComponent<UdomPaintState>(), Is.Null);
+            Assert.That(overlayObject.GetComponent<UdomPaintState>(), Is.Null);
+            Assert.That(buttonObject.GetComponent<UdomPaintState>(), Is.Null);
+            Assert.That(rowObject.GetComponent<HorizontalLayoutGroup>(), Is.Not.Null);
+            Assert.That(lowWrapper.transform.GetSiblingIndex(), Is.EqualTo(0));
+            Assert.That(overlayObject.transform.GetSiblingIndex(), Is.EqualTo(1));
+            Assert.That(midObject.transform.GetSiblingIndex(), Is.EqualTo(2));
+            Assert.That(highWrapper.transform.GetSiblingIndex(), Is.EqualTo(3));
+            Object.DestroyImmediate(root.gameObject);
+
+            var excessiveOpacity = HtmlToUdomConverter.Convert(html.Replace("opacity: 50%", "opacity: 120%"));
+            Assert.That(excessiveOpacity.IsValid, Is.False);
+            Assert.That(excessiveOpacity.Format(), Does.Contain("opacity"));
+
+            var nonFiniteOpacity = HtmlToUdomConverter.Convert(html.Replace("opacity: 50%", "opacity: NaN"));
+            Assert.That(nonFiniteOpacity.IsValid, Is.False);
+            Assert.That(nonFiniteOpacity.Format(), Does.Contain("opacity"));
+
+            var collapsed = HtmlToUdomConverter.Convert(html.Replace("visibility: hidden", "visibility: collapse"));
+            Assert.That(collapsed.IsValid, Is.False);
+            Assert.That(collapsed.Format(), Does.Contain("visibility"));
+
+            var fractionalZIndex = HtmlToUdomConverter.Convert(html.Replace("z-index: -10", "z-index: 1.5"));
+            Assert.That(fractionalZIndex.IsValid, Is.False);
+            Assert.That(fractionalZIndex.Format(), Does.Contain("z-index"));
+        }
+
+        [Test]
         public void HtmlConverter_FlexCssUsesCanonicalSizingAlignmentAndStableHierarchy()
         {
             const string html = @"
