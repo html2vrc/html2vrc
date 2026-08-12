@@ -220,4 +220,6 @@ Embed는 외부 오브젝트를 소유하거나 자식으로 옮기지 않는다
 
 UDOM 자체는 HTML/CSS가 아니다. 별도 HTML 입력 0.1 도구가 제한된 정적 HTML과 일부 인라인 CSS를 이 규격으로 번역할 수 있지만, 일반 HTML/CSS 호환 파서는 아니다.
 
+HTML 입력의 flex-direction, justify-content, align-items, align-self, order, grow/shrink/basis는 canonical importer와 같은 정규화·크기 해석 경로를 공유한다. `display: none`은 `displayNone`, `position: absolute`와 left/top은 `positionAbsolute` 및 top-left 좌표로 변환하므로 HTML 재생성도 canonical wrapper와 안정 ID 규칙을 그대로 따른다.
+
 JavaScript, 조건식, 반복문, 상태 관리, 애니메이션, 임의 컴포넌트 생성, 네트워크 동기화는 오류 또는 범위 밖 기능이다. 알 수 없는 JSON 속성도 Validation 오류로 처리한다.

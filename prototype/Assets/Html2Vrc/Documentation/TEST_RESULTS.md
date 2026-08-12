@@ -40,11 +40,12 @@
 - canonical flex shrink 기본값·명시적 비율과 숫자·percentage·auto basis, scaled-shrink 분배, min/max 고정 재분배, margin 보존, 0 size, 양축 Scroll overflow와 normalized JSON round-trip을 확인했다.
 - canonical flex justify의 start·center·end·space-between·space-around·space-evenly 정렬과 gap 분배, row-reverse end의 물리 anchor·안정 형제 순서, 실제 RectTransform 좌표와 normalized JSON round-trip을 확인했다.
 - canonical `flexItem.alignSelf`의 auto·start·center·end·stretch가 부모 alignItems를 교차축에서 override하는 것을 확인했다. Row·column-reverse, 비대칭 margin, min/max stretch, transform wrapper, 교차축 overflow, normalized JSON round-trip과 정렬 전환 시 안정 GameObject·wrapper 수명주기를 포함한다.
+- 제한형 HTML CSS의 row/column reverse, justify-content, align-items, align-self, order, grow/shrink/basis를 canonical flex 해석기와 공유했다. Percentage basis·기본 shrink, 실제 Unity Rect 좌표·형제 순서, `display: none`, absolute left/top, wrapper 제거·노드 재사용과 지원하지 않는 값의 명시적 진단을 확인했다.
 
 자동 검증 결과:
 
 - `npm run check`: UDOM conformance 36/36, React 5/5, TypeScript typecheck와 build 통과
-- Unity EditMode `Html2Vrc.Tests.UdomPrototypeTests`: **37/37 통과, 실패 0**
+- Unity EditMode `Html2Vrc.Tests.UdomPrototypeTests`: **39/39 통과, 실패 0**
 - Unity 종료 코드 0, C# 컴파일 오류 0
 - Windows CRLF에서 기존 HTML 재생성 테스트가 문자열을 교체하지 못하던 문제도 함께 수정했다.
 
@@ -74,7 +75,7 @@
 
 ## 자동 회귀 검증
 
-HTML2VRC 전용 Unity Test Framework 테스트 37개를 실행한다. 검증 범위는 다음과 같다.
+HTML2VRC 전용 Unity Test Framework 테스트 39개를 실행한다. 검증 범위는 다음과 같다.
 
 1. 샘플 UDOM Validation 성공과 잘못된 속성/중복 ID 거부
 2. Canvas, TextMeshProUGUI, Image, Button, ScrollRect, LayoutGroup과 VRChat용 `VRCUiShape` 생성
@@ -113,11 +114,13 @@ HTML2VRC 전용 Unity Test Framework 테스트 37개를 실행한다. 검증 범
 35. canonical flex shrink·basis의 기본값과 mixed unit, scaled factor, min/max 고정 재분배, margin·zero size·Scroll overflow, normalized 상태 round-trip
 36. canonical flex justify 여섯 모드의 정렬·free-space gap 분배, reverse end anchor·형제 순서, 실제 Rect 좌표와 normalized 상태 round-trip
 37. canonical flex item alignSelf의 부모 교차축 정렬 override, margin·min/max·overflow 계산, transform·reverse hierarchy와 안정 wrapper 재생성, normalized 상태 round-trip
+38. 제한형 HTML CSS flex의 reverse·justify·align·order·grow/shrink/basis를 canonical 계산기로 해석하고 실제 Rect·형제 순서·absolute/none·안정 재생성을 검증
+39. 제한형 HTML CSS flex의 지원하지 않는 alignment·basis·order·음수 shrink 값을 명시적 오류로 거부
 
 최종 자동 테스트 결과:
 
-- 전체 37개
-- 통과 37개
+- 전체 39개
+- 통과 39개
 - 실패 0개
 - 건너뜀 0개
 - Unity 종료 코드 0

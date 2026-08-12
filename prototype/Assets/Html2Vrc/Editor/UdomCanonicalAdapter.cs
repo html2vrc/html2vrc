@@ -1490,7 +1490,7 @@ namespace Html2Vrc.Editor
             style.flexBasisIsPercent = isPercent;
         }
 
-        private static string MapAlignSelf(string value, string path)
+        internal static string MapAlignSelf(string value, string path)
         {
             switch (value)
             {
@@ -1589,7 +1589,7 @@ namespace Html2Vrc.Editor
             return new[] { resolvedWidth, resolvedWidth / ratio };
         }
 
-        private static void ResolveFlexLayoutTree(UdomNode node)
+        internal static void ResolveFlexLayoutTree(UdomNode node)
         {
             if (node == null || (node.style != null && node.style.displayNone))
             {
@@ -2176,7 +2176,7 @@ namespace Html2Vrc.Editor
             }
         }
 
-        private static string MapChildAlignment(
+        internal static string MapChildAlignment(
             bool isVertical,
             bool reversesMainAxis,
             string alignItems,
@@ -2225,7 +2225,7 @@ namespace Html2Vrc.Editor
             }
         }
 
-        private static string MapJustifyContent(string value, string path)
+        internal static string MapJustifyContent(string value, string path)
         {
             switch (value)
             {

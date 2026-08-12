@@ -280,7 +280,7 @@ VRChat 패키지는 VPM manifest에 고정되어 있습니다. UDOM 파서와 Un
 4. `Generate / Regenerate`를 누릅니다.
 5. 생성 루트의 `External References`에서 `world-light` 슬롯을 연결합니다.
 
-지원 범위는 `div`, 제목과 문단, `img`, `button`, 목록, ScrollView, Embed와 일부 인라인 CSS입니다. `script`, `onclick`, 외부 CSS와 임의 JavaScript는 실행하지 않고 오류로 표시합니다. 자세한 계약은 `Assets/Html2Vrc/Documentation/HTML_SUBSET.md`에 있습니다.
+지원 범위는 `div`, 제목과 문단, `img`, `button`, 목록, ScrollView, Embed와 일부 인라인 CSS입니다. 제한형 CSS flex는 reverse 방향, justify/align, 항목별 order·align-self·grow/shrink/basis를 canonical UDOM과 같은 계산기로 처리하며, `display: none`과 top-left absolute 배치도 지원합니다. `script`, `onclick`, 외부 CSS와 임의 JavaScript는 실행하지 않고 오류로 표시합니다. 자세한 계약은 `Assets/Html2Vrc/Documentation/HTML_SUBSET.md`에 있습니다.
 
 HTML 입력부터 독립된 샘플 Scene까지 한 번에 확인하려면 `Tools > HTML2VRC > Build HTML World Settings Scene`을 실행합니다. 결과는 `Assets/Html2Vrc/Samples/WorldSettingsHtmlSample.unity`에 저장됩니다. VRChat에서 바로 확인하려면 `Tools > HTML2VRC > VRChat > Build & Test HTML Sample World`를 실행합니다.
 

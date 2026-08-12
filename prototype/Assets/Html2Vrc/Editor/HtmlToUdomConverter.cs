@@ -131,6 +131,8 @@ namespace Html2Vrc.Editor
                 return result;
             }
 
+            PrepareHtmlFlexTree(document.root);
+            UdomCanonicalAdapter.ResolveFlexLayoutTree(document.root);
             var json = UdomJsonWriter.Write(document);
             var udomValidation = UdomValidator.Validate(json);
             for (var index = 0; index < udomValidation.Issues.Count; index++)
@@ -444,6 +446,13 @@ namespace Html2Vrc.Editor
             HtmlToUdomResult result)
         {
             var declarations = ParseStyle(element.Get("style"), path, result);
+            string display = null;
+            string flexDirection = null;
+            string alignItems = null;
+            string justifyContent = null;
+            string positionMode = null;
+            float? left = null;
+            float? top = null;
             foreach (var declaration in declarations)
             {
                 switch (declaration.Key)
@@ -455,36 +464,64 @@ namespace Html2Vrc.Editor
                         SetPixelValue(declaration.Value, path, declaration.Key, result, value => style.size[1] = value);
                         break;
                     case "left":
-                        SetPixelValue(declaration.Value, path, declaration.Key, result, value => style.position[0] = value);
+                        SetPixelValue(declaration.Value, path, declaration.Key, result, value => left = value);
                         break;
                     case "top":
-                        SetPixelValue(declaration.Value, path, declaration.Key, result, value => style.position[1] = -value);
+                        SetPixelValue(declaration.Value, path, declaration.Key, result, value => top = value);
                         break;
                     case "display":
-                        if (!string.Equals(declaration.Value, "flex", StringComparison.OrdinalIgnoreCase)
-                            && !string.Equals(declaration.Value, "block", StringComparison.OrdinalIgnoreCase))
+                        display = declaration.Value.Trim().ToLowerInvariant();
+                        if (display != "flex" && display != "block" && display != "none")
                         {
                             AddError(result, path + "/@style", $"display 값 '{declaration.Value}'은 지원하지 않는다.");
-                        }
-                        else if (string.Equals(declaration.Value, "flex", StringComparison.OrdinalIgnoreCase)
-                                 && string.Equals(style.layout, "None", StringComparison.OrdinalIgnoreCase))
-                        {
-                            style.layout = "Horizontal";
+                            display = null;
                         }
 
                         break;
                     case "flex-direction":
-                        if (string.Equals(declaration.Value, "column", StringComparison.OrdinalIgnoreCase))
-                        {
-                            style.layout = "Vertical";
-                        }
-                        else if (string.Equals(declaration.Value, "row", StringComparison.OrdinalIgnoreCase))
-                        {
-                            style.layout = "Horizontal";
-                        }
-                        else
+                        flexDirection = declaration.Value.Trim().ToLowerInvariant();
+                        if (flexDirection != "row"
+                            && flexDirection != "row-reverse"
+                            && flexDirection != "column"
+                            && flexDirection != "column-reverse")
                         {
                             AddError(result, path + "/@style", $"flex-direction 값 '{declaration.Value}'은 지원하지 않는다.");
+                            flexDirection = null;
+                        }
+
+                        break;
+                    case "justify-content":
+                        justifyContent = NormalizeJustifyContent(declaration.Value, path, result);
+                        break;
+                    case "align-items":
+                        alignItems = NormalizeFlexAlignment(
+                            declaration.Value,
+                            false,
+                            declaration.Key,
+                            path,
+                            result);
+                        break;
+                    case "align-self":
+                        var alignSelf = NormalizeFlexAlignment(
+                            declaration.Value,
+                            true,
+                            declaration.Key,
+                            path,
+                            result);
+                        if (alignSelf != null)
+                        {
+                            style.alignSelf = UdomCanonicalAdapter.MapAlignSelf(
+                                alignSelf,
+                                path + "/@style/align-self");
+                        }
+
+                        break;
+                    case "position":
+                        positionMode = declaration.Value.Trim().ToLowerInvariant();
+                        if (positionMode != "static" && positionMode != "absolute")
+                        {
+                            AddError(result, path + "/@style", $"position 값 '{declaration.Value}'은 지원하지 않는다.");
+                            positionMode = null;
                         }
 
                         break;
@@ -521,6 +558,35 @@ namespace Html2Vrc.Editor
                         }
 
                         break;
+                    case "flex-shrink":
+                        if (!TryParseNumber(declaration.Value, out var shrink) || shrink < 0f)
+                        {
+                            AddError(result, path + "/@style", "flex-shrink는 0 이상의 숫자여야 한다.");
+                        }
+                        else
+                        {
+                            style.flexShrink = shrink;
+                        }
+
+                        break;
+                    case "flex-basis":
+                        SetFlexBasis(declaration.Value, path, result, style);
+                        break;
+                    case "order":
+                        if (!int.TryParse(
+                                declaration.Value.Trim(),
+                                NumberStyles.Integer,
+                                CultureInfo.InvariantCulture,
+                                out var order))
+                        {
+                            AddError(result, path + "/@style", "order는 정수여야 한다.");
+                        }
+                        else
+                        {
+                            style.flexOrder = order;
+                        }
+
+                        break;
                     default:
                         AddError(result, path + "/@style", $"지원하지 않는 CSS 속성 '{declaration.Key}'.");
                         break;
@@ -528,24 +594,242 @@ namespace Html2Vrc.Editor
             }
 
             var explicitLayout = element.Get("data-layout");
+            var hasExplicitLayout = false;
             if (!string.IsNullOrWhiteSpace(explicitLayout))
             {
                 if (string.Equals(explicitLayout, "vertical", StringComparison.OrdinalIgnoreCase))
                 {
                     style.layout = "Vertical";
+                    style.reverseChildren = false;
+                    hasExplicitLayout = true;
                 }
                 else if (string.Equals(explicitLayout, "horizontal", StringComparison.OrdinalIgnoreCase))
                 {
                     style.layout = "Horizontal";
+                    style.reverseChildren = false;
+                    hasExplicitLayout = true;
                 }
                 else if (string.Equals(explicitLayout, "none", StringComparison.OrdinalIgnoreCase))
                 {
                     style.layout = "None";
+                    style.reverseChildren = false;
+                    hasExplicitLayout = true;
                 }
                 else
                 {
                     AddError(result, path + "/@data-layout", "data-layout은 vertical, horizontal, none만 지원한다.");
                 }
+            }
+
+            if (display == "none")
+            {
+                style.displayNone = true;
+                style.layout = "None";
+                style.reverseChildren = false;
+            }
+            else if (!hasExplicitLayout)
+            {
+                if (display == "block")
+                {
+                    style.layout = "None";
+                    style.reverseChildren = false;
+                }
+                else if (display == "flex")
+                {
+                    ApplyFlexDirection(style, flexDirection ?? "row");
+                }
+                else if (flexDirection != null)
+                {
+                    ApplyFlexDirection(style, flexDirection);
+                }
+            }
+
+            var isFlexLayout = string.Equals(style.layout, "Horizontal", StringComparison.OrdinalIgnoreCase)
+                               || string.Equals(style.layout, "Vertical", StringComparison.OrdinalIgnoreCase);
+            if (isFlexLayout)
+            {
+                var usesCssFlexDefaults = display == "flex" || flexDirection != null;
+                ConfigureFlexContainer(
+                    style,
+                    alignItems ?? (usesCssFlexDefaults ? "stretch" : "start"),
+                    justifyContent ?? "start",
+                    path);
+            }
+
+            if (positionMode != null)
+            {
+                style.positionAbsolute = positionMode == "absolute";
+            }
+
+            if (left.HasValue)
+            {
+                style.position[0] = left.Value;
+            }
+
+            if (top.HasValue)
+            {
+                style.position[1] = style.positionAbsolute ? top.Value : -top.Value;
+            }
+        }
+
+        private static void ApplyFlexDirection(UdomStyle style, string direction)
+        {
+            var isVertical = direction == "column" || direction == "column-reverse";
+            style.layout = isVertical ? "Vertical" : "Horizontal";
+            style.reverseChildren = direction == "row-reverse" || direction == "column-reverse";
+        }
+
+        private static void ConfigureFlexContainer(
+            UdomStyle style,
+            string alignItems,
+            string justifyContent,
+            string path)
+        {
+            var isVertical = string.Equals(style.layout, "Vertical", StringComparison.OrdinalIgnoreCase);
+            style.justifyContent = UdomCanonicalAdapter.MapJustifyContent(
+                justifyContent,
+                path + "/@style/justify-content");
+            style.childAlignment = UdomCanonicalAdapter.MapChildAlignment(
+                isVertical,
+                style.reverseChildren,
+                alignItems,
+                style.justifyContent,
+                path + "/@style/align-items");
+            var stretchesCrossAxis = alignItems == "stretch";
+            style.stretchChildrenWidth = isVertical && stretchesCrossAxis;
+            style.stretchChildrenHeight = !isVertical && stretchesCrossAxis;
+        }
+
+        private static string NormalizeJustifyContent(
+            string value,
+            string path,
+            HtmlToUdomResult result)
+        {
+            switch (value.Trim().ToLowerInvariant())
+            {
+                case "start":
+                case "flex-start":
+                    return "start";
+                case "center":
+                    return "center";
+                case "end":
+                case "flex-end":
+                    return "end";
+                case "space-between":
+                    return "space-between";
+                case "space-around":
+                    return "space-around";
+                case "space-evenly":
+                    return "space-evenly";
+                default:
+                    AddError(result, path + "/@style", $"justify-content 값 '{value}'은 지원하지 않는다.");
+                    return null;
+            }
+        }
+
+        private static string NormalizeFlexAlignment(
+            string value,
+            bool allowAuto,
+            string property,
+            string path,
+            HtmlToUdomResult result)
+        {
+            switch (value.Trim().ToLowerInvariant())
+            {
+                case "auto" when allowAuto:
+                    return "auto";
+                case "normal":
+                    return "stretch";
+                case "start":
+                case "flex-start":
+                    return "start";
+                case "center":
+                    return "center";
+                case "end":
+                case "flex-end":
+                    return "end";
+                case "stretch":
+                    return "stretch";
+                default:
+                    AddError(result, path + "/@style", $"{property} 값 '{value}'은 지원하지 않는다.");
+                    return null;
+            }
+        }
+
+        private static void SetFlexBasis(
+            string source,
+            string path,
+            HtmlToUdomResult result,
+            UdomStyle style)
+        {
+            var value = source.Trim();
+            if (string.Equals(value, "auto", StringComparison.OrdinalIgnoreCase))
+            {
+                style.flexBasis = -1f;
+                style.flexBasisIsPercent = false;
+                return;
+            }
+
+            var isPercent = value.EndsWith("%", StringComparison.Ordinal);
+            if (isPercent)
+            {
+                value = value.Substring(0, value.Length - 1).Trim();
+            }
+            else if (value.EndsWith("px", StringComparison.OrdinalIgnoreCase))
+            {
+                value = value.Substring(0, value.Length - 2).Trim();
+            }
+
+            if (!TryParseNumber(value, out var basis) || basis < 0f)
+            {
+                AddError(result, path + "/@style", "flex-basis는 auto, 0 이상의 px 숫자 또는 percentage여야 한다.");
+                return;
+            }
+
+            style.flexBasis = basis;
+            style.flexBasisIsPercent = isPercent;
+        }
+
+        private static void PrepareHtmlFlexTree(UdomNode node)
+        {
+            if (node == null || (node.style != null && node.style.displayNone))
+            {
+                return;
+            }
+
+            var style = node.style ?? new UdomStyle();
+            var isVertical = string.Equals(style.layout, "Vertical", StringComparison.OrdinalIgnoreCase);
+            var isHorizontal = string.Equals(style.layout, "Horizontal", StringComparison.OrdinalIgnoreCase);
+            var children = node.children ?? Array.Empty<UdomNode>();
+            if (isVertical || isHorizontal)
+            {
+                for (var index = 0; index < children.Length; index++)
+                {
+                    var childStyle = children[index] != null ? children[index].style : null;
+                    if (childStyle == null || childStyle.displayNone || childStyle.positionAbsolute)
+                    {
+                        continue;
+                    }
+
+                    if (childStyle.flexShrink < 0f)
+                    {
+                        childStyle.flexShrink = 1f;
+                    }
+
+                    if (isVertical)
+                    {
+                        childStyle.flexibleWidth = 0f;
+                    }
+                    else
+                    {
+                        childStyle.flexibleHeight = 0f;
+                    }
+                }
+            }
+
+            for (var index = 0; index < children.Length; index++)
+            {
+                PrepareHtmlFlexTree(children[index]);
             }
         }
 

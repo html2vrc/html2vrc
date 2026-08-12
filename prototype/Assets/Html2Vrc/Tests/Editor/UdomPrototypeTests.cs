@@ -2649,6 +2649,153 @@ namespace Html2Vrc.Tests
         }
 
         [Test]
+        public void HtmlConverter_FlexCssUsesCanonicalSizingAlignmentAndStableHierarchy()
+        {
+            const string html = @"
+              <main id=""css-flex-root"" data-canvas-size=""700 520""
+                style=""width: 700px; height: 520px; display: flex; flex-direction: column-reverse; align-items: flex-start; gap: 20px"">
+                <section id=""css-flex-row""
+                  style=""width: 600px; height: 160px; display: flex; flex-direction: row-reverse; justify-content: flex-end; align-items: center; padding: 20px; gap: 10px"">
+                  <div id=""css-flex-a"" style=""width: 80px; height: 40px; flex-grow: 1; flex-shrink: 0.5; flex-basis: 100px; order: 2""></div>
+                  <div id=""css-flex-b"" style=""width: 80px; height: 40px; flex-grow: 2; flex-basis: 50%; order: -1; align-self: flex-start""></div>
+                  <div id=""css-flex-c"" style=""width: 80px; height: 40px; flex-shrink: 0; order: 2; align-self: stretch""></div>
+                </section>
+                <section id=""css-space-row""
+                  style=""width: 400px; height: 100px; display: flex; justify-content: space-evenly; align-items: center; gap: 10px"">
+                  <div id=""css-space-first"" style=""width: 80px; height: 40px""></div>
+                  <div id=""css-space-second"" style=""width: 80px; height: 40px""></div>
+                </section>
+                <section id=""css-absolute-host"" style=""width: 100px; height: 80px; display: block"">
+                  <div id=""css-absolute"" style=""width: 50px; height: 30px; position: absolute; left: 15px; top: 25px""></div>
+                </section>
+                <div id=""css-hidden"" style=""width: 40px; height: 40px; display: none""></div>
+              </main>";
+            var conversion = HtmlToUdomConverter.Convert(html);
+
+            Assert.That(conversion.IsValid, Is.True, conversion.Format());
+            var document = conversion.Document;
+            var row = document.root.children[0];
+            var spaceRow = document.root.children[1];
+            var absolute = document.root.children[2].children[0];
+            var hidden = document.root.children[3];
+            var a = row.children[0];
+            var b = row.children[1];
+            var c = row.children[2];
+            Assert.That(document.root.style.layout, Is.EqualTo("Vertical"));
+            Assert.That(document.root.style.reverseChildren, Is.True);
+            Assert.That(document.root.style.childAlignment, Is.EqualTo("LowerLeft"));
+            Assert.That(row.style.layout, Is.EqualTo("Horizontal"));
+            Assert.That(row.style.reverseChildren, Is.True);
+            Assert.That(row.style.justifyContent, Is.EqualTo("End"));
+            Assert.That(row.style.childAlignment, Is.EqualTo("MiddleLeft"));
+            Assert.That(row.style.spacing, Is.EqualTo(10f).Within(0.001f));
+            Assert.That(row.style.useResolvedChildrenHeight, Is.True);
+            Assert.That(a.style.flexOrder, Is.EqualTo(2));
+            Assert.That(a.style.flexShrink, Is.EqualTo(0.5f));
+            Assert.That(a.style.flexBasis, Is.EqualTo(100f));
+            Assert.That(a.style.flexBasisIsPercent, Is.False);
+            Assert.That(a.style.flexibleWidth, Is.Zero);
+            Assert.That(a.style.flexibleHeight, Is.Zero);
+            Assert.That(a.style.size[0], Is.EqualTo(126.6667f).Within(0.001f));
+            Assert.That(b.style.flexOrder, Is.EqualTo(-1));
+            Assert.That(b.style.flexShrink, Is.EqualTo(1f));
+            Assert.That(b.style.flexBasis, Is.EqualTo(50f));
+            Assert.That(b.style.flexBasisIsPercent, Is.True);
+            Assert.That(b.style.alignSelf, Is.EqualTo("Start"));
+            Assert.That(b.style.size[0], Is.EqualTo(333.3333f).Within(0.001f));
+            Assert.That(b.style.alignSelfMargin, Is.EqualTo(new[] { 0f, 0f, 0f, 80f }));
+            Assert.That(c.style.flexShrink, Is.Zero);
+            Assert.That(c.style.alignSelf, Is.EqualTo("Stretch"));
+            Assert.That(c.style.size, Is.EqualTo(new[] { 80f, 120f }));
+            Assert.That(spaceRow.style.layout, Is.EqualTo("Horizontal"));
+            Assert.That(spaceRow.style.justifyContent, Is.EqualTo("SpaceEvenly"));
+            Assert.That(spaceRow.style.childAlignment, Is.EqualTo("MiddleCenter"));
+            Assert.That(spaceRow.style.spacing, Is.EqualTo(86.6667f).Within(0.001f));
+            Assert.That(absolute.style.positionAbsolute, Is.True);
+            Assert.That(absolute.style.position, Is.EqualTo(new[] { 15f, 25f }));
+            Assert.That(hidden.style.displayNone, Is.True);
+
+            var normalized = UdomValidator.Validate(conversion.Json);
+            Assert.That(normalized.IsValid, Is.True, normalized.Format());
+            Assert.That(normalized.Document.root.children[0].children[1].style.flexBasisIsPercent, Is.True);
+            Assert.That(normalized.Document.root.children[0].children[1].style.alignSelf, Is.EqualTo("Start"));
+
+            var build = UdomBuilder.GenerateOrRegenerate(document);
+            var root = build.Root;
+            var rootRect = UdomBuilder.FindNode(root, "css-flex-root").GetComponent<RectTransform>();
+            var rowObject = UdomBuilder.FindNode(root, "css-flex-row").gameObject;
+            var spaceRowObject = UdomBuilder.FindNode(root, "css-space-row").gameObject;
+            Canvas.ForceUpdateCanvases();
+            LayoutRebuilder.ForceRebuildLayoutImmediate(rootRect);
+            LayoutRebuilder.ForceRebuildLayoutImmediate(rowObject.GetComponent<RectTransform>());
+            LayoutRebuilder.ForceRebuildLayoutImmediate(spaceRowObject.GetComponent<RectTransform>());
+
+            Assert.That(rowObject.GetComponent<HorizontalLayoutGroup>().childAlignment, Is.EqualTo(TextAnchor.MiddleLeft));
+            Assert.That(UdomBuilder.FindNode(root, "css-absolute-host").transform.GetSiblingIndex(), Is.EqualTo(0));
+            Assert.That(spaceRowObject.transform.GetSiblingIndex(), Is.EqualTo(1));
+            Assert.That(rowObject.transform.GetSiblingIndex(), Is.EqualTo(2));
+            Assert.That(UdomBuilder.FindNode(root, "css-flex-c").transform.GetSiblingIndex(), Is.EqualTo(0));
+            Assert.That(UdomBuilder.FindNode(root, "css-flex-a").transform.GetSiblingIndex(), Is.EqualTo(1));
+            Assert.That(UdomBuilder.FindNode(root, "css-flex-b::__margin").transform.GetSiblingIndex(), Is.EqualTo(2));
+            Assert.That(
+                UdomBuilder.FindNode(root, "css-flex-a").GetComponent<RectTransform>().localPosition.y,
+                Is.Zero.Within(0.001f));
+            AssertAlignedWithinMargin(
+                root,
+                "css-flex-b",
+                new Vector2(333.3333f, 40f),
+                new Vector2(0f, 40f),
+                new Vector2(333.3333f, 120f));
+            Assert.That(
+                UdomBuilder.FindNode(root, "css-flex-c").GetComponent<RectTransform>().rect.height,
+                Is.EqualTo(120f).Within(0.001f));
+            Assert.That(
+                UdomBuilder.FindNode(root, "css-space-first").GetComponent<RectTransform>().localPosition.x,
+                Is.EqualTo(-83.3333f).Within(0.001f));
+            Assert.That(
+                UdomBuilder.FindNode(root, "css-space-second").GetComponent<RectTransform>().localPosition.x,
+                Is.EqualTo(83.3333f).Within(0.001f));
+            Assert.That(
+                UdomBuilder.FindNode(root, "css-absolute").GetComponent<RectTransform>().anchoredPosition,
+                Is.EqualTo(new Vector2(15f, -25f)));
+            Assert.That(UdomBuilder.FindNode(root, "css-hidden"), Is.Null);
+
+            var originalB = UdomBuilder.FindNode(root, "css-flex-b").gameObject;
+            var changed = HtmlToUdomConverter.Convert(
+                html.Replace("align-self: flex-start", "align-self: auto")
+                    .Replace("display: none", "display: block"));
+            Assert.That(changed.IsValid, Is.True, changed.Format());
+            var regenerated = UdomBuilder.GenerateOrRegenerate(changed.Document, root);
+            Assert.That(UdomBuilder.FindNode(root, "css-flex-b").gameObject, Is.SameAs(originalB));
+            Assert.That(UdomBuilder.FindNode(root, "css-flex-b::__margin"), Is.Null);
+            Assert.That(UdomBuilder.FindNode(root, "css-hidden"), Is.Not.Null);
+            Assert.That(regenerated.Created, Is.GreaterThan(0));
+            Assert.That(regenerated.Removed, Is.GreaterThan(0));
+            Object.DestroyImmediate(root.gameObject);
+        }
+
+        [Test]
+        public void HtmlConverter_RejectsUnsupportedFlexCssValues()
+        {
+            const string html = @"
+              <main id=""invalid-flex""
+                style=""display: flex; justify-content: left; align-items: baseline"">
+                <div id=""invalid-item""
+                  style=""align-self: baseline; flex-shrink: -1; flex-basis: calc(50% - 2px); order: 1.5""></div>
+              </main>";
+
+            var conversion = HtmlToUdomConverter.Convert(html);
+
+            Assert.That(conversion.IsValid, Is.False);
+            Assert.That(conversion.Format(), Does.Contain("justify-content"));
+            Assert.That(conversion.Format(), Does.Contain("align-items"));
+            Assert.That(conversion.Format(), Does.Contain("align-self"));
+            Assert.That(conversion.Format(), Does.Contain("flex-shrink"));
+            Assert.That(conversion.Format(), Does.Contain("flex-basis"));
+            Assert.That(conversion.Format(), Does.Contain("order"));
+        }
+
+        [Test]
         public void HtmlConverter_GeneratesNativeUiAndRegeneratesWithoutDuplicates()
         {
             var html = AssetDatabase.LoadAssetAtPath<TextAsset>(SampleHtmlPath);
