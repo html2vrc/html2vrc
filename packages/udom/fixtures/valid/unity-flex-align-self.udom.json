@@ -1,0 +1,323 @@
+{
+  "asset": {
+    "version": "0.1",
+    "generator": "@html2vrc/udom Unity flex align-self fixture"
+  },
+  "viewport": {
+    "width": 760,
+    "height": 680
+  },
+  "styles": [
+    {
+      "id": "align-item",
+      "style": {
+        "layout": {
+          "width": 90,
+          "height": 40
+        }
+      }
+    }
+  ],
+  "root": {
+    "type": "element",
+    "id": "align-self-root",
+    "name": "view",
+    "style": {
+      "layout": {
+        "mode": "flex",
+        "width": "100%",
+        "height": "100%",
+        "padding": {
+          "top": 20,
+          "right": 20,
+          "bottom": 20,
+          "left": 20
+        },
+        "flex": {
+          "direction": "column",
+          "alignItems": "start",
+          "rowGap": 10
+        }
+      }
+    },
+    "children": [
+      {
+        "type": "element",
+        "id": "stretch-parent",
+        "name": "view",
+        "style": {
+          "layout": {
+            "mode": "flex",
+            "width": 640,
+            "height": 160,
+            "padding": {
+              "top": 20,
+              "right": 20,
+              "bottom": 20,
+              "left": 20
+            },
+            "flex": {
+              "direction": "row",
+              "alignItems": "stretch",
+              "columnGap": 10
+            }
+          }
+        },
+        "children": [
+          {
+            "type": "element",
+            "id": "stretch-auto",
+            "name": "view",
+            "styleRefs": [
+              "align-item"
+            ]
+          },
+          {
+            "type": "element",
+            "id": "stretch-start",
+            "name": "view",
+            "styleRefs": [
+              "align-item"
+            ],
+            "style": {
+              "layout": {
+                "margin": {
+                  "top": 5,
+                  "bottom": 5
+                },
+                "flexItem": {
+                  "alignSelf": "start"
+                }
+              }
+            }
+          },
+          {
+            "type": "element",
+            "id": "stretch-center",
+            "name": "view",
+            "styleRefs": [
+              "align-item"
+            ],
+            "style": {
+              "layout": {
+                "margin": {
+                  "top": 10
+                },
+                "flexItem": {
+                  "alignSelf": "center"
+                }
+              },
+              "transform": {
+                "operations": [
+                  {
+                    "type": "rotate",
+                    "degrees": 5
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "type": "element",
+            "id": "stretch-end",
+            "name": "view",
+            "styleRefs": [
+              "align-item"
+            ],
+            "style": {
+              "layout": {
+                "flexItem": {
+                  "alignSelf": "end"
+                }
+              }
+            }
+          },
+          {
+            "type": "element",
+            "id": "stretch-limited",
+            "name": "view",
+            "styleRefs": [
+              "align-item"
+            ],
+            "style": {
+              "layout": {
+                "maxHeight": 70,
+                "margin": {
+                  "top": 5,
+                  "bottom": 5
+                },
+                "flexItem": {
+                  "alignSelf": "stretch"
+                }
+              }
+            }
+          }
+        ]
+      },
+      {
+        "type": "element",
+        "id": "center-parent",
+        "name": "view",
+        "style": {
+          "layout": {
+            "mode": "flex",
+            "width": 640,
+            "height": 140,
+            "padding": {
+              "top": 20,
+              "right": 20,
+              "bottom": 20,
+              "left": 20
+            },
+            "flex": {
+              "direction": "row",
+              "alignItems": "center",
+              "columnGap": 10
+            }
+          }
+        },
+        "children": [
+          {
+            "type": "element",
+            "id": "center-auto",
+            "name": "view",
+            "styleRefs": [
+              "align-item"
+            ]
+          },
+          {
+            "type": "element",
+            "id": "center-start",
+            "name": "view",
+            "styleRefs": [
+              "align-item"
+            ],
+            "style": {
+              "layout": {
+                "flexItem": {
+                  "alignSelf": "start"
+                }
+              }
+            }
+          },
+          {
+            "type": "element",
+            "id": "center-end",
+            "name": "view",
+            "styleRefs": [
+              "align-item"
+            ],
+            "style": {
+              "layout": {
+                "flexItem": {
+                  "alignSelf": "end"
+                }
+              }
+            }
+          },
+          {
+            "type": "element",
+            "id": "center-stretch",
+            "name": "view",
+            "styleRefs": [
+              "align-item"
+            ],
+            "style": {
+              "layout": {
+                "flexItem": {
+                  "alignSelf": "stretch"
+                }
+              }
+            }
+          }
+        ]
+      },
+      {
+        "type": "element",
+        "id": "column-parent",
+        "name": "view",
+        "style": {
+          "layout": {
+            "mode": "flex",
+            "width": 200,
+            "height": 280,
+            "padding": {
+              "top": 20,
+              "right": 20,
+              "bottom": 20,
+              "left": 20
+            },
+            "flex": {
+              "direction": "column-reverse",
+              "alignItems": "start",
+              "rowGap": 10
+            }
+          }
+        },
+        "children": [
+          {
+            "type": "element",
+            "id": "column-center",
+            "name": "view",
+            "style": {
+              "layout": {
+                "width": 40,
+                "height": 50,
+                "flexItem": {
+                  "alignSelf": "center"
+                }
+              }
+            }
+          },
+          {
+            "type": "element",
+            "id": "column-end",
+            "name": "view",
+            "style": {
+              "layout": {
+                "width": 40,
+                "height": 50,
+                "flexItem": {
+                  "alignSelf": "end"
+                }
+              }
+            }
+          },
+          {
+            "type": "element",
+            "id": "column-stretch",
+            "name": "view",
+            "style": {
+              "layout": {
+                "width": 40,
+                "height": 50,
+                "maxWidth": 90,
+                "margin": {
+                  "right": 5,
+                  "left": 5
+                },
+                "flexItem": {
+                  "alignSelf": "stretch"
+                }
+              }
+            }
+          },
+          {
+            "type": "element",
+            "id": "column-overflow-start",
+            "name": "view",
+            "style": {
+              "layout": {
+                "width": 200,
+                "height": 50,
+                "flexItem": {
+                  "alignSelf": "start"
+                }
+              }
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -95,7 +95,7 @@ namespace Html2Vrc.Editor
             "backgroundGradientRadius", "backgroundGradientRadiusIsPercent",
             "cornerRadius", "cornerRadiusPercent", "borderWidth", "borderColor", "textColor", "fontSize",
             "lineHeight", "letterSpacing", "textWrap", "textOverflow", "preserveWhitespace",
-            "alignment", "fontStyle", "childAlignment", "justifyContent",
+            "alignment", "fontStyle", "childAlignment", "justifyContent", "alignSelf", "alignSelfMargin",
             "shadowOffsets", "shadowBlurs", "shadowSpreads", "shadowColors", "shadowInsets",
             "stretchChildrenWidth", "stretchChildrenHeight", "useResolvedChildrenWidth", "useResolvedChildrenHeight",
             "reverseChildren", "flexOrder", "flexShrink", "flexBasis", "flexBasisIsPercent",
@@ -397,6 +397,7 @@ namespace Html2Vrc.Editor
             ValidateBooleanVector(style.autoSize, 2, path + ".autoSize", result);
             ValidateVector(style.padding, 4, path + ".padding", result, requirePositive: false, requireNonNegative: true);
             ValidateVector(style.margin, 4, path + ".margin", result, requirePositive: false, requireNonNegative: true);
+            ValidateVector(style.alignSelfMargin, 4, path + ".alignSelfMargin", result, requirePositive: false);
             ValidateVector(
                 style.borderWidth,
                 4,
@@ -498,6 +499,15 @@ namespace Html2Vrc.Editor
                 && !string.Equals(style.justifyContent, "SpaceEvenly", StringComparison.Ordinal))
             {
                 AddError(result, path + ".justifyContent", $"지원하지 않는 flex justify '{style.justifyContent}'.");
+            }
+
+            if (!string.Equals(style.alignSelf, "Auto", StringComparison.Ordinal)
+                && !string.Equals(style.alignSelf, "Start", StringComparison.Ordinal)
+                && !string.Equals(style.alignSelf, "Center", StringComparison.Ordinal)
+                && !string.Equals(style.alignSelf, "End", StringComparison.Ordinal)
+                && !string.Equals(style.alignSelf, "Stretch", StringComparison.Ordinal))
+            {
+                AddError(result, path + ".alignSelf", $"지원하지 않는 flex alignSelf '{style.alignSelf}'.");
             }
 
             if ((style.flexShrink < 0f && !Mathf.Approximately(style.flexShrink, -1f))

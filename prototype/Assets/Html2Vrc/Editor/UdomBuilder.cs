@@ -478,7 +478,8 @@ namespace Html2Vrc.Editor
             }
 
             var actualParent = parent;
-            var hasMargin = HasNonZero(style.margin);
+            var effectiveMargin = GetEffectiveMargin(style);
+            var hasMargin = HasNonZero(effectiveMargin);
             var hasTransform = HasTransform(style);
             var hasOuterShadows = HasRenderableOuterShadow(style);
             var hasSiblingInsetShadows = RequiresSiblingInsetShadow(node, style);
@@ -513,7 +514,7 @@ namespace Html2Vrc.Editor
                     transformLayout.transform.SetSiblingIndex(0);
                     ConfigureInsideMargin(
                         transformLayout.GetComponent<RectTransform>(),
-                        style.margin);
+                        effectiveMargin);
                 }
                 else
                 {
@@ -543,7 +544,7 @@ namespace Html2Vrc.Editor
                     shadowLayout.transform.SetSiblingIndex(0);
                     ConfigureInsideMargin(
                         shadowLayout.GetComponent<RectTransform>(),
-                        style.margin);
+                        effectiveMargin);
                 }
                 else
                 {
@@ -595,7 +596,7 @@ namespace Html2Vrc.Editor
             else if (hasMargin)
             {
                 nodeObject.transform.SetSiblingIndex(0);
-                ConfigureInsideMargin(nodeObject.GetComponent<RectTransform>(), style.margin);
+                ConfigureInsideMargin(nodeObject.GetComponent<RectTransform>(), effectiveMargin);
             }
             else
             {
@@ -1228,7 +1229,7 @@ namespace Html2Vrc.Editor
 
         private static void ConfigureMarginWrapper(GameObject wrapper, UdomStyle style, Transform parent)
         {
-            var margin = GetEdges(style.margin);
+            var margin = GetEdges(GetEffectiveMargin(style));
             var size = GetVector2(style.size, new Vector2(100f, 100f));
             var wrapperStyle = new UdomStyle
             {
@@ -1249,6 +1250,23 @@ namespace Html2Vrc.Editor
                 flexibleHeight = style.flexibleHeight
             };
             ConfigureRect(wrapper, wrapperStyle, parent);
+        }
+
+        private static float[] GetEffectiveMargin(UdomStyle style)
+        {
+            var margin = style.margin != null && style.margin.Length >= 4
+                ? style.margin
+                : new[] { 0f, 0f, 0f, 0f };
+            var alignment = style.alignSelfMargin != null && style.alignSelfMargin.Length >= 4
+                ? style.alignSelfMargin
+                : new[] { 0f, 0f, 0f, 0f };
+            return new[]
+            {
+                margin[0] + alignment[0],
+                margin[1] + alignment[1],
+                margin[2] + alignment[2],
+                margin[3] + alignment[3]
+            };
         }
 
         private static void ConfigureInsideMargin(RectTransform rect, float[] marginValues)
@@ -1493,7 +1511,7 @@ namespace Html2Vrc.Editor
             var style = node.style ?? new UdomStyle();
             if (style.positionAbsolute)
             {
-                var hasMargin = HasNonZero(style.margin);
+                var hasMargin = HasNonZero(GetEffectiveMargin(style));
                 var hasTransform = HasTransform(style);
                 var hasStackedShadows = HasRenderableOuterShadow(style)
                                         || RequiresSiblingInsetShadow(node, style);

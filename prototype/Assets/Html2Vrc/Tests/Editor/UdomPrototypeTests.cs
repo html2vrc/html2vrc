@@ -1230,6 +1230,132 @@ namespace Html2Vrc.Tests
         }
 
         [Test]
+        public void CanonicalFlexAlignSelf_OverridesCrossAxisAndReusesMarginWrappers()
+        {
+            var json = LoadRepositoryFile(
+                "packages",
+                "udom",
+                "fixtures",
+                "valid",
+                "unity-flex-align-self.udom.json");
+            var validation = UdomValidator.Validate(json);
+
+            Assert.That(validation.IsValid, Is.True, validation.Format());
+            Assert.That(validation.Issues, Is.Empty, validation.Format());
+
+            var document = validation.Document;
+            var stretchParent = document.root.children[0];
+            var centerParent = document.root.children[1];
+            var columnParent = document.root.children[2];
+            Assert.That(stretchParent.style.useResolvedChildrenHeight, Is.True);
+            Assert.That(centerParent.style.useResolvedChildrenHeight, Is.True);
+            Assert.That(columnParent.style.reverseChildren, Is.True);
+            Assert.That(stretchParent.children.Select(child => child.style.alignSelf), Is.EqualTo(new[]
+            {
+                "Auto", "Start", "Center", "End", "Stretch"
+            }));
+            Assert.That(stretchParent.children[0].style.size[1], Is.EqualTo(120f));
+            Assert.That(stretchParent.children[1].style.margin, Is.EqualTo(new[] { 0f, 5f, 0f, 5f }));
+            Assert.That(stretchParent.children[1].style.alignSelfMargin, Is.EqualTo(new[] { 0f, 0f, 0f, 70f }));
+            Assert.That(stretchParent.children[2].style.alignSelfMargin, Is.EqualTo(new[] { 0f, 35f, 0f, 35f }));
+            Assert.That(stretchParent.children[3].style.alignSelfMargin, Is.EqualTo(new[] { 0f, 80f, 0f, 0f }));
+            Assert.That(stretchParent.children[4].style.size[1], Is.EqualTo(70f));
+            Assert.That(stretchParent.children[4].style.alignSelfMargin, Is.EqualTo(new[] { 0f, 0f, 0f, 40f }));
+            Assert.That(centerParent.children[1].style.alignSelfMargin, Is.EqualTo(new[] { 0f, 0f, 0f, 60f }));
+            Assert.That(centerParent.children[2].style.alignSelfMargin, Is.EqualTo(new[] { 0f, 60f, 0f, 0f }));
+            Assert.That(centerParent.children[3].style.size[1], Is.EqualTo(100f));
+            Assert.That(columnParent.children[0].style.alignSelfMargin, Is.EqualTo(new[] { 60f, 0f, 60f, 0f }));
+            Assert.That(columnParent.children[1].style.alignSelfMargin, Is.EqualTo(new[] { 120f, 0f, 0f, 0f }));
+            Assert.That(columnParent.children[2].style.size[0], Is.EqualTo(90f));
+            Assert.That(columnParent.children[2].style.alignSelfMargin, Is.EqualTo(new[] { 0f, 0f, 60f, 0f }));
+            Assert.That(columnParent.children[3].style.alignSelfMargin, Is.EqualTo(new[] { 0f, 0f, -40f, 0f }));
+
+            var normalized = UdomJsonWriter.Write(document);
+            var roundTrip = UdomValidator.Validate(normalized);
+            Assert.That(roundTrip.IsValid, Is.True, roundTrip.Format());
+            Assert.That(roundTrip.Document.root.children[0].children[2].style.alignSelf, Is.EqualTo("Center"));
+            Assert.That(
+                roundTrip.Document.root.children[2].children[3].style.alignSelfMargin,
+                Is.EqualTo(new[] { 0f, 0f, -40f, 0f }));
+            Assert.That(
+                roundTrip.Document.root.children[0].children[1].style.margin,
+                Is.EqualTo(new[] { 0f, 5f, 0f, 5f }));
+
+            var build = UdomBuilder.GenerateOrRegenerate(document);
+            var root = build.Root;
+            var stretchParentObject = UdomBuilder.FindNode(root, "stretch-parent").gameObject;
+            var centerParentObject = UdomBuilder.FindNode(root, "center-parent").gameObject;
+            var columnParentObject = UdomBuilder.FindNode(root, "column-parent").gameObject;
+            Canvas.ForceUpdateCanvases();
+            LayoutRebuilder.ForceRebuildLayoutImmediate(
+                stretchParentObject.GetComponent<RectTransform>());
+            LayoutRebuilder.ForceRebuildLayoutImmediate(
+                centerParentObject.GetComponent<RectTransform>());
+            LayoutRebuilder.ForceRebuildLayoutImmediate(
+                columnParentObject.GetComponent<RectTransform>());
+
+            var stretchGroup = stretchParentObject.GetComponent<HorizontalLayoutGroup>();
+            Assert.That(stretchGroup.childControlHeight, Is.False);
+            Assert.That(stretchGroup.childForceExpandHeight, Is.False);
+            Assert.That(
+                UdomBuilder.FindNode(root, "stretch-auto").GetComponent<RectTransform>().rect.height,
+                Is.EqualTo(120f).Within(0.001f));
+            AssertAlignedWithinMargin(root, "stretch-start", new Vector2(90f, 40f), new Vector2(0f, 35f), new Vector2(90f, 120f));
+            AssertAlignedWithinMargin(
+                root,
+                "stretch-center",
+                new Vector2(90f, 40f),
+                new Vector2(0f, -5f),
+                new Vector2(90f, 120f),
+                "::__transform-layout");
+            AssertAlignedWithinMargin(root, "stretch-end", new Vector2(90f, 40f), new Vector2(0f, -40f), new Vector2(90f, 120f));
+            AssertAlignedWithinMargin(root, "stretch-limited", new Vector2(90f, 70f), new Vector2(0f, 20f), new Vector2(90f, 120f));
+
+            Assert.That(
+                UdomBuilder.FindNode(root, "center-auto").GetComponent<RectTransform>().localPosition.y,
+                Is.Zero.Within(0.001f));
+            AssertAlignedWithinMargin(root, "center-start", new Vector2(90f, 40f), new Vector2(0f, 30f), new Vector2(90f, 100f));
+            AssertAlignedWithinMargin(root, "center-end", new Vector2(90f, 40f), new Vector2(0f, -30f), new Vector2(90f, 100f));
+            Assert.That(UdomBuilder.FindNode(root, "center-stretch::__margin"), Is.Null);
+            Assert.That(
+                UdomBuilder.FindNode(root, "center-stretch").GetComponent<RectTransform>().rect.height,
+                Is.EqualTo(100f).Within(0.001f));
+
+            AssertAlignedWithinMargin(root, "column-center", new Vector2(40f, 50f), Vector2.zero, new Vector2(160f, 50f));
+            AssertAlignedWithinMargin(root, "column-end", new Vector2(40f, 50f), new Vector2(60f, 0f), new Vector2(160f, 50f));
+            AssertAlignedWithinMargin(root, "column-stretch", new Vector2(90f, 50f), new Vector2(-30f, 0f), new Vector2(160f, 50f));
+            AssertAlignedWithinMargin(root, "column-overflow-start", new Vector2(200f, 50f), new Vector2(20f, 0f), new Vector2(160f, 50f));
+            Assert.That(UdomBuilder.FindNode(root, "column-overflow-start::__margin").transform.GetSiblingIndex(), Is.EqualTo(0));
+            Assert.That(UdomBuilder.FindNode(root, "column-center::__margin").transform.GetSiblingIndex(), Is.EqualTo(3));
+
+            var originalCenterStart = UdomBuilder.FindNode(root, "center-start").gameObject;
+            var originalCenterStartMargin = UdomBuilder.FindNode(root, "center-start::__margin").gameObject;
+            var repeated = UdomValidator.Validate(json);
+            var regenerated = UdomBuilder.GenerateOrRegenerate(repeated.Document, root);
+            Assert.That(regenerated.Created, Is.Zero);
+            Assert.That(UdomBuilder.FindNode(root, "center-start").gameObject, Is.SameAs(originalCenterStart));
+            Assert.That(UdomBuilder.FindNode(root, "center-start::__margin").gameObject, Is.SameAs(originalCenterStartMargin));
+
+            var autoJson = json.Replace("\"alignSelf\": \"start\"", "\"alignSelf\": \"auto\"");
+            var autoValidation = UdomValidator.Validate(autoJson);
+            Assert.That(autoValidation.IsValid, Is.True, autoValidation.Format());
+            var autoBuild = UdomBuilder.GenerateOrRegenerate(autoValidation.Document, root);
+            Assert.That(autoBuild.Removed, Is.GreaterThan(0));
+            Assert.That(UdomBuilder.FindNode(root, "center-start").gameObject, Is.SameAs(originalCenterStart));
+            Assert.That(UdomBuilder.FindNode(root, "center-start::__margin"), Is.Null);
+            Assert.That(UdomBuilder.FindNode(root, "column-overflow-start::__margin"), Is.Null);
+            Assert.That(UdomBuilder.FindNode(root, "stretch-start::__margin"), Is.Not.Null);
+
+            Object.DestroyImmediate(root.gameObject);
+
+            var invalid = UdomValidator.Validate(json.Replace(
+                "\"alignSelf\": \"center\"",
+                "\"alignSelf\": \"baseline\""));
+            Assert.That(invalid.IsValid, Is.False);
+            Assert.That(invalid.Format(), Does.Contain("alignSelf"));
+        }
+
+        [Test]
         public void CanonicalAbsolutePosition_LeavesFlexFlowAndUsesTopLeftCoordinates()
         {
             var json = LoadRepositoryFile(
@@ -2828,6 +2954,34 @@ namespace Html2Vrc.Tests
             Assert.That(panel.activeSelf, Is.False, "Close button must disable the panel during Play Mode.");
 
             yield return new ExitPlayMode();
+        }
+
+        private static void AssertAlignedWithinMargin(
+            UdomGeneratedRoot root,
+            string nodeId,
+            Vector2 expectedContentSize,
+            Vector2 expectedContentPosition,
+            Vector2 expectedWrapperSize,
+            string contentSuffix = "")
+        {
+            var wrapper = UdomBuilder.FindNode(root, nodeId + "::__margin");
+            var content = UdomBuilder.FindNode(root, nodeId + contentSuffix);
+            Assert.That(wrapper, Is.Not.Null, nodeId + " alignment wrapper");
+            Assert.That(content, Is.Not.Null, nodeId + " aligned content");
+            var wrapperRect = wrapper.GetComponent<RectTransform>();
+            var contentRect = content.GetComponent<RectTransform>();
+            Assert.That(wrapperRect.rect.width, Is.EqualTo(expectedWrapperSize.x).Within(0.001f));
+            Assert.That(wrapperRect.rect.height, Is.EqualTo(expectedWrapperSize.y).Within(0.001f));
+            Assert.That(contentRect.rect.width, Is.EqualTo(expectedContentSize.x).Within(0.001f));
+            Assert.That(contentRect.rect.height, Is.EqualTo(expectedContentSize.y).Within(0.001f));
+            Assert.That(
+                contentRect.anchoredPosition.x,
+                Is.EqualTo(expectedContentPosition.x).Within(0.001f),
+                nodeId + " content x");
+            Assert.That(
+                contentRect.anchoredPosition.y,
+                Is.EqualTo(expectedContentPosition.y).Within(0.001f),
+                nodeId + " content y");
         }
 
         private static void AssertImageContent(

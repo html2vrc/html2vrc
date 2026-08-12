@@ -403,6 +403,18 @@ namespace Html2Vrc.Editor
                 style.justifyContent = GetString(value, "justifyContent");
             }
 
+            if (value.TryGetValue("alignSelf", out _))
+            {
+                style.alignSelf = GetString(value, "alignSelf");
+            }
+
+            if (value.TryGetValue("alignSelfMargin", out var alignSelfMargin))
+            {
+                style.alignSelfMargin = GetFloatArray(
+                    alignSelfMargin,
+                    path + ".alignSelfMargin");
+            }
+
             if (value.TryGetValue("stretchChildrenWidth", out var stretchChildrenWidth))
             {
                 style.stretchChildrenWidth = GetBoolean(

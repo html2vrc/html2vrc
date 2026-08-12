@@ -1420,10 +1420,16 @@ namespace Html2Vrc.Editor
             {
                 var flexItem = RequireObject(flexItemValue, path + ".flexItem");
                 EnsureOnlyKeys(flexItem, path + ".flexItem", "grow", "shrink", "basis", "alignSelf", "order");
-                RejectPresent(flexItem, path + ".flexItem", "alignSelf", "flex alignSelf is not supported yet");
                 if (flexItem.TryGetValue("order", out var orderValue))
                 {
                     result.Style.flexOrder = RequireInteger(orderValue, path + ".flexItem.order");
+                }
+
+                if (flexItem.TryGetValue("alignSelf", out var alignSelfValue))
+                {
+                    result.Style.alignSelf = MapAlignSelf(
+                        RequireString(alignSelfValue, path + ".flexItem.alignSelf"),
+                        path + ".flexItem.alignSelf");
                 }
 
                 if (flexItem.TryGetValue("shrink", out var shrinkValue))
@@ -1482,6 +1488,25 @@ namespace Html2Vrc.Editor
 
             style.flexBasis = basis;
             style.flexBasisIsPercent = isPercent;
+        }
+
+        private static string MapAlignSelf(string value, string path)
+        {
+            switch (value)
+            {
+                case "auto":
+                    return "Auto";
+                case "start":
+                    return "Start";
+                case "center":
+                    return "Center";
+                case "end":
+                    return "End";
+                case "stretch":
+                    return "Stretch";
+                default:
+                    throw new FormatException($"{path}: unsupported flex item alignment '{value}'.");
+            }
         }
 
         private static float MapConstraintLength(
@@ -1601,7 +1626,9 @@ namespace Html2Vrc.Editor
                 }
 
                 flowChildCount++;
-                if (HasLayoutConstraint(childStyle) || HasCanonicalFlexSizing(childStyle))
+                if (HasLayoutConstraint(childStyle)
+                    || HasCanonicalFlexSizing(childStyle)
+                    || HasExplicitAlignSelf(childStyle))
                 {
                     requiresSizeResolution = true;
                 }
@@ -1628,8 +1655,10 @@ namespace Html2Vrc.Editor
                                       && (crossAxis == 0 && node.scrollHorizontal
                                           || crossAxis == 1 && node.scrollVertical);
             var stretchCrossForSizing = stretchCross && !allowsCrossOverflow;
-            var resolveCrossAxis = stretchCrossForSizing
-                                   && RequiresCrossAxisResolution(children, crossAxis);
+            var hasExplicitAlignSelf = HasExplicitAlignSelf(children);
+            var resolveCrossAxis = (stretchCrossForSizing
+                                    && RequiresCrossAxisResolution(children, crossAxis))
+                                   || hasExplicitAlignSelf;
             var allowsMainOverflow = string.Equals(node.type, "ScrollView", StringComparison.OrdinalIgnoreCase)
                                      && (mainAxis == 0 && node.scrollHorizontal
                                          || mainAxis == 1 && node.scrollVertical);
@@ -1649,9 +1678,10 @@ namespace Html2Vrc.Editor
                 }
 
                 var margins = GetAxisMargins(childStyle, mainAxis);
+                var stretchesCross = StretchesCrossAxis(childStyle, stretchCrossForSizing);
                 var preserveAspect = HasAspectRatio(childStyle)
                                      && IsAutoSize(childStyle, crossAxis)
-                                     && !stretchCrossForSizing;
+                                     && !stretchesCross;
                 var minimum = GetEffectiveMinimumSize(childStyle, mainAxis, preserveAspect);
                 var maximum = GetEffectiveMaximumSize(childStyle, mainAxis, preserveAspect);
                 var fallbackSize = childStyle.size != null && childStyle.size.Length >= 2
@@ -1774,14 +1804,15 @@ namespace Html2Vrc.Editor
                     0f,
                     allocatedOuterSizes[index] - GetAxisMargins(childStyle, mainAxis));
 
-                if (stretchCrossForSizing)
+                var stretchesCross = StretchesCrossAxis(childStyle, stretchCrossForSizing);
+                if (stretchesCross)
                 {
                     size[crossAxis] = ClampSizeAxis(
                         childStyle,
                         crossAxis,
                         Math.Max(0f, crossAvailable - GetAxisMargins(childStyle, crossAxis)));
                 }
-                else if (!stretchCrossForSizing
+                else if (!stretchesCross
                          && HasAspectRatio(childStyle)
                          && IsAutoSize(childStyle, crossAxis))
                 {
@@ -1797,6 +1828,7 @@ namespace Html2Vrc.Editor
                     size[1] = ClampSizeAxis(childStyle, 1, size[1]);
                 }
 
+                ApplyAlignSelfMargins(childStyle, crossAxis, crossAvailable, size[crossAxis]);
                 childStyle.size = size;
                 if (mainAxis == 0)
                 {
@@ -1875,6 +1907,74 @@ namespace Html2Vrc.Editor
         private static bool HasCanonicalFlexSizing(UdomStyle style)
         {
             return style != null && (style.flexShrink >= 0f || style.flexBasis >= 0f);
+        }
+
+        private static bool HasExplicitAlignSelf(UdomStyle style)
+        {
+            return style != null
+                   && !string.Equals(style.alignSelf, "Auto", StringComparison.Ordinal);
+        }
+
+        private static bool HasExplicitAlignSelf(UdomNode[] children)
+        {
+            for (var index = 0; index < children.Length; index++)
+            {
+                var childStyle = children[index] != null ? children[index].style : null;
+                if (childStyle != null
+                    && !childStyle.displayNone
+                    && !childStyle.positionAbsolute
+                    && HasExplicitAlignSelf(childStyle))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool StretchesCrossAxis(UdomStyle style, bool parentStretches)
+        {
+            return string.Equals(style.alignSelf, "Stretch", StringComparison.Ordinal)
+                   || (string.Equals(style.alignSelf, "Auto", StringComparison.Ordinal)
+                       && parentStretches);
+        }
+
+        private static void ApplyAlignSelfMargins(
+            UdomStyle style,
+            int crossAxis,
+            float crossAvailable,
+            float crossSize)
+        {
+            if (!HasExplicitAlignSelf(style))
+            {
+                return;
+            }
+
+            var margin = style.margin != null && style.margin.Length >= 4
+                ? style.margin
+                : new[] { 0f, 0f, 0f, 0f };
+            var leadingIndex = crossAxis == 0 ? 0 : 1;
+            var trailingIndex = crossAxis == 0 ? 2 : 3;
+            var slack = crossAvailable
+                        - crossSize
+                        - margin[leadingIndex]
+                        - margin[trailingIndex];
+            var synthetic = new[] { 0f, 0f, 0f, 0f };
+            if (string.Equals(style.alignSelf, "Center", StringComparison.Ordinal))
+            {
+                synthetic[leadingIndex] = slack * 0.5f;
+                synthetic[trailingIndex] = slack * 0.5f;
+            }
+            else if (string.Equals(style.alignSelf, "End", StringComparison.Ordinal))
+            {
+                synthetic[leadingIndex] = slack;
+            }
+            else
+            {
+                synthetic[trailingIndex] = slack;
+            }
+
+            style.alignSelfMargin = synthetic;
         }
 
         private static bool HasCrossAxisConstraint(UdomStyle style, int crossAxis)

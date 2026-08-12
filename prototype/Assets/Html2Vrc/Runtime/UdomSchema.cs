@@ -102,6 +102,8 @@ namespace Html2Vrc
         public string fontStyle = "Normal";
         public string childAlignment = "UpperLeft";
         public string justifyContent = "Start";
+        public string alignSelf = "Auto";
+        public float[] alignSelfMargin = { 0f, 0f, 0f, 0f };
         public bool stretchChildrenWidth;
         public bool stretchChildrenHeight;
         public bool useResolvedChildrenWidth;

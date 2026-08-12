@@ -108,6 +108,8 @@ Canonical layout의 `minWidth`, `minHeight`, `maxWidth`, `maxHeight`, `aspectRat
 
 Canonical flex item의 `grow`, 기본값 1인 `shrink`, 숫자·percentage·`auto` `basis`를 지원합니다. Basis에서 시작한 여유 공간은 grow 비율로, 부족한 공간은 `shrink × basis` 비율로 나누며 min/max에 닿은 항목을 고정한 뒤 나머지 항목에 재분배합니다. Margin과 gap은 줄이지 않고, 활성 Scroll 축은 콘텐츠 overflow를 유지합니다.
 
+Canonical flex item의 `alignSelf`는 `auto`, `start`, `center`, `end`, `stretch`를 지원합니다. 개별 항목이 부모의 `alignItems`를 교차축에서 override하고, 기존 margin과 min/max 제약을 보존하며, overflow가 있어도 canonical start 기준을 유지합니다. Unity에서는 기존 안정 margin wrapper를 재사용하므로 정렬을 바꿔 재생성해도 원본 GameObject와 transform·shadow 계층이 유지됩니다.
+
 Canonical flex의 `justify`는 `start`, `center`, `end`, `space-between`, `space-around`, `space-evenly`를 지원합니다. 고정 gap을 먼저 적용한 뒤 남은 주축 공간을 정렬 또는 분배하고, reverse 방향에서는 canonical main-start/main-end가 뒤집힌 물리 좌표와 안정 형제 순서에 함께 반영됩니다.
 
 Canonical flex의 `row-reverse`, `column-reverse`, 정수 `flexItem.order`를 지원합니다. 항목은 `(order, 원본 자식 순서)`로 안정 정렬하고 reverse 방향의 main-start에서 배치하며, margin·transform·shadow wrapper가 있어도 같은 GameObject와 안정 ID를 재사용합니다.
