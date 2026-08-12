@@ -102,12 +102,18 @@ namespace Html2Vrc
         public string fontStyle = "Normal";
         public string childAlignment = "UpperLeft";
         public string justifyContent = "Start";
+        public string alignContent = "Stretch";
+        public string flexWrap = "NoWrap";
         public string alignSelf = "Auto";
         public float[] alignSelfMargin = { 0f, 0f, 0f, 0f };
+        public float rowGap;
+        public float columnGap;
         public bool stretchChildrenWidth;
         public bool stretchChildrenHeight;
         public bool useResolvedChildrenWidth;
         public bool useResolvedChildrenHeight;
+        public bool useResolvedChildPositions;
+        public bool useResolvedPosition;
         public bool reverseChildren;
         public int flexOrder;
         public float flexShrink = -1f;

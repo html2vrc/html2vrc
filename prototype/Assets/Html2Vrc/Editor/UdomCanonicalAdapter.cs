@@ -39,6 +39,14 @@ namespace Html2Vrc.Editor
             public bool HasBackground;
         }
 
+        private sealed class ResolvedFlexLine
+        {
+            public readonly List<int> Indices = new List<int>();
+            public float CrossSize;
+            public float CrossStart;
+            public float MainRemaining;
+        }
+
         public static UdomDocument Map(
             Dictionary<string, object> value,
             string sourceAssetPath,
@@ -1615,6 +1623,12 @@ namespace Html2Vrc.Editor
                 return;
             }
 
+            if (!string.Equals(style.flexWrap, "NoWrap", StringComparison.Ordinal))
+            {
+                ResolveWrappedFlexChildren(node, isVertical);
+                return;
+            }
+
             var flowChildCount = 0;
             var requiresSizeResolution = false;
             for (var index = 0; index < children.Length; index++)
@@ -1850,6 +1864,478 @@ namespace Html2Vrc.Editor
                 {
                     style.useResolvedChildrenHeight = true;
                 }
+            }
+        }
+
+        private static void ResolveWrappedFlexChildren(UdomNode node, bool isVertical)
+        {
+            var style = node.style ?? new UdomStyle();
+            var children = node.children ?? Array.Empty<UdomNode>();
+            var mainAxis = isVertical ? 1 : 0;
+            var crossAxis = 1 - mainAxis;
+            var padding = style.padding != null && style.padding.Length >= 4
+                ? style.padding
+                : new[] { 0f, 0f, 0f, 0f };
+            var contentWidth = Math.Max(0f, style.size[0] - padding[0] - padding[2]);
+            var contentHeight = Math.Max(0f, style.size[1] - padding[1] - padding[3]);
+            var mainAvailable = mainAxis == 0 ? contentWidth : contentHeight;
+            var crossAvailable = crossAxis == 0 ? contentWidth : contentHeight;
+            var mainGap = mainAxis == 0 ? style.columnGap : style.rowGap;
+            var crossGap = crossAxis == 0 ? style.columnGap : style.rowGap;
+            var allowsMainOverflow = string.Equals(node.type, "ScrollView", StringComparison.OrdinalIgnoreCase)
+                                     && (mainAxis == 0 && node.scrollHorizontal
+                                         || mainAxis == 1 && node.scrollVertical);
+            var allowsCrossOverflow = string.Equals(node.type, "ScrollView", StringComparison.OrdinalIgnoreCase)
+                                      && (crossAxis == 0 && node.scrollHorizontal
+                                          || crossAxis == 1 && node.scrollVertical);
+            var parentCrossAlignment = GetParentCrossAlignment(style, isVertical);
+            if (allowsCrossOverflow && parentCrossAlignment == "Stretch")
+            {
+                parentCrossAlignment = "Start";
+            }
+
+            var orderedIndices = new List<int>();
+            for (var index = 0; index < children.Length; index++)
+            {
+                var childStyle = children[index] != null ? children[index].style : null;
+                if (childStyle == null || childStyle.displayNone || childStyle.positionAbsolute)
+                {
+                    continue;
+                }
+
+                orderedIndices.Add(index);
+            }
+
+            orderedIndices.Sort((left, right) =>
+            {
+                var leftOrder = children[left].style.flexOrder;
+                var rightOrder = children[right].style.flexOrder;
+                var orderComparison = leftOrder.CompareTo(rightOrder);
+                return orderComparison != 0 ? orderComparison : left.CompareTo(right);
+            });
+            if (orderedIndices.Count == 0)
+            {
+                return;
+            }
+
+            var baseOuterSizes = new float[children.Length];
+            var minimumOuterSizes = new float[children.Length];
+            var maximumOuterSizes = new float[children.Length];
+            var growWeights = new double[children.Length];
+            var shrinkWeights = new double[children.Length];
+            for (var orderedIndex = 0; orderedIndex < orderedIndices.Count; orderedIndex++)
+            {
+                var index = orderedIndices[orderedIndex];
+                var childStyle = children[index].style;
+                var crossAlignment = GetEffectiveCrossAlignment(childStyle, parentCrossAlignment);
+                var preservesAspect = HasAspectRatio(childStyle)
+                                      && IsAutoSize(childStyle, crossAxis)
+                                      && crossAlignment != "Stretch";
+                var minimum = GetEffectiveMinimumSize(childStyle, mainAxis, preservesAspect);
+                var maximum = GetEffectiveMaximumSize(childStyle, mainAxis, preservesAspect);
+                var fallback = childStyle.size != null && childStyle.size.Length >= 2
+                    ? childStyle.size[mainAxis]
+                    : 100f;
+                var baseSize = ResolveFlexBaseSize(childStyle, mainAvailable, fallback);
+                var contentSize = Clamp(baseSize, minimum, Math.Max(minimum, maximum));
+                var margins = GetAxisMargins(childStyle, mainAxis);
+                baseOuterSizes[index] = contentSize + margins;
+                minimumOuterSizes[index] = minimum + margins;
+                maximumOuterSizes[index] = float.IsPositiveInfinity(maximum)
+                    ? float.PositiveInfinity
+                    : maximum + margins;
+                growWeights[index] = mainAxis == 0
+                    ? Math.Max(0f, childStyle.flexibleWidth)
+                    : Math.Max(0f, childStyle.flexibleHeight);
+                shrinkWeights[index] = childStyle.flexShrink >= 0f
+                    ? (double)childStyle.flexShrink * contentSize
+                    : 0d;
+            }
+
+            var lines = new List<ResolvedFlexLine>();
+            ResolvedFlexLine currentLine = null;
+            var currentOuterSize = 0f;
+            for (var orderedIndex = 0; orderedIndex < orderedIndices.Count; orderedIndex++)
+            {
+                var index = orderedIndices[orderedIndex];
+                var required = baseOuterSizes[index]
+                               + (currentLine != null && currentLine.Indices.Count > 0 ? mainGap : 0f);
+                if (currentLine != null
+                    && currentLine.Indices.Count > 0
+                    && currentOuterSize + required > mainAvailable + 0.0001f)
+                {
+                    currentLine = null;
+                    currentOuterSize = 0f;
+                    required = baseOuterSizes[index];
+                }
+
+                if (currentLine == null)
+                {
+                    currentLine = new ResolvedFlexLine();
+                    lines.Add(currentLine);
+                }
+
+                currentLine.Indices.Add(index);
+                currentOuterSize += required;
+            }
+
+            var resolvedOuterMainSizes = new float[children.Length];
+            var resolvedSizes = new float[children.Length][];
+            for (var lineIndex = 0; lineIndex < lines.Count; lineIndex++)
+            {
+                ResolveWrappedLineMainSizes(
+                    lines[lineIndex],
+                    baseOuterSizes,
+                    minimumOuterSizes,
+                    maximumOuterSizes,
+                    growWeights,
+                    shrinkWeights,
+                    mainAvailable,
+                    mainGap,
+                    allowsMainOverflow,
+                    resolvedOuterMainSizes);
+
+                var line = lines[lineIndex];
+                for (var itemIndex = 0; itemIndex < line.Indices.Count; itemIndex++)
+                {
+                    var index = line.Indices[itemIndex];
+                    var childStyle = children[index].style;
+                    var size = childStyle.size != null && childStyle.size.Length >= 2
+                        ? new[] { childStyle.size[0], childStyle.size[1] }
+                        : new[] { 100f, 100f };
+                    size[mainAxis] = Math.Max(
+                        0f,
+                        resolvedOuterMainSizes[index] - GetAxisMargins(childStyle, mainAxis));
+                    var crossAlignment = GetEffectiveCrossAlignment(childStyle, parentCrossAlignment);
+                    if (crossAlignment != "Stretch"
+                        && HasAspectRatio(childStyle)
+                        && IsAutoSize(childStyle, crossAxis))
+                    {
+                        size = ResolveAspectSize(
+                            childStyle,
+                            size[0],
+                            size[1],
+                            mainAxis == 0);
+                    }
+                    else
+                    {
+                        size[0] = ClampSizeAxis(childStyle, 0, size[0]);
+                        size[1] = ClampSizeAxis(childStyle, 1, size[1]);
+                    }
+
+                    resolvedSizes[index] = size;
+                    resolvedOuterMainSizes[index] = size[mainAxis]
+                                                    + GetAxisMargins(childStyle, mainAxis);
+                    line.CrossSize = Math.Max(
+                        line.CrossSize,
+                        size[crossAxis] + GetAxisMargins(childStyle, crossAxis));
+                }
+
+                line.MainRemaining = mainAvailable
+                                     - SumLineOuterSizes(line, resolvedOuterMainSizes)
+                                     - Math.Max(0, line.Indices.Count - 1) * mainGap;
+            }
+
+            var totalCrossSize = Math.Max(0, lines.Count - 1) * crossGap;
+            for (var lineIndex = 0; lineIndex < lines.Count; lineIndex++)
+            {
+                totalCrossSize += lines[lineIndex].CrossSize;
+            }
+
+            var crossRemaining = crossAvailable - totalCrossSize;
+            if (crossRemaining > 0.0001f
+                && string.Equals(style.alignContent, "Stretch", StringComparison.Ordinal))
+            {
+                var addition = crossRemaining / lines.Count;
+                for (var lineIndex = 0; lineIndex < lines.Count; lineIndex++)
+                {
+                    lines[lineIndex].CrossSize += addition;
+                }
+
+                crossRemaining = 0f;
+            }
+
+            ResolveAxisDistribution(
+                style.alignContent,
+                crossRemaining,
+                lines.Count,
+                crossGap,
+                out var crossOffset,
+                out var resolvedCrossGap);
+            var crossCursor = crossOffset;
+            var reversesCrossAxis = string.Equals(style.flexWrap, "WrapReverse", StringComparison.Ordinal);
+            for (var lineIndex = 0; lineIndex < lines.Count; lineIndex++)
+            {
+                var line = lines[lineIndex];
+                line.CrossStart = reversesCrossAxis
+                    ? crossAvailable - crossCursor - line.CrossSize
+                    : crossCursor;
+                crossCursor += line.CrossSize + resolvedCrossGap;
+            }
+
+            for (var lineIndex = 0; lineIndex < lines.Count; lineIndex++)
+            {
+                var line = lines[lineIndex];
+                ResolveAxisDistribution(
+                    style.justifyContent,
+                    line.MainRemaining,
+                    line.Indices.Count,
+                    mainGap,
+                    out var mainOffset,
+                    out var resolvedMainGap);
+                var mainCursor = mainOffset;
+                for (var itemIndex = 0; itemIndex < line.Indices.Count; itemIndex++)
+                {
+                    var index = line.Indices[itemIndex];
+                    var childStyle = children[index].style;
+                    var size = resolvedSizes[index];
+                    var mainOuterSize = size[mainAxis] + GetAxisMargins(childStyle, mainAxis);
+                    var mainStart = style.reverseChildren
+                        ? mainAvailable - mainCursor - mainOuterSize
+                        : mainCursor;
+
+                    var crossAlignment = GetEffectiveCrossAlignment(childStyle, parentCrossAlignment);
+                    if (crossAlignment == "Stretch")
+                    {
+                        size[crossAxis] = ClampSizeAxis(
+                            childStyle,
+                            crossAxis,
+                            Math.Max(0f, line.CrossSize - GetAxisMargins(childStyle, crossAxis)));
+                    }
+
+                    var crossOuterSize = size[crossAxis] + GetAxisMargins(childStyle, crossAxis);
+                    var crossSlack = line.CrossSize - crossOuterSize;
+                    var logicalCrossOffset = crossAlignment == "Center"
+                        ? crossSlack * 0.5f
+                        : crossAlignment == "End" ? crossSlack : 0f;
+                    var physicalCrossOffset = reversesCrossAxis
+                        ? line.CrossSize - logicalCrossOffset - crossOuterSize
+                        : logicalCrossOffset;
+                    var crossStart = line.CrossStart + physicalCrossOffset;
+                    childStyle.position = mainAxis == 0
+                        ? new[] { padding[0] + mainStart, padding[1] + crossStart }
+                        : new[] { padding[0] + crossStart, padding[1] + mainStart };
+                    childStyle.size = size;
+                    childStyle.alignSelfMargin = new[] { 0f, 0f, 0f, 0f };
+                    childStyle.useResolvedPosition = true;
+                    childStyle.flexibleWidth = 0f;
+                    childStyle.flexibleHeight = 0f;
+                    mainCursor += mainOuterSize + resolvedMainGap;
+                }
+            }
+
+            style.useResolvedChildPositions = true;
+        }
+
+        private static void ResolveWrappedLineMainSizes(
+            ResolvedFlexLine line,
+            float[] baseOuterSizes,
+            float[] minimumOuterSizes,
+            float[] maximumOuterSizes,
+            double[] growWeights,
+            double[] shrinkWeights,
+            float mainAvailable,
+            float mainGap,
+            bool allowsMainOverflow,
+            float[] resolvedOuterSizes)
+        {
+            var totalOuterSize = Math.Max(0, line.Indices.Count - 1) * mainGap;
+            for (var itemIndex = 0; itemIndex < line.Indices.Count; itemIndex++)
+            {
+                var index = line.Indices[itemIndex];
+                resolvedOuterSizes[index] = baseOuterSizes[index];
+                totalOuterSize += resolvedOuterSizes[index];
+            }
+
+            var remaining = mainAvailable - totalOuterSize;
+            while (remaining > 0.0001f)
+            {
+                var totalWeight = 0d;
+                for (var itemIndex = 0; itemIndex < line.Indices.Count; itemIndex++)
+                {
+                    var index = line.Indices[itemIndex];
+                    if (growWeights[index] > 0d
+                        && resolvedOuterSizes[index] + 0.0001f < maximumOuterSizes[index])
+                    {
+                        totalWeight += growWeights[index];
+                    }
+                }
+
+                if (totalWeight <= 0d)
+                {
+                    break;
+                }
+
+                var distributed = 0f;
+                for (var itemIndex = 0; itemIndex < line.Indices.Count; itemIndex++)
+                {
+                    var index = line.Indices[itemIndex];
+                    if (growWeights[index] <= 0d
+                        || resolvedOuterSizes[index] + 0.0001f >= maximumOuterSizes[index])
+                    {
+                        continue;
+                    }
+
+                    var share = (float)(remaining * growWeights[index] / totalWeight);
+                    var room = maximumOuterSizes[index] - resolvedOuterSizes[index];
+                    var addition = Math.Min(share, room);
+                    resolvedOuterSizes[index] += addition;
+                    distributed += addition;
+                }
+
+                if (distributed <= 0.0001f)
+                {
+                    break;
+                }
+
+                remaining -= distributed;
+            }
+
+            var deficit = allowsMainOverflow ? 0f : -remaining;
+            while (deficit > 0.0001f)
+            {
+                var totalWeight = 0d;
+                for (var itemIndex = 0; itemIndex < line.Indices.Count; itemIndex++)
+                {
+                    var index = line.Indices[itemIndex];
+                    if (shrinkWeights[index] > 0d
+                        && resolvedOuterSizes[index] > minimumOuterSizes[index] + 0.0001f)
+                    {
+                        totalWeight += shrinkWeights[index];
+                    }
+                }
+
+                if (totalWeight <= 0d)
+                {
+                    break;
+                }
+
+                var distributed = 0f;
+                for (var itemIndex = 0; itemIndex < line.Indices.Count; itemIndex++)
+                {
+                    var index = line.Indices[itemIndex];
+                    if (shrinkWeights[index] <= 0d
+                        || resolvedOuterSizes[index] <= minimumOuterSizes[index] + 0.0001f)
+                    {
+                        continue;
+                    }
+
+                    var share = (float)(deficit * shrinkWeights[index] / totalWeight);
+                    var room = resolvedOuterSizes[index] - minimumOuterSizes[index];
+                    var reduction = Math.Min(share, room);
+                    resolvedOuterSizes[index] -= reduction;
+                    distributed += reduction;
+                }
+
+                if (distributed <= 0.0001f)
+                {
+                    break;
+                }
+
+                deficit -= distributed;
+            }
+        }
+
+        private static float SumLineOuterSizes(ResolvedFlexLine line, float[] resolvedOuterSizes)
+        {
+            var total = 0f;
+            for (var itemIndex = 0; itemIndex < line.Indices.Count; itemIndex++)
+            {
+                total += resolvedOuterSizes[line.Indices[itemIndex]];
+            }
+
+            return total;
+        }
+
+        private static string GetParentCrossAlignment(UdomStyle style, bool isVertical)
+        {
+            if (isVertical && style.stretchChildrenWidth
+                || !isVertical && style.stretchChildrenHeight)
+            {
+                return "Stretch";
+            }
+
+            var alignment = style.childAlignment ?? "UpperLeft";
+            if (isVertical)
+            {
+                if (alignment.EndsWith("Right", StringComparison.Ordinal))
+                {
+                    return "End";
+                }
+
+                return alignment.EndsWith("Center", StringComparison.Ordinal) ? "Center" : "Start";
+            }
+
+            if (alignment.StartsWith("Lower", StringComparison.Ordinal))
+            {
+                return "End";
+            }
+
+            return alignment.StartsWith("Middle", StringComparison.Ordinal) ? "Center" : "Start";
+        }
+
+        private static string GetEffectiveCrossAlignment(UdomStyle style, string parentAlignment)
+        {
+            return style != null && !string.Equals(style.alignSelf, "Auto", StringComparison.Ordinal)
+                ? style.alignSelf
+                : parentAlignment;
+        }
+
+        private static void ResolveAxisDistribution(
+            string alignment,
+            float remaining,
+            int itemCount,
+            float baseGap,
+            out float offset,
+            out float gap)
+        {
+            offset = 0f;
+            gap = baseGap;
+            if (itemCount <= 0)
+            {
+                return;
+            }
+
+            if (remaining > 0.0001f)
+            {
+                if (string.Equals(alignment, "Center", StringComparison.Ordinal))
+                {
+                    offset = remaining * 0.5f;
+                }
+                else if (string.Equals(alignment, "End", StringComparison.Ordinal))
+                {
+                    offset = remaining;
+                }
+                else if (string.Equals(alignment, "SpaceBetween", StringComparison.Ordinal)
+                         && itemCount > 1)
+                {
+                    gap += remaining / (itemCount - 1);
+                }
+                else if (string.Equals(alignment, "SpaceAround", StringComparison.Ordinal))
+                {
+                    var addition = remaining / itemCount;
+                    offset = addition * 0.5f;
+                    gap += addition;
+                }
+                else if (string.Equals(alignment, "SpaceEvenly", StringComparison.Ordinal))
+                {
+                    var addition = remaining / (itemCount + 1);
+                    offset = addition;
+                    gap += addition;
+                }
+
+                return;
+            }
+
+            if (string.Equals(alignment, "Center", StringComparison.Ordinal)
+                || string.Equals(alignment, "SpaceAround", StringComparison.Ordinal)
+                || string.Equals(alignment, "SpaceEvenly", StringComparison.Ordinal))
+            {
+                offset = remaining * 0.5f;
+            }
+            else if (string.Equals(alignment, "End", StringComparison.Ordinal))
+            {
+                offset = remaining;
             }
         }
 
@@ -2126,8 +2612,12 @@ namespace Html2Vrc.Editor
                 "alignContent",
                 "rowGap",
                 "columnGap");
-            RequireDefaultString(flex, "wrap", "nowrap", path + ".flex.wrap");
-            RequireDefaultString(flex, "alignContent", "start", path + ".flex.alignContent");
+            result.Style.flexWrap = MapFlexWrap(
+                GetString(flex, "wrap") ?? "nowrap",
+                path + ".flex.wrap");
+            result.Style.alignContent = MapAlignContent(
+                GetString(flex, "alignContent") ?? "stretch",
+                path + ".flex.alignContent");
 
             var direction = GetString(flex, "direction") ?? "row";
             var isVertical = string.Equals(direction, "column", StringComparison.Ordinal)
@@ -2155,24 +2645,74 @@ namespace Html2Vrc.Editor
             var stretchesCrossAxis = string.Equals(alignItems, "stretch", StringComparison.Ordinal);
             result.Style.stretchChildrenWidth = isVertical && stretchesCrossAxis;
             result.Style.stretchChildrenHeight = !isVertical && stretchesCrossAxis;
-            var primaryGapKey = isVertical ? "rowGap" : "columnGap";
-            var crossGapKey = isVertical ? "columnGap" : "rowGap";
-            if (flex.TryGetValue(primaryGapKey, out var primaryGapValue)
-                && TryResolveLength(primaryGapValue, 100f, path + ".flex." + primaryGapKey, out var primaryGap))
-            {
-                if (primaryGap < 0f)
-                {
-                    throw new FormatException($"{path}.flex.{primaryGapKey}: gap cannot be negative.");
-                }
+            result.Style.rowGap = ResolveFlexGap(
+                flex,
+                "rowGap",
+                result.Style.size[1],
+                path + ".flex.rowGap");
+            result.Style.columnGap = ResolveFlexGap(
+                flex,
+                "columnGap",
+                result.Style.size[0],
+                path + ".flex.columnGap");
+            result.Style.spacing = isVertical
+                ? result.Style.rowGap
+                : result.Style.columnGap;
+        }
 
-                result.Style.spacing = primaryGap;
+        private static float ResolveFlexGap(
+            Dictionary<string, object> flex,
+            string key,
+            float reference,
+            string path)
+        {
+            if (!flex.TryGetValue(key, out var raw)
+                || !TryResolveLength(raw, reference, path, out var gap))
+            {
+                return 0f;
             }
 
-            if (flex.TryGetValue(crossGapKey, out var crossGapValue)
-                && TryResolveLength(crossGapValue, 100f, path + ".flex." + crossGapKey, out var crossGap)
-                && crossGap != 0f)
+            if (gap < 0f || float.IsNaN(gap) || float.IsInfinity(gap))
             {
-                throw new FormatException($"{path}.flex.{crossGapKey}: cross-axis gaps are not supported yet.");
+                throw new FormatException($"{path}: gap must be finite and non-negative.");
+            }
+
+            return gap;
+        }
+
+        private static string MapFlexWrap(string value, string path)
+        {
+            switch (value)
+            {
+                case "nowrap":
+                    return "NoWrap";
+                case "wrap":
+                    return "Wrap";
+                case "wrap-reverse":
+                    return "WrapReverse";
+                default:
+                    throw new FormatException($"{path}: unsupported flex wrap '{value}'.");
+            }
+        }
+
+        private static string MapAlignContent(string value, string path)
+        {
+            switch (value)
+            {
+                case "start":
+                    return "Start";
+                case "center":
+                    return "Center";
+                case "end":
+                    return "End";
+                case "stretch":
+                    return "Stretch";
+                case "space-between":
+                    return "SpaceBetween";
+                case "space-around":
+                    return "SpaceAround";
+                default:
+                    throw new FormatException($"{path}: unsupported flex content alignment '{value}'.");
             }
         }
 

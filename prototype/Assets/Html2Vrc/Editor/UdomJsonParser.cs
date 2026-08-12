@@ -403,6 +403,16 @@ namespace Html2Vrc.Editor
                 style.justifyContent = GetString(value, "justifyContent");
             }
 
+            if (value.TryGetValue("alignContent", out _))
+            {
+                style.alignContent = GetString(value, "alignContent");
+            }
+
+            if (value.TryGetValue("flexWrap", out _))
+            {
+                style.flexWrap = GetString(value, "flexWrap");
+            }
+
             if (value.TryGetValue("alignSelf", out _))
             {
                 style.alignSelf = GetString(value, "alignSelf");
@@ -413,6 +423,16 @@ namespace Html2Vrc.Editor
                 style.alignSelfMargin = GetFloatArray(
                     alignSelfMargin,
                     path + ".alignSelfMargin");
+            }
+
+            if (value.TryGetValue("rowGap", out var rowGap))
+            {
+                style.rowGap = GetFloat(rowGap, path + ".rowGap");
+            }
+
+            if (value.TryGetValue("columnGap", out var columnGap))
+            {
+                style.columnGap = GetFloat(columnGap, path + ".columnGap");
             }
 
             if (value.TryGetValue("stretchChildrenWidth", out var stretchChildrenWidth))
@@ -441,6 +461,20 @@ namespace Html2Vrc.Editor
                 style.useResolvedChildrenHeight = GetBoolean(
                     useResolvedChildrenHeight,
                     path + ".useResolvedChildrenHeight");
+            }
+
+            if (value.TryGetValue("useResolvedChildPositions", out var useResolvedChildPositions))
+            {
+                style.useResolvedChildPositions = GetBoolean(
+                    useResolvedChildPositions,
+                    path + ".useResolvedChildPositions");
+            }
+
+            if (value.TryGetValue("useResolvedPosition", out var useResolvedPosition))
+            {
+                style.useResolvedPosition = GetBoolean(
+                    useResolvedPosition,
+                    path + ".useResolvedPosition");
             }
 
             if (value.TryGetValue("reverseChildren", out var reverseChildren))

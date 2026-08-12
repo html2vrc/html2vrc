@@ -1356,6 +1356,107 @@ namespace Html2Vrc.Tests
         }
 
         [Test]
+        public void CanonicalFlexWrap_BakesLinesGapsAlignmentAndReverseAxes()
+        {
+            var json = LoadRepositoryFile(
+                "packages",
+                "udom",
+                "fixtures",
+                "valid",
+                "unity-flex-wrap.udom.json");
+            var validation = UdomValidator.Validate(json);
+
+            Assert.That(validation.IsValid, Is.True, validation.Format());
+            Assert.That(validation.Issues, Is.Empty, validation.Format());
+            var document = validation.Document;
+            var row = document.root.children[0];
+            var column = document.root.children[1];
+            var stretch = document.root.children[2];
+            Assert.That(row.style.flexWrap, Is.EqualTo("Wrap"));
+            Assert.That(row.style.alignContent, Is.EqualTo("SpaceBetween"));
+            Assert.That(row.style.rowGap, Is.EqualTo(20f));
+            Assert.That(row.style.columnGap, Is.EqualTo(10f));
+            Assert.That(row.style.useResolvedChildPositions, Is.True);
+            Assert.That(row.children.All(child => child.style.useResolvedPosition), Is.True);
+            Assert.That(row.children[0].style.position, Is.EqualTo(new[] { 20f, 30f }));
+            Assert.That(row.children[1].style.position, Is.EqualTo(new[] { 240f, 20f }));
+            Assert.That(row.children[2].style.position, Is.EqualTo(new[] { 20f, 190f }));
+            Assert.That(row.children[3].style.position, Is.EqualTo(new[] { 210f, 200f }));
+            Assert.That(row.children[3].style.size, Is.EqualTo(new[] { 130f, 30f }));
+
+            Assert.That(column.style.flexWrap, Is.EqualTo("WrapReverse"));
+            Assert.That(column.style.alignContent, Is.EqualTo("Center"));
+            Assert.That(column.style.reverseChildren, Is.True);
+            Assert.That(column.children[0].style.position, Is.EqualTo(new[] { 160f, 135f }));
+            Assert.That(column.children[1].style.position, Is.EqualTo(new[] { 160f, 25f }));
+            Assert.That(column.children[2].style.position, Is.EqualTo(new[] { 100f, 135f }));
+            Assert.That(column.children[3].style.position, Is.EqualTo(new[] { 100f, 25f }));
+
+            Assert.That(stretch.style.alignContent, Is.EqualTo("Stretch"));
+            Assert.That(stretch.children[0].style.position, Is.EqualTo(new[] { 20f, 20f }));
+            Assert.That(stretch.children[0].style.size, Is.EqualTo(new[] { 170f, 60f }));
+            Assert.That(stretch.children[1].style.position, Is.EqualTo(new[] { 20f, 120f }));
+            Assert.That(stretch.children[1].style.size, Is.EqualTo(new[] { 170f, 80f }));
+
+            var normalized = UdomJsonWriter.Write(document);
+            var roundTrip = UdomValidator.Validate(normalized);
+            Assert.That(roundTrip.IsValid, Is.True, roundTrip.Format());
+            Assert.That(roundTrip.Document.root.children[0].style.flexWrap, Is.EqualTo("Wrap"));
+            Assert.That(roundTrip.Document.root.children[0].style.alignContent, Is.EqualTo("SpaceBetween"));
+            Assert.That(roundTrip.Document.root.children[1].children[0].style.useResolvedPosition, Is.True);
+            Assert.That(
+                roundTrip.Document.root.children[2].children[1].style.position,
+                Is.EqualTo(new[] { 20f, 120f }));
+
+            var build = UdomBuilder.GenerateOrRegenerate(document);
+            var root = build.Root;
+            var rowObject = UdomBuilder.FindNode(root, "row-wrap").gameObject;
+            var columnObject = UdomBuilder.FindNode(root, "column-wrap-reverse").gameObject;
+            var stretchObject = UdomBuilder.FindNode(root, "stretch-wrap").gameObject;
+            Canvas.ForceUpdateCanvases();
+            Assert.That(rowObject.GetComponent<HorizontalLayoutGroup>(), Is.Null);
+            Assert.That(columnObject.GetComponent<VerticalLayoutGroup>(), Is.Null);
+            Assert.That(stretchObject.GetComponent<HorizontalLayoutGroup>(), Is.Null);
+            AssertResolvedTopLeftRect(root, "row-a", new Vector2(20f, 30f), new Vector2(120f, 40f));
+            AssertResolvedTopLeftRect(root, "row-b", new Vector2(240f, 20f), new Vector2(100f, 60f));
+            AssertResolvedTopLeftRect(root, "row-c", new Vector2(20f, 190f), new Vector2(140f, 50f));
+            AssertResolvedTopLeftRect(root, "row-d", new Vector2(210f, 200f), new Vector2(130f, 30f));
+            AssertResolvedTopLeftRect(root, "column-a", new Vector2(160f, 135f), new Vector2(40f, 100f));
+            AssertResolvedTopLeftRect(root, "column-b", new Vector2(160f, 25f), new Vector2(40f, 100f));
+            AssertResolvedTopLeftRect(root, "column-c", new Vector2(100f, 135f), new Vector2(40f, 100f));
+            AssertResolvedTopLeftRect(root, "column-d", new Vector2(100f, 25f), new Vector2(40f, 100f));
+            Assert.That(UdomBuilder.FindNode(root, "column-d").transform.GetSiblingIndex(), Is.EqualTo(0));
+            Assert.That(UdomBuilder.FindNode(root, "column-a").transform.GetSiblingIndex(), Is.EqualTo(3));
+            AssertResolvedTopLeftRect(root, "stretch-a", new Vector2(20f, 20f), new Vector2(170f, 60f));
+            AssertResolvedTopLeftRect(root, "stretch-b", new Vector2(20f, 120f), new Vector2(170f, 80f));
+
+            var originalRowA = UdomBuilder.FindNode(root, "row-a").gameObject;
+            var repeated = UdomBuilder.GenerateOrRegenerate(roundTrip.Document, root);
+            Assert.That(repeated.Created, Is.Zero);
+            Assert.That(UdomBuilder.FindNode(root, "row-a").gameObject, Is.SameAs(originalRowA));
+
+            var nowrapJson = json.Replace("\"wrap\": \"wrap\"", "\"wrap\": \"nowrap\"");
+            var nowrapValidation = UdomValidator.Validate(nowrapJson);
+            Assert.That(nowrapValidation.IsValid, Is.True, nowrapValidation.Format());
+            var nowrapBuild = UdomBuilder.GenerateOrRegenerate(nowrapValidation.Document, root);
+            Assert.That(nowrapBuild.Created, Is.EqualTo(1));
+            Assert.That(UdomBuilder.FindNode(root, "row-a").gameObject, Is.SameAs(originalRowA));
+            Assert.That(UdomBuilder.FindNode(root, "row-b::__margin"), Is.Not.Null);
+            Assert.That(rowObject.GetComponent<HorizontalLayoutGroup>(), Is.Not.Null);
+            Assert.That(stretchObject.GetComponent<HorizontalLayoutGroup>(), Is.Not.Null);
+            Object.DestroyImmediate(root.gameObject);
+
+            var invalidWrap = UdomValidator.Validate(json.Replace("wrap-reverse", "balance"));
+            Assert.That(invalidWrap.IsValid, Is.False);
+            Assert.That(invalidWrap.Format(), Does.Contain("wrap"));
+            var invalidAlignment = UdomValidator.Validate(json.Replace(
+                "\"alignContent\": \"space-between\"",
+                "\"alignContent\": \"space-evenly\""));
+            Assert.That(invalidAlignment.IsValid, Is.False);
+            Assert.That(invalidAlignment.Format(), Does.Contain("alignContent"));
+        }
+
+        [Test]
         public void CanonicalAbsolutePosition_LeavesFlexFlowAndUsesTopLeftCoordinates()
         {
             var json = LoadRepositoryFile(
@@ -3129,6 +3230,26 @@ namespace Html2Vrc.Tests
                 contentRect.anchoredPosition.y,
                 Is.EqualTo(expectedContentPosition.y).Within(0.001f),
                 nodeId + " content y");
+        }
+
+        private static void AssertResolvedTopLeftRect(
+            UdomGeneratedRoot root,
+            string nodeId,
+            Vector2 expectedPosition,
+            Vector2 expectedSize)
+        {
+            var node = UdomBuilder.FindNode(root, nodeId);
+            Assert.That(node, Is.Not.Null, nodeId + " resolved node");
+            var rect = node.GetComponent<RectTransform>();
+            Assert.That(rect.anchorMin, Is.EqualTo(new Vector2(0f, 1f)), nodeId + " anchorMin");
+            Assert.That(rect.anchorMax, Is.EqualTo(new Vector2(0f, 1f)), nodeId + " anchorMax");
+            Assert.That(rect.pivot, Is.EqualTo(new Vector2(0f, 1f)), nodeId + " pivot");
+            Assert.That(
+                rect.anchoredPosition,
+                Is.EqualTo(new Vector2(expectedPosition.x, -expectedPosition.y)),
+                nodeId + " anchored position");
+            Assert.That(rect.rect.size, Is.EqualTo(expectedSize), nodeId + " size");
+            Assert.That(rect.GetComponent<LayoutElement>().ignoreLayout, Is.True, nodeId + " ignoreLayout");
         }
 
         private static void AssertImageContent(

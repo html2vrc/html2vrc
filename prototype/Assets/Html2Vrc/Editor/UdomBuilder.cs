@@ -766,7 +766,7 @@ namespace Html2Vrc.Editor
             var size = GetVector2(style.size, new Vector2(100f, 100f));
             Undo.RecordObject(rect, "Configure UDOM RectTransform");
 
-            if (style.positionAbsolute)
+            if (UsesTopLeftPosition(style))
             {
                 rect.anchorMin = new Vector2(0f, 1f);
                 rect.anchorMax = new Vector2(0f, 1f);
@@ -793,7 +793,7 @@ namespace Html2Vrc.Editor
             layoutElement.preferredHeight = size.y;
             layoutElement.flexibleWidth = style.flexibleWidth;
             layoutElement.flexibleHeight = style.flexibleHeight;
-            layoutElement.ignoreLayout = style.positionAbsolute || parent.GetComponent<LayoutGroup>() == null;
+            layoutElement.ignoreLayout = UsesTopLeftPosition(style) || parent.GetComponent<LayoutGroup>() == null;
         }
 
         private static Transform ConfigureTransformHierarchy(
@@ -1246,6 +1246,7 @@ namespace Html2Vrc.Editor
                     AddMarginToMaximumSize(style, 1, margin.y + margin.w)
                 },
                 positionAbsolute = style.positionAbsolute,
+                useResolvedPosition = style.useResolvedPosition,
                 flexibleWidth = style.flexibleWidth,
                 flexibleHeight = style.flexibleHeight
             };
@@ -1267,6 +1268,11 @@ namespace Html2Vrc.Editor
                 margin[2] + alignment[2],
                 margin[3] + alignment[3]
             };
+        }
+
+        private static bool UsesTopLeftPosition(UdomStyle style)
+        {
+            return style != null && (style.positionAbsolute || style.useResolvedPosition);
         }
 
         private static void ConfigureInsideMargin(RectTransform rect, float[] marginValues)
@@ -1509,7 +1515,7 @@ namespace Html2Vrc.Editor
             }
 
             var style = node.style ?? new UdomStyle();
-            if (style.positionAbsolute)
+            if (UsesTopLeftPosition(style))
             {
                 var hasMargin = HasNonZero(GetEffectiveMargin(style));
                 var hasTransform = HasTransform(style);
@@ -1646,6 +1652,13 @@ namespace Html2Vrc.Editor
 
         private static void ConfigureLayout(GameObject target, UdomStyle style)
         {
+            if (style.useResolvedChildPositions)
+            {
+                RemoveIfPresent<VerticalLayoutGroup>(target);
+                RemoveIfPresent<HorizontalLayoutGroup>(target);
+                return;
+            }
+
             var layoutName = (style.layout ?? "None").Trim();
             if (string.Equals(layoutName, "Vertical", StringComparison.OrdinalIgnoreCase))
             {

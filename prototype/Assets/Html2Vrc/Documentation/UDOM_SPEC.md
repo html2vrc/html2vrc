@@ -17,7 +17,7 @@ Unity Importer는 이 문서의 기존 형식과 함께 `packages/udom` JSON Sch
 | `element/text-input` | `TextInput` / `TMP_InputField` |
 | `element/scroll` | `ScrollView` |
 | `element/embed` | `Embed` |
-| `layout.mode: flex` | `Vertical` 또는 `Horizontal` Layout Group |
+| `layout.mode: flex` | 단일 line은 `Vertical`/`Horizontal` Layout Group, wrap은 계산된 top-left Rect |
 | `viewport.width`, `viewport.height`, `pixelRatio`, `fit` | 디자인 크기와 Unity Canvas 배치 |
 
 Canonical 길이의 숫자와 부모 크기 기준 백분율, 기본 flex 방향과 간격, cross-axis 정렬, padding/margin, 단일 색상과 선형 gradient 배경, 기본 텍스트 스타일과 font weight를 변환한다. `styleRefs`는 배열 순서대로 깊은 병합한 뒤 노드의 inline `style`로 마지막 덮어쓴다. canonical `image` resource는 Texture2D/RawImage, `sprite` resource는 Sprite/Image로 생성한다.
@@ -29,6 +29,8 @@ Canonical flex의 `justify` 여섯 값은 내부 `justifyContent`와 main-axis�
 Canonical `flexItem.grow`, 기본값 1의 `shrink`, 숫자·percentage·`auto` `basis`는 내부 `flexibleWidth/Height`, `flexShrink`, `flexBasis`, `flexBasisIsPercent`로 보존한다. 부모 content box에서 percentage basis를 해석하고 basis가 auto면 해당 주축 size를 사용한다. 양의 여유 공간은 grow 비율로 최대값까지, 부족한 공간은 `shrink × 초기 content size` 비율로 최소값까지 분배한다. Min/max에 닿은 항목은 고정하고 남은 공간을 활성 항목에 반복 재분배하며 margin과 gap은 축소하지 않는다. 결과가 0인 size는 canonical non-negative Length 의미에 따라 유효하다. ScrollView의 활성 축은 콘텐츠가 viewport보다 커야 하므로 main·cross axis shrink/stretch 선계산에서 overflow를 보존한다.
 
 Canonical `flexItem.alignSelf`의 `auto`, `start`, `center`, `end`, `stretch`는 내부 `alignSelf`와 `alignSelfMargin`으로 보존한다. `auto`는 부모 `alignItems`를 따르고 나머지는 항목별 교차축 정렬을 override한다. Unity Layout Group에는 항목별 정렬 속성이 없으므로, 원래 canonical margin은 그대로 두고 남는 교차축 공간만 합성 margin으로 계산해 기존 `<node-id>::__margin` 안정 wrapper에 더한다. `stretch`는 원래 margin을 제외한 content box를 min/max로 제한하며, start·center·end는 원래 크기와 비대칭 margin을 보존한다. 항목이 교차축보다 커지면 음수 합성 margin으로 overflow 방향을 유지하고, row/column 및 reverse 주축의 형제 순서에는 영향을 주지 않는다.
+
+Canonical flex의 `wrap`과 `wrap-reverse`는 order가 적용된 항목을 부모 content box의 주축 크기와 주축 gap으로 안정적으로 line에 나눈다. 각 line 안에서 grow/shrink와 min/max를 먼저 재분배하고 justify와 항목별 alignSelf를 적용한 뒤, 모든 line의 교차축 크기에 `alignContent`의 start·center·end·stretch·space-between·space-around를 적용한다. `rowGap`과 `columnGap`은 물리 축을 따르므로 flex 방향이 바뀌어도 의미가 유지된다. Wrap-reverse는 line의 교차축 진행만 뒤집고 source/order 순서는 보존한다. Unity Layout Group은 여러 line과 항목별 교차축 좌표를 직접 표현할 수 없으므로 wrapped 부모는 계산된 최종 Rect를 top-left 좌표로 굽고 자식의 `LayoutElement.ignoreLayout`을 켠다. 같은 canonical 입력의 반복 생성은 GameObject와 wrapper를 재사용한다.
 
 Canonical `position: absolute`는 내부 `positionAbsolute`로 보존한다. 해당 항목은 부모 flex의 main-axis 크기 계산, grow 재분배와 gap 개수에서 제외하고 Unity `LayoutElement.ignoreLayout`을 켠다. 숫자와 percentage `x/y`는 부모 design box를 기준으로 미리 해석한 뒤 RectTransform의 top-left anchor와 pivot에서 `(x, -y)`로 적용한다. Margin이 있으면 margin wrapper가 좌표와 외곽 크기를 소유하고, transform·shadow wrapper는 그 안쪽 box를 채운다. Absolute/flow 전환 시에도 같은 wrapper와 노드를 재사용한다.
 
@@ -161,6 +163,9 @@ Resource URI는 canonical 명세대로 UDOM TextAsset이 있는 폴더를 기준
 - `displayNone`: canonical `layout.mode: none`으로 인해 노드와 subtree가 렌더링·레이아웃에서 제외되는지 나타내는 내부 플래그.
 - `stretchChildrenWidth`, `stretchChildrenHeight`: canonical flex의 기본 `alignItems: stretch`를 Unity Layout Group의 cross-axis 제어로 보존하는 내부 플래그.
 - `justifyContent`: canonical flex의 `start`, `center`, `end`, `space-between`, `space-around`, `space-evenly`를 보존하는 내부 enum 문자열.
+- `alignContent`, `flexWrap`: canonical flex line 묶음의 교차축 정렬과 `nowrap`/`wrap`/`wrap-reverse`를 보존하는 내부 enum 문자열.
+- `rowGap`, `columnGap`: canonical flex의 물리 행·열 gap을 design unit으로 보존한다. 기존 `spacing`은 현재 주축 gap을 유지한다.
+- `useResolvedChildPositions`, `useResolvedPosition`: wrapped 부모가 Unity Layout Group 대신 계산된 top-left 자식 Rect를 사용하고, 각 항목이 그 좌표를 소유하는지 나타내는 내부 플래그.
 - `alignSelf`: canonical flex item의 `auto`, `start`, `center`, `end`, `stretch`를 보존하는 내부 enum 문자열. `alignSelfMargin`은 Unity 항목별 교차축 정렬에 사용하는 `[left, top, right, bottom]` 합성 margin이며 원래 `margin`과 분리된다.
 - `reverseChildren`, `flexOrder`: canonical reverse main axis와 order-modified flex 순서를 보존하는 내부 플래그와 정수.
 - `flexShrink`: canonical flex shrink 비율. `-1`은 shrink 선계산을 사용하지 않는 기존 내부 문서 sentinel이고 canonical 기본값은 `1`이다.

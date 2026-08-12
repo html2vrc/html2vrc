@@ -95,9 +95,11 @@ namespace Html2Vrc.Editor
             "backgroundGradientRadius", "backgroundGradientRadiusIsPercent",
             "cornerRadius", "cornerRadiusPercent", "borderWidth", "borderColor", "textColor", "fontSize",
             "lineHeight", "letterSpacing", "textWrap", "textOverflow", "preserveWhitespace",
-            "alignment", "fontStyle", "childAlignment", "justifyContent", "alignSelf", "alignSelfMargin",
+            "alignment", "fontStyle", "childAlignment", "justifyContent", "alignContent", "flexWrap",
+            "alignSelf", "alignSelfMargin", "rowGap", "columnGap",
             "shadowOffsets", "shadowBlurs", "shadowSpreads", "shadowColors", "shadowInsets",
             "stretchChildrenWidth", "stretchChildrenHeight", "useResolvedChildrenWidth", "useResolvedChildrenHeight",
+            "useResolvedChildPositions", "useResolvedPosition",
             "reverseChildren", "flexOrder", "flexShrink", "flexBasis", "flexBasisIsPercent",
             "flexibleWidth", "flexibleHeight",
             "transformOrigin", "transformOriginIsPercent", "transformOperationTypes",
@@ -432,6 +434,16 @@ namespace Html2Vrc.Editor
                 AddError(result, path + ".spacing", "spacing은 음수가 될 수 없다.");
             }
 
+            if (style.rowGap < 0f || float.IsNaN(style.rowGap) || float.IsInfinity(style.rowGap))
+            {
+                AddError(result, path + ".rowGap", "rowGap은 0 이상의 유한한 값이어야 한다.");
+            }
+
+            if (style.columnGap < 0f || float.IsNaN(style.columnGap) || float.IsInfinity(style.columnGap))
+            {
+                AddError(result, path + ".columnGap", "columnGap은 0 이상의 유한한 값이어야 한다.");
+            }
+
             if (style.aspectRatio < 0f
                 || float.IsNaN(style.aspectRatio)
                 || float.IsInfinity(style.aspectRatio))
@@ -499,6 +511,23 @@ namespace Html2Vrc.Editor
                 && !string.Equals(style.justifyContent, "SpaceEvenly", StringComparison.Ordinal))
             {
                 AddError(result, path + ".justifyContent", $"지원하지 않는 flex justify '{style.justifyContent}'.");
+            }
+
+            if (!string.Equals(style.alignContent, "Start", StringComparison.Ordinal)
+                && !string.Equals(style.alignContent, "Center", StringComparison.Ordinal)
+                && !string.Equals(style.alignContent, "End", StringComparison.Ordinal)
+                && !string.Equals(style.alignContent, "Stretch", StringComparison.Ordinal)
+                && !string.Equals(style.alignContent, "SpaceBetween", StringComparison.Ordinal)
+                && !string.Equals(style.alignContent, "SpaceAround", StringComparison.Ordinal))
+            {
+                AddError(result, path + ".alignContent", $"지원하지 않는 flex alignContent '{style.alignContent}'.");
+            }
+
+            if (!string.Equals(style.flexWrap, "NoWrap", StringComparison.Ordinal)
+                && !string.Equals(style.flexWrap, "Wrap", StringComparison.Ordinal)
+                && !string.Equals(style.flexWrap, "WrapReverse", StringComparison.Ordinal))
+            {
+                AddError(result, path + ".flexWrap", $"지원하지 않는 flex wrap '{style.flexWrap}'.");
             }
 
             if (!string.Equals(style.alignSelf, "Auto", StringComparison.Ordinal)

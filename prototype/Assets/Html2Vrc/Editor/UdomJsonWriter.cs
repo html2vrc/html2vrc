@@ -165,12 +165,18 @@ namespace Html2Vrc.Editor
             writer.StringProperty("fontStyle", style.fontStyle);
             writer.StringProperty("childAlignment", style.childAlignment);
             writer.StringProperty("justifyContent", style.justifyContent);
+            writer.StringProperty("alignContent", style.alignContent);
+            writer.StringProperty("flexWrap", style.flexWrap);
             writer.StringProperty("alignSelf", style.alignSelf);
             writer.FloatArrayProperty("alignSelfMargin", style.alignSelfMargin);
+            writer.FloatProperty("rowGap", style.rowGap);
+            writer.FloatProperty("columnGap", style.columnGap);
             writer.BoolProperty("stretchChildrenWidth", style.stretchChildrenWidth);
             writer.BoolProperty("stretchChildrenHeight", style.stretchChildrenHeight);
             writer.BoolProperty("useResolvedChildrenWidth", style.useResolvedChildrenWidth);
             writer.BoolProperty("useResolvedChildrenHeight", style.useResolvedChildrenHeight);
+            writer.BoolProperty("useResolvedChildPositions", style.useResolvedChildPositions);
+            writer.BoolProperty("useResolvedPosition", style.useResolvedPosition);
             writer.BoolProperty("reverseChildren", style.reverseChildren);
             writer.IntProperty("flexOrder", style.flexOrder);
             writer.FloatProperty("flexShrink", style.flexShrink);

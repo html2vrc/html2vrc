@@ -1,0 +1,239 @@
+{
+  "asset": {
+    "version": "0.1",
+    "generator": "@html2vrc/udom Unity flex wrap fixture"
+  },
+  "viewport": {
+    "width": 760,
+    "height": 900
+  },
+  "root": {
+    "type": "element",
+    "id": "wrap-root",
+    "name": "view",
+    "style": {
+      "layout": {
+        "mode": "flex",
+        "width": "100%",
+        "height": "100%",
+        "padding": {
+          "top": 20,
+          "right": 20,
+          "bottom": 20,
+          "left": 20
+        },
+        "flex": {
+          "direction": "column",
+          "alignItems": "start",
+          "rowGap": 20
+        }
+      }
+    },
+    "children": [
+      {
+        "type": "element",
+        "id": "row-wrap",
+        "name": "view",
+        "style": {
+          "layout": {
+            "mode": "flex",
+            "width": 360,
+            "height": 260,
+            "padding": {
+              "top": 20,
+              "right": 20,
+              "bottom": 20,
+              "left": 20
+            },
+            "flex": {
+              "direction": "row",
+              "wrap": "wrap",
+              "justify": "space-between",
+              "alignItems": "center",
+              "alignContent": "space-between",
+              "rowGap": 20,
+              "columnGap": 10
+            }
+          }
+        },
+        "children": [
+          {
+            "type": "element",
+            "id": "row-a",
+            "name": "view",
+            "style": {
+              "layout": {
+                "width": 120,
+                "height": 40
+              }
+            }
+          },
+          {
+            "type": "element",
+            "id": "row-b",
+            "name": "view",
+            "style": {
+              "layout": {
+                "width": 100,
+                "height": 60,
+                "flexItem": {
+                  "alignSelf": "end"
+                }
+              }
+            }
+          },
+          {
+            "type": "element",
+            "id": "row-c",
+            "name": "view",
+            "style": {
+              "layout": {
+                "width": 140,
+                "height": 50
+              }
+            }
+          },
+          {
+            "type": "element",
+            "id": "row-d",
+            "name": "view",
+            "style": {
+              "layout": {
+                "width": 80,
+                "height": 30,
+                "maxWidth": 130,
+                "flexItem": {
+                  "grow": 1
+                }
+              }
+            }
+          }
+        ]
+      },
+      {
+        "type": "element",
+        "id": "column-wrap-reverse",
+        "name": "view",
+        "style": {
+          "layout": {
+            "mode": "flex",
+            "width": 300,
+            "height": 260,
+            "padding": {
+              "top": 20,
+              "right": 20,
+              "bottom": 20,
+              "left": 20
+            },
+            "flex": {
+              "direction": "column-reverse",
+              "wrap": "wrap-reverse",
+              "justify": "center",
+              "alignItems": "start",
+              "alignContent": "center",
+              "rowGap": 10,
+              "columnGap": 20
+            }
+          }
+        },
+        "children": [
+          {
+            "type": "element",
+            "id": "column-a",
+            "name": "view",
+            "style": {
+              "layout": {
+                "width": 40,
+                "height": 100
+              }
+            }
+          },
+          {
+            "type": "element",
+            "id": "column-b",
+            "name": "view",
+            "style": {
+              "layout": {
+                "width": 40,
+                "height": 100
+              }
+            }
+          },
+          {
+            "type": "element",
+            "id": "column-c",
+            "name": "view",
+            "style": {
+              "layout": {
+                "width": 40,
+                "height": 100
+              }
+            }
+          },
+          {
+            "type": "element",
+            "id": "column-d",
+            "name": "view",
+            "style": {
+              "layout": {
+                "width": 40,
+                "height": 100
+              }
+            }
+          }
+        ]
+      },
+      {
+        "type": "element",
+        "id": "stretch-wrap",
+        "name": "view",
+        "style": {
+          "layout": {
+            "mode": "flex",
+            "width": 360,
+            "height": 220,
+            "padding": {
+              "top": 20,
+              "right": 20,
+              "bottom": 20,
+              "left": 20
+            },
+            "flex": {
+              "direction": "row",
+              "wrap": "wrap",
+              "alignItems": "stretch",
+              "alignContent": "stretch",
+              "rowGap": 20,
+              "columnGap": 10
+            }
+          }
+        },
+        "children": [
+          {
+            "type": "element",
+            "id": "stretch-a",
+            "name": "view",
+            "style": {
+              "layout": {
+                "width": 170,
+                "height": 40,
+                "maxHeight": 60
+              }
+            }
+          },
+          {
+            "type": "element",
+            "id": "stretch-b",
+            "name": "view",
+            "style": {
+              "layout": {
+                "width": 170,
+                "height": 40
+              }
+            }
+          }
+        ]
+      }
+    ]
+  }
+}
