@@ -4167,7 +4167,7 @@ Second   line&#32;&#32;</p>
             Assert.That(nestedBlock.Format(), Does.Contain("텍스트 내부"));
 
             var attributedInline = HtmlToUdomConverter.Convert(
-                "<p id=\"attributed-inline\">Before <span style=\"font-weight: bold\">styled</span></p>");
+                "<p id=\"attributed-inline\">Before <span class=\"label\">styled</span></p>");
             Assert.That(attributedInline.IsValid, Is.False);
             Assert.That(attributedInline.Format(), Does.Contain("인라인 텍스트"));
 
@@ -4181,6 +4181,206 @@ Second   line&#32;&#32;</p>
             Assert.That(whitespaceText.IsValid, Is.True, whitespaceText.Format());
             Assert.That(whitespaceText.Document.root.text, Is.EqualTo("  "));
             Assert.That(UdomValidator.Validate(whitespaceText.Json).IsValid, Is.True);
+        }
+
+        [Test]
+        public void HtmlConverter_InlineCssUsesInheritedEffectiveTextRuns()
+        {
+            const string html = @"
+              <main id=""inline-css-root"" data-canvas-size=""760 420""
+                style=""width: 760px; height: 420px; display: flex; flex-direction: column; align-items: flex-start; padding: 20px; gap: 12px"">
+                <p id=""inline-css-text""
+                  style=""width: 700px; height: 72px; font-size: 24px; color: #FFFFFFFF; font-weight: bold; font-style: italic"">Base <span style=""color: #FF0000FF; font-weight: normal; font-style: normal; font-size: 50%"">reset <strong style=""font-weight: inherit; color: currentColor""><em style=""font-style: italic; font-size: 2em"">nested</em></strong></span> <span style=""color: transparent; font-size: 18px"">transparent</span> <small style=""font-size: 120%; color: #00FF00FF"">author</small></p>
+                <button id=""inline-css-button"" data-action=""ClosePanel""
+                  style=""width: 300px; height: 64px; font-size: 20px; color: #112233FF"">Go <span style=""font-weight: 600; color: #AABBCCFF"">now</span></button>
+                <ul id=""inline-css-list"" style=""width: 500px; height: 80px"">
+                  <li id=""inline-css-item"" style=""width: 500px; height: 64px; font-size: 20px; color: #445566FF"">Item <span style=""font-size: 50%; font-style: italic; color: inherit""><span style=""font-size: inherit; font-style: inherit"">small</span></span></li>
+                </ul>
+              </main>";
+            const string expectedText = "Base reset nested transparent author";
+
+            var conversion = HtmlToUdomConverter.Convert(html);
+
+            Assert.That(conversion.IsValid, Is.True, conversion.Format());
+            var textNode = conversion.Document.root.children[0];
+            var buttonLabelNode = conversion.Document.root.children[1].children[0];
+            var listLabelNode = conversion.Document.root.children[2].children[0].children[0];
+            Assert.That(textNode.text, Is.EqualTo(expectedText));
+            Assert.That(buttonLabelNode.text, Is.EqualTo("Go now"));
+            Assert.That(listLabelNode.text, Is.EqualTo("Item small"));
+            Assert.That(textNode.textRuns, Is.Not.Empty);
+            Assert.That(textNode.textRuns.All(run => !string.IsNullOrWhiteSpace(run.fontStyle)), Is.True);
+            Assert.That(string.Concat(textNode.textRuns.Select(run => run.text)), Is.EqualTo(expectedText));
+
+            var baseRun = textNode.textRuns.First(run => run.text.Contains("Base"));
+            var resetRun = textNode.textRuns.First(run => run.text.Contains("reset"));
+            var nestedRun = textNode.textRuns.First(run => run.text.Contains("nested"));
+            var transparentRun = textNode.textRuns.First(run => run.text.Contains("transparent"));
+            var authorRun = textNode.textRuns.First(run => run.text.Contains("author"));
+            Assert.That(baseRun.fontStyle, Is.EqualTo("BoldItalic"));
+            Assert.That(baseRun.textColor, Is.Null);
+            Assert.That(resetRun.fontStyle, Is.EqualTo("Normal"));
+            Assert.That(resetRun.textColor, Is.EqualTo("#FF0000FF"));
+            Assert.That(resetRun.fontScale, Is.EqualTo(0.5f).Within(0.0001f));
+            Assert.That(nestedRun.fontStyle, Is.EqualTo("Italic"));
+            Assert.That(nestedRun.textColor, Is.EqualTo("#FF0000FF"));
+            Assert.That(nestedRun.fontScale, Is.EqualTo(1f).Within(0.0001f));
+            Assert.That(transparentRun.fontStyle, Is.EqualTo("BoldItalic"));
+            Assert.That(transparentRun.textColor, Is.EqualTo("#00000000"));
+            Assert.That(transparentRun.fontScale, Is.EqualTo(0.75f).Within(0.0001f));
+            Assert.That(authorRun.fontStyle, Is.EqualTo("BoldItalic"));
+            Assert.That(authorRun.textColor, Is.EqualTo("#00FF00FF"));
+            Assert.That(authorRun.fontScale, Is.EqualTo(1.2f).Within(0.0001f));
+
+            var buttonAccentRun = buttonLabelNode.textRuns.First(run => run.text.Contains("now"));
+            var listAccentRun = listLabelNode.textRuns.First(run => run.text.Contains("small"));
+            Assert.That(buttonAccentRun.fontStyle, Is.EqualTo("Bold"));
+            Assert.That(buttonAccentRun.textColor, Is.EqualTo("#AABBCCFF"));
+            Assert.That(listAccentRun.fontStyle, Is.EqualTo("Italic"));
+            Assert.That(listAccentRun.textColor, Is.Null);
+            Assert.That(listAccentRun.fontScale, Is.EqualTo(0.5f).Within(0.0001f));
+            Assert.That(conversion.Json, Does.Contain("\"fontStyle\": \"Normal\""));
+            Assert.That(conversion.Json, Does.Contain("\"textColor\": \"#FF0000FF\""));
+
+            var normalized = UdomValidator.Validate(conversion.Json);
+            Assert.That(normalized.IsValid, Is.True, normalized.Format());
+            Assert.That(
+                normalized.Document.root.children[0].textRuns.First(run => run.text.Contains("nested")).fontStyle,
+                Is.EqualTo("Italic"));
+
+            var build = UdomBuilder.GenerateOrRegenerate(normalized.Document);
+            var root = build.Root;
+            var text = UdomBuilder.FindNode(root, "inline-css-text").GetComponent<TextMeshProUGUI>();
+            var buttonLabel = UdomBuilder.FindNode(root, "inline-css-button-label").GetComponent<TextMeshProUGUI>();
+            var listLabel = UdomBuilder.FindNode(root, "inline-css-item-label").GetComponent<TextMeshProUGUI>();
+            var originalText = text.gameObject;
+            var originalButtonLabel = buttonLabel.gameObject;
+            var originalListLabel = listLabel.gameObject;
+            text.ForceMeshUpdate();
+            buttonLabel.ForceMeshUpdate();
+            listLabel.ForceMeshUpdate();
+            Assert.That(text.richText, Is.True);
+            Assert.That(text.fontStyle, Is.EqualTo(FontStyles.Normal));
+            Assert.That(text.GetParsedText(), Is.EqualTo(expectedText));
+            Assert.That(buttonLabel.GetParsedText(), Is.EqualTo("Go now"));
+            Assert.That(listLabel.GetParsedText(), Is.EqualTo("Item small"));
+
+            var baseIndex = expectedText.IndexOf("Base", System.StringComparison.Ordinal);
+            var resetIndex = expectedText.IndexOf("reset", System.StringComparison.Ordinal);
+            var nestedIndex = expectedText.IndexOf("nested", System.StringComparison.Ordinal);
+            var transparentIndex = expectedText.IndexOf("transparent", System.StringComparison.Ordinal);
+            var authorIndex = expectedText.IndexOf("author", System.StringComparison.Ordinal);
+            Assert.That(
+                text.textInfo.characterInfo[baseIndex].style & (FontStyles.Bold | FontStyles.Italic),
+                Is.EqualTo(FontStyles.Bold | FontStyles.Italic));
+            Assert.That(
+                text.textInfo.characterInfo[resetIndex].style & (FontStyles.Bold | FontStyles.Italic),
+                Is.EqualTo(FontStyles.Normal));
+            Assert.That(
+                text.textInfo.characterInfo[nestedIndex].style & (FontStyles.Bold | FontStyles.Italic),
+                Is.EqualTo(FontStyles.Italic));
+            Assert.That(text.textInfo.characterInfo[resetIndex].color, Is.EqualTo(new Color32(0xFF, 0x00, 0x00, 0xFF)));
+            Assert.That(text.textInfo.characterInfo[nestedIndex].color, Is.EqualTo(new Color32(0xFF, 0x00, 0x00, 0xFF)));
+            Assert.That(text.textInfo.characterInfo[transparentIndex].color.a, Is.Zero);
+            Assert.That(text.textInfo.characterInfo[authorIndex].color, Is.EqualTo(new Color32(0x00, 0xFF, 0x00, 0xFF)));
+            Assert.That(text.textInfo.characterInfo[resetIndex].pointSize, Is.EqualTo(12f).Within(0.01f));
+            Assert.That(text.textInfo.characterInfo[nestedIndex].pointSize, Is.EqualTo(24f).Within(0.01f));
+            Assert.That(text.textInfo.characterInfo[transparentIndex].pointSize, Is.EqualTo(18f).Within(0.01f));
+            Assert.That(text.textInfo.characterInfo[authorIndex].pointSize, Is.EqualTo(28.8f).Within(0.01f));
+
+            const string plainHtml = @"
+              <main id=""inline-css-root"" data-canvas-size=""760 420""
+                style=""width: 760px; height: 420px; display: flex; flex-direction: column; align-items: flex-start; padding: 20px; gap: 12px"">
+                <p id=""inline-css-text"" style=""width: 700px; height: 72px; font-size: 24px; color: #FFFFFFFF; font-weight: bold; font-style: italic"">Base reset nested transparent author</p>
+                <button id=""inline-css-button"" data-action=""ClosePanel"" style=""width: 300px; height: 64px; font-size: 20px; color: #112233FF"">Go now</button>
+                <ul id=""inline-css-list"" style=""width: 500px; height: 80px""><li id=""inline-css-item"" style=""width: 500px; height: 64px; font-size: 20px; color: #445566FF"">Item small</li></ul>
+              </main>";
+            var restored = HtmlToUdomConverter.Convert(plainHtml);
+            Assert.That(restored.IsValid, Is.True, restored.Format());
+            Assert.That(restored.Document.root.children[0].textRuns, Is.Empty);
+            Assert.That(restored.Document.root.children[1].children[0].textRuns, Is.Empty);
+            Assert.That(restored.Document.root.children[2].children[0].children[0].textRuns, Is.Empty);
+            UdomBuilder.GenerateOrRegenerate(restored.Document, root);
+            text = UdomBuilder.FindNode(root, "inline-css-text").GetComponent<TextMeshProUGUI>();
+            buttonLabel = UdomBuilder.FindNode(root, "inline-css-button-label").GetComponent<TextMeshProUGUI>();
+            listLabel = UdomBuilder.FindNode(root, "inline-css-item-label").GetComponent<TextMeshProUGUI>();
+            Assert.That(text.gameObject, Is.SameAs(originalText));
+            Assert.That(buttonLabel.gameObject, Is.SameAs(originalButtonLabel));
+            Assert.That(listLabel.gameObject, Is.SameAs(originalListLabel));
+            Assert.That(text.richText, Is.False);
+            Assert.That(text.fontStyle, Is.EqualTo(FontStyles.Bold | FontStyles.Italic));
+            Object.DestroyImmediate(root.gameObject);
+
+            var legacyDocument = HtmlToUdomConverter.Convert(
+                "<p id=\"legacy-additive-run\" style=\"font-style: italic\">Legacy</p>").Document;
+            legacyDocument.root.textRuns = new[]
+            {
+                new UdomTextRun
+                {
+                    text = "Legacy",
+                    bold = true,
+                    fontScale = 1f
+                }
+            };
+            var legacyValidation = UdomValidator.Validate(UdomJsonWriter.Write(legacyDocument));
+            Assert.That(legacyValidation.IsValid, Is.True, legacyValidation.Format());
+            var legacyBuild = UdomBuilder.GenerateOrRegenerate(legacyValidation.Document);
+            var legacyText = UdomBuilder.FindNode(legacyBuild.Root, "legacy-additive-run")
+                .GetComponent<TextMeshProUGUI>();
+            legacyText.ForceMeshUpdate();
+            Assert.That(legacyText.fontStyle, Is.EqualTo(FontStyles.Italic));
+            Assert.That(
+                legacyText.textInfo.characterInfo[0].style & (FontStyles.Bold | FontStyles.Italic),
+                Is.EqualTo(FontStyles.Bold | FontStyles.Italic));
+            Object.DestroyImmediate(legacyBuild.Root.gameObject);
+
+            var mixedEffectiveRuns = HtmlToUdomConverter.Convert(html).Document;
+            mixedEffectiveRuns.root.children[0].textRuns[0].fontStyle = null;
+            var mixedValidation = UdomValidator.Validate(UdomJsonWriter.Write(mixedEffectiveRuns));
+            Assert.That(mixedValidation.IsValid, Is.False);
+            Assert.That(mixedValidation.Format(), Does.Contain("fontStyle"));
+
+            var invalidRunColor = HtmlToUdomConverter.Convert(html).Document;
+            invalidRunColor.root.children[0].textRuns[0].textColor = "red";
+            var colorValidation = UdomValidator.Validate(UdomJsonWriter.Write(invalidRunColor));
+            Assert.That(colorValidation.IsValid, Is.False);
+            Assert.That(colorValidation.Format(), Does.Contain("textColor"));
+
+            var unsafeColorDocument = HtmlToUdomConverter.Convert(
+                "<p id=\"unsafe-run-color\">Unsafe</p>").Document;
+            unsafeColorDocument.root.textRuns = new[]
+            {
+                new UdomTextRun
+                {
+                    text = "Unsafe",
+                    fontStyle = "Normal",
+                    textColor = "#FF0000><b>",
+                    fontScale = 1f
+                }
+            };
+            var unsafeColorBuild = UdomBuilder.GenerateOrRegenerate(unsafeColorDocument);
+            var unsafeColorText = UdomBuilder.FindNode(unsafeColorBuild.Root, "unsafe-run-color")
+                .GetComponent<TextMeshProUGUI>();
+            unsafeColorText.ForceMeshUpdate();
+            Assert.That(unsafeColorText.GetParsedText(), Is.EqualTo("Unsafe"));
+            Assert.That(unsafeColorText.text, Does.Not.Contain("<color="));
+            Assert.That(unsafeColorText.textInfo.characterInfo[0].style & FontStyles.Bold, Is.EqualTo(FontStyles.Normal));
+            Object.DestroyImmediate(unsafeColorBuild.Root.gameObject);
+
+            var unsupportedProperty = HtmlToUdomConverter.Convert(
+                html.Replace("color: #FF0000FF", "letter-spacing: 1px"));
+            Assert.That(unsupportedProperty.IsValid, Is.False);
+            Assert.That(unsupportedProperty.Format(), Does.Contain("letter-spacing"));
+
+            var invalidInlineColor = HtmlToUdomConverter.Convert(
+                html.Replace("color: #FF0000FF", "color: red"));
+            Assert.That(invalidInlineColor.IsValid, Is.False);
+            Assert.That(invalidInlineColor.Format(), Does.Contain("color"));
+
+            var invalidInlineSize = HtmlToUdomConverter.Convert(
+                html.Replace("font-size: 50%", "font-size: 0"));
+            Assert.That(invalidInlineSize.IsValid, Is.False);
+            Assert.That(invalidInlineSize.Format(), Does.Contain("font-size"));
         }
 
         [Test]

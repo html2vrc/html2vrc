@@ -133,6 +133,8 @@ namespace Html2Vrc.Editor
                         if (!string.Equals(key, "text", StringComparison.Ordinal)
                             && !string.Equals(key, "bold", StringComparison.Ordinal)
                             && !string.Equals(key, "italic", StringComparison.Ordinal)
+                            && !string.Equals(key, "fontStyle", StringComparison.Ordinal)
+                            && !string.Equals(key, "textColor", StringComparison.Ordinal)
                             && !string.Equals(key, "fontScale", StringComparison.Ordinal))
                         {
                             throw new FormatException($"{runPath}: 지원하지 않는 text run 속성 '{key}'.");
@@ -151,6 +153,16 @@ namespace Html2Vrc.Editor
                     if (runValue.TryGetValue("italic", out var italic))
                     {
                         run.italic = GetBoolean(italic, runPath + ".italic");
+                    }
+
+                    if (runValue.TryGetValue("fontStyle", out _))
+                    {
+                        run.fontStyle = GetString(runValue, "fontStyle");
+                    }
+
+                    if (runValue.TryGetValue("textColor", out _))
+                    {
+                        run.textColor = GetString(runValue, "textColor");
                     }
 
                     if (runValue.TryGetValue("fontScale", out var fontScale))

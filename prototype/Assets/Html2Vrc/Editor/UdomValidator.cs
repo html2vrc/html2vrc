@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 using UnityEditor;
@@ -376,6 +377,7 @@ namespace Html2Vrc.Editor
             }
 
             var combined = new StringBuilder();
+            var usesEffectiveFontStyles = runs.Any(run => run != null && !string.IsNullOrWhiteSpace(run.fontStyle));
             for (var index = 0; index < runs.Length; index++)
             {
                 var runPath = $"{path}.textRuns[{index}]";
@@ -395,6 +397,20 @@ namespace Html2Vrc.Editor
                     combined.Append(run.text);
                 }
 
+                if (usesEffectiveFontStyles
+                    && !IsSupportedTextRunFontStyle(run.fontStyle))
+                {
+                    AddError(
+                        result,
+                        runPath + ".fontStyle",
+                        "effective text run은 Normal, Bold, Italic 또는 BoldItalic fontStyle이 필요하다.");
+                }
+
+                if (!string.IsNullOrWhiteSpace(run.textColor))
+                {
+                    ValidateColor(run.textColor, runPath + ".textColor", result);
+                }
+
                 if (float.IsNaN(run.fontScale)
                     || float.IsInfinity(run.fontScale)
                     || run.fontScale <= 0f
@@ -408,6 +424,14 @@ namespace Html2Vrc.Editor
             {
                 AddError(result, path + ".textRuns", "textRuns를 합친 값은 Text의 text와 같아야 한다.");
             }
+        }
+
+        private static bool IsSupportedTextRunFontStyle(string value)
+        {
+            return string.Equals(value, "Normal", StringComparison.OrdinalIgnoreCase)
+                   || string.Equals(value, "Bold", StringComparison.OrdinalIgnoreCase)
+                   || string.Equals(value, "Italic", StringComparison.OrdinalIgnoreCase)
+                   || string.Equals(value, "BoldItalic", StringComparison.OrdinalIgnoreCase);
         }
 
         private static void ValidateBinding(UdomBinding binding, string path, UdomValidationResult result)
@@ -905,7 +929,9 @@ namespace Html2Vrc.Editor
 
         private static void ValidateColor(string value, string path, UdomValidationResult result)
         {
-            if (string.IsNullOrWhiteSpace(value) || !ColorUtility.TryParseHtmlString(value, out _))
+            if (string.IsNullOrWhiteSpace(value)
+                || !Regex.IsMatch(value, @"^#[0-9A-Fa-f]{6}(?:[0-9A-Fa-f]{2})?$")
+                || !ColorUtility.TryParseHtmlString(value, out _))
             {
                 AddError(result, path, $"잘못된 색상 '{value}'. #RRGGBB 또는 #RRGGBBAA 형식을 사용한다.");
             }

@@ -62,6 +62,8 @@ namespace Html2Vrc
         public string text;
         public bool bold;
         public bool italic;
+        public string fontStyle;
+        public string textColor;
         public float fontScale = 1f;
     }
 

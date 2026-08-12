@@ -1747,9 +1747,11 @@ namespace Html2Vrc.Editor
             var text = GetOrAdd<TextMeshProUGUI>(target);
             Undo.RecordObject(text, "Configure UDOM Text");
             var textRuns = node.textRuns ?? Array.Empty<UdomTextRun>();
+            var usesEffectiveFontStyles = textRuns.Any(
+                run => run != null && !string.IsNullOrWhiteSpace(run.fontStyle));
             text.richText = textRuns.Length > 0;
             text.text = textRuns.Length > 0
-                ? BuildSafeRichText(textRuns)
+                ? BuildSafeRichText(textRuns, usesEffectiveFontStyles)
                 : node.text ?? string.Empty;
             text.fontSize = style.fontSize;
             text.color = UdomBuilderUtility.ParseColor(style.textColor, Color.white);
@@ -1763,7 +1765,7 @@ namespace Html2Vrc.Editor
 
             if (UdomBuilderUtility.TryParseFontStyle(style.fontStyle, out var fontStyle))
             {
-                text.fontStyle = fontStyle;
+                text.fontStyle = usesEffectiveFontStyles ? FontStyles.Normal : fontStyle;
             }
 
             if (font != null)
@@ -1774,7 +1776,7 @@ namespace Html2Vrc.Editor
             ConfigureTextMetrics(text, style);
         }
 
-        private static string BuildSafeRichText(UdomTextRun[] runs)
+        private static string BuildSafeRichText(UdomTextRun[] runs, bool usesEffectiveFontStyles)
         {
             var builder = new StringBuilder();
             for (var index = 0; index < runs.Length; index++)
@@ -1785,14 +1787,31 @@ namespace Html2Vrc.Editor
                     continue;
                 }
 
-                if (run.bold)
+                var bold = run.bold;
+                var italic = run.italic;
+                if (usesEffectiveFontStyles
+                    && UdomBuilderUtility.TryParseFontStyle(run.fontStyle, out var effectiveFontStyle))
+                {
+                    bold = (effectiveFontStyle & FontStyles.Bold) != 0;
+                    italic = (effectiveFontStyle & FontStyles.Italic) != 0;
+                }
+
+                if (bold)
                 {
                     builder.Append("<b>");
                 }
 
-                if (run.italic)
+                if (italic)
                 {
                     builder.Append("<i>");
+                }
+
+                var hasTextColor = TryGetSafeTextRunColor(run.textColor, out var textColor);
+                if (hasTextColor)
+                {
+                    builder.Append("<color=");
+                    builder.Append(textColor);
+                    builder.Append(">");
                 }
 
                 var hasScaledFont = Math.Abs(run.fontScale - 1f) > 0.0001f;
@@ -1812,18 +1831,42 @@ namespace Html2Vrc.Editor
                     builder.Append("</size>");
                 }
 
-                if (run.italic)
+                if (hasTextColor)
+                {
+                    builder.Append("</color>");
+                }
+
+                if (italic)
                 {
                     builder.Append("</i>");
                 }
 
-                if (run.bold)
+                if (bold)
                 {
                     builder.Append("</b>");
                 }
             }
 
             return builder.ToString();
+        }
+
+        private static bool TryGetSafeTextRunColor(string source, out string color)
+        {
+            color = null;
+            if (string.IsNullOrWhiteSpace(source)
+                || (source.Length != 7 && source.Length != 9)
+                || source[0] != '#'
+                || !uint.TryParse(
+                    source.Substring(1),
+                    System.Globalization.NumberStyles.HexNumber,
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    out _))
+            {
+                return false;
+            }
+
+            color = source;
+            return true;
         }
 
         private static void AppendSafeRichTextLiteral(StringBuilder builder, string value)

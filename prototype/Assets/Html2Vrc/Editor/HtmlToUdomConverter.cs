@@ -231,7 +231,7 @@ namespace Html2Vrc.Editor
             if (string.Equals(type, "Text", StringComparison.Ordinal))
             {
                 ValidateTextChildren(element, path, result);
-                var textContent = GetTextContent(element, whiteSpaceMode);
+                var textContent = GetTextContent(element, whiteSpaceMode, node.style, path, result);
                 node.text = textContent.Text;
                 node.textRuns = textContent.Runs;
             }
@@ -276,7 +276,10 @@ namespace Html2Vrc.Editor
                 ValidateTextChildren(element, path, result);
                 node.children = new[]
                 {
-                    CreateDerivedTextNode(node, GetTextContent(element, whiteSpaceMode), "-label")
+                    CreateDerivedTextNode(
+                        node,
+                        GetTextContent(element, whiteSpaceMode, node.style, path, result),
+                        "-label")
                 };
             }
             else
@@ -331,7 +334,10 @@ namespace Html2Vrc.Editor
             };
             node.children = new[]
             {
-                CreateDerivedTextNode(node, GetTextContent(element, whiteSpaceMode), "-label")
+                CreateDerivedTextNode(
+                    node,
+                    GetTextContent(element, whiteSpaceMode, node.style, path, result),
+                    "-label")
             };
         }
 
@@ -4012,12 +4018,18 @@ namespace Html2Vrc.Editor
                     continue;
                 }
 
-                if (child.Attributes.Count > 0)
+                foreach (var attribute in child.Attributes.Keys)
                 {
+                    if (string.Equals(attribute, "style", StringComparison.OrdinalIgnoreCase)
+                        && !string.Equals(child.Tag, "br", StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
+
                     AddError(
                         result,
-                        path + "/" + child.Tag + "[" + index + "]",
-                        $"인라인 텍스트 <{child.Tag}>의 속성은 아직 지원하지 않는다.");
+                        path + "/" + child.Tag + "[" + index + "]/@" + attribute,
+                        $"인라인 텍스트 <{child.Tag}>의 '{attribute}' 속성은 지원하지 않는다.");
                 }
 
                 if (!string.Equals(child.Tag, "br", StringComparison.OrdinalIgnoreCase))
@@ -4027,10 +4039,27 @@ namespace Html2Vrc.Editor
             }
         }
 
-        private static HtmlTextContent GetTextContent(HtmlElement element, string whiteSpaceMode)
+        private static HtmlTextContent GetTextContent(
+            HtmlElement element,
+            string whiteSpaceMode,
+            UdomStyle nodeStyle,
+            string path,
+            HtmlToUdomResult result)
         {
             var rawCharacters = new List<HtmlStyledCharacter>();
-            AppendText(element, rawCharacters, false, false, 1f);
+            var baseFontStyle = nodeStyle.fontStyle ?? string.Empty;
+            AppendText(
+                element,
+                rawCharacters,
+                new HtmlInlineTextStyle
+                {
+                    Bold = baseFontStyle.IndexOf("Bold", StringComparison.OrdinalIgnoreCase) >= 0,
+                    Italic = baseFontStyle.IndexOf("Italic", StringComparison.OrdinalIgnoreCase) >= 0,
+                    FontScale = 1f
+                },
+                nodeStyle.fontSize,
+                path,
+                result);
             var normalizedCharacters = NormalizeLineEndings(rawCharacters);
             List<HtmlStyledCharacter> characters;
             if (whiteSpaceMode == "pre" || whiteSpaceMode == "pre-wrap")
@@ -4057,9 +4086,10 @@ namespace Html2Vrc.Editor
         private static void AppendText(
             HtmlElement element,
             List<HtmlStyledCharacter> characters,
-            bool bold,
-            bool italic,
-            float fontScale)
+            HtmlInlineTextStyle inlineStyle,
+            float baseFontSize,
+            string path,
+            HtmlToUdomResult result)
         {
             for (var index = 0; index < element.Content.Count; index++)
             {
@@ -4071,9 +4101,11 @@ namespace Html2Vrc.Editor
                         characters.Add(new HtmlStyledCharacter
                         {
                             Value = part.Text[characterIndex],
-                            Bold = bold,
-                            Italic = italic,
-                            FontScale = fontScale
+                            Bold = inlineStyle.Bold,
+                            Italic = inlineStyle.Italic,
+                            FontScale = inlineStyle.FontScale,
+                            TextColor = inlineStyle.TextColor,
+                            HasInlineStyle = inlineStyle.HasInlineStyle
                         });
                     }
 
@@ -4087,25 +4119,233 @@ namespace Html2Vrc.Editor
                     {
                         Value = '\n',
                         ForcedBreak = true,
-                        Bold = bold,
-                        Italic = italic,
-                        FontScale = fontScale
+                        Bold = inlineStyle.Bold,
+                        Italic = inlineStyle.Italic,
+                        FontScale = inlineStyle.FontScale,
+                        TextColor = inlineStyle.TextColor,
+                        HasInlineStyle = inlineStyle.HasInlineStyle
                     });
                 }
                 else
                 {
-                    var childBold = bold
-                                    || string.Equals(child.Tag, "strong", StringComparison.OrdinalIgnoreCase)
-                                    || string.Equals(child.Tag, "b", StringComparison.OrdinalIgnoreCase);
-                    var childItalic = italic
-                                      || string.Equals(child.Tag, "em", StringComparison.OrdinalIgnoreCase)
-                                      || string.Equals(child.Tag, "i", StringComparison.OrdinalIgnoreCase);
-                    var childFontScale = string.Equals(child.Tag, "small", StringComparison.OrdinalIgnoreCase)
-                        ? fontScale * 5f / 6f
-                        : fontScale;
-                    AppendText(child, characters, childBold, childItalic, childFontScale);
+                    var childPath = path + "/" + child.Tag + "[" + index + "]";
+                    var childStyle = GetInlineTextStyle(
+                        child,
+                        inlineStyle,
+                        baseFontSize,
+                        childPath,
+                        result);
+                    AppendText(child, characters, childStyle, baseFontSize, childPath, result);
                 }
             }
+        }
+
+        private static HtmlInlineTextStyle GetInlineTextStyle(
+            HtmlElement element,
+            HtmlInlineTextStyle inherited,
+            float baseFontSize,
+            string path,
+            HtmlToUdomResult result)
+        {
+            var style = inherited;
+            if (string.Equals(element.Tag, "strong", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(element.Tag, "b", StringComparison.OrdinalIgnoreCase))
+            {
+                style.Bold = true;
+                style.HasInlineStyle = true;
+            }
+
+            if (string.Equals(element.Tag, "em", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(element.Tag, "i", StringComparison.OrdinalIgnoreCase))
+            {
+                style.Italic = true;
+                style.HasInlineStyle = true;
+            }
+
+            if (string.Equals(element.Tag, "small", StringComparison.OrdinalIgnoreCase))
+            {
+                style.FontScale *= 5f / 6f;
+                style.HasInlineStyle = true;
+            }
+
+            var inlineCss = element.Get("style");
+            if (string.IsNullOrWhiteSpace(inlineCss))
+            {
+                return style;
+            }
+
+            style.HasInlineStyle = true;
+            var declarations = ParseStyle(inlineCss, path, result);
+            for (var index = 0; index < declarations.Count; index++)
+            {
+                var declaration = declarations[index];
+                switch (declaration.Key)
+                {
+                    case "color":
+                        if (TryParseInlineTextColor(
+                                declaration.Value,
+                                inherited.TextColor,
+                                path,
+                                result,
+                                out var textColor))
+                        {
+                            style.TextColor = textColor;
+                        }
+
+                        break;
+                    case "font-size":
+                        if (TryParseInlineFontSize(
+                                declaration.Value,
+                                inherited.FontScale,
+                                baseFontSize,
+                                path,
+                                result,
+                                out var fontScale))
+                        {
+                            style.FontScale = fontScale;
+                        }
+
+                        break;
+                    case "font-weight":
+                        if (string.Equals(declaration.Value.Trim(), "inherit", StringComparison.OrdinalIgnoreCase))
+                        {
+                            style.Bold = inherited.Bold;
+                        }
+                        else
+                        {
+                            var bold = style.Bold;
+                            SetFontWeight(declaration.Value, path, result, ref bold);
+                            style.Bold = bold;
+                        }
+
+                        break;
+                    case "font-style":
+                        if (string.Equals(declaration.Value.Trim(), "inherit", StringComparison.OrdinalIgnoreCase))
+                        {
+                            style.Italic = inherited.Italic;
+                        }
+                        else
+                        {
+                            var italic = style.Italic;
+                            SetFontStyle(declaration.Value, path, result, ref italic);
+                            style.Italic = italic;
+                        }
+
+                        break;
+                    default:
+                        AddError(
+                            result,
+                            path + "/@style",
+                            $"인라인 텍스트 CSS 속성 '{declaration.Key}'은 지원하지 않는다.");
+                        break;
+                }
+            }
+
+            return style;
+        }
+
+        private static bool TryParseInlineTextColor(
+            string source,
+            string inheritedColor,
+            string path,
+            HtmlToUdomResult result,
+            out string color)
+        {
+            var value = source.Trim();
+            if (string.Equals(value, "inherit", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(value, "currentcolor", StringComparison.OrdinalIgnoreCase))
+            {
+                color = inheritedColor;
+                return true;
+            }
+
+            if (string.Equals(value, "transparent", StringComparison.OrdinalIgnoreCase))
+            {
+                color = "#00000000";
+                return true;
+            }
+
+            string parsedColor = null;
+            SetColor(value, path, "color", result, parsed => parsedColor = parsed);
+            color = parsedColor;
+            return parsedColor != null;
+        }
+
+        private static bool TryParseInlineFontSize(
+            string source,
+            float inheritedScale,
+            float baseFontSize,
+            string path,
+            HtmlToUdomResult result,
+            out float scale)
+        {
+            var value = source.Trim();
+            if (string.Equals(value, "inherit", StringComparison.OrdinalIgnoreCase))
+            {
+                scale = inheritedScale;
+                return true;
+            }
+
+            if (value.EndsWith("%", StringComparison.Ordinal))
+            {
+                if (!TryParseNumber(value.Substring(0, value.Length - 1).Trim(), out var percentage))
+                {
+                    AddInlineFontSizeError(source, path, result);
+                    scale = 0f;
+                    return false;
+                }
+
+                scale = inheritedScale * percentage / 100f;
+            }
+            else if (value.EndsWith("em", StringComparison.OrdinalIgnoreCase))
+            {
+                if (!TryParseNumber(value.Substring(0, value.Length - 2).Trim(), out var em))
+                {
+                    AddInlineFontSizeError(source, path, result);
+                    scale = 0f;
+                    return false;
+                }
+
+                scale = inheritedScale * em;
+            }
+            else
+            {
+                if (value.EndsWith("px", StringComparison.OrdinalIgnoreCase))
+                {
+                    value = value.Substring(0, value.Length - 2).Trim();
+                }
+
+                if (!TryParseNumber(value, out var fontSize) || baseFontSize <= 0f)
+                {
+                    AddInlineFontSizeError(source, path, result);
+                    scale = 0f;
+                    return false;
+                }
+
+                scale = fontSize / baseFontSize;
+            }
+
+            if (float.IsNaN(scale)
+                || float.IsInfinity(scale)
+                || scale <= 0f
+                || scale > 100f)
+            {
+                AddInlineFontSizeError(source, path, result);
+                return false;
+            }
+
+            return true;
+        }
+
+        private static void AddInlineFontSizeError(
+            string source,
+            string path,
+            HtmlToUdomResult result)
+        {
+            AddError(
+                result,
+                path + "/@style",
+                $"인라인 font-size 값 '{source}'은 양수 px·숫자, percentage, em 또는 inherit이어야 한다.");
         }
 
         private static List<HtmlStyledCharacter> NormalizeLineEndings(
@@ -4230,9 +4470,7 @@ namespace Html2Vrc.Editor
 
         private static UdomTextRun[] BuildTextRuns(List<HtmlStyledCharacter> characters)
         {
-            if (!characters.Any(character => character.Bold
-                                             || character.Italic
-                                             || Math.Abs(character.FontScale - 1f) > 0.0001f))
+            if (!characters.Any(character => character.HasInlineStyle))
             {
                 return Array.Empty<UdomTextRun>();
             }
@@ -4243,13 +4481,15 @@ namespace Html2Vrc.Editor
             var bold = false;
             var italic = false;
             var fontScale = 1f;
+            string textColor = null;
             for (var index = 0; index < characters.Count; index++)
             {
                 var character = characters[index];
                 var sameStyle = hasStyle
                                 && bold == character.Bold
                                 && italic == character.Italic
-                                && Math.Abs(fontScale - character.FontScale) <= 0.0001f;
+                                && Math.Abs(fontScale - character.FontScale) <= 0.0001f
+                                && string.Equals(textColor, character.TextColor, StringComparison.OrdinalIgnoreCase);
                 if (!sameStyle && text.Length > 0)
                 {
                     runs.Add(new UdomTextRun
@@ -4257,6 +4497,8 @@ namespace Html2Vrc.Editor
                         text = text.ToString(),
                         bold = bold,
                         italic = italic,
+                        fontStyle = GetTextRunFontStyle(bold, italic),
+                        textColor = textColor,
                         fontScale = fontScale
                     });
                     text.Length = 0;
@@ -4268,6 +4510,7 @@ namespace Html2Vrc.Editor
                     bold = character.Bold;
                     italic = character.Italic;
                     fontScale = character.FontScale;
+                    textColor = character.TextColor;
                 }
 
                 text.Append(character.Value);
@@ -4280,11 +4523,20 @@ namespace Html2Vrc.Editor
                     text = text.ToString(),
                     bold = bold,
                     italic = italic,
+                    fontStyle = GetTextRunFontStyle(bold, italic),
+                    textColor = textColor,
                     fontScale = fontScale
                 });
             }
 
             return runs.ToArray();
+        }
+
+        private static string GetTextRunFontStyle(bool bold, bool italic)
+        {
+            return bold
+                ? (italic ? "BoldItalic" : "Bold")
+                : (italic ? "Italic" : "Normal");
         }
 
         private static string CollapseWhitespace(string value)
@@ -4418,6 +4670,17 @@ namespace Html2Vrc.Editor
             public bool Bold;
             public bool Italic;
             public float FontScale;
+            public string TextColor;
+            public bool HasInlineStyle;
+        }
+
+        private struct HtmlInlineTextStyle
+        {
+            public bool Bold;
+            public bool Italic;
+            public float FontScale;
+            public string TextColor;
+            public bool HasInlineStyle;
         }
 
         private sealed class HtmlElement

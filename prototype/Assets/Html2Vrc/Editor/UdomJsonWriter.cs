@@ -139,6 +139,8 @@ namespace Html2Vrc.Editor
                 writer.StringProperty("text", run.text);
                 writer.BoolProperty("bold", run.bold);
                 writer.BoolProperty("italic", run.italic);
+                writer.OptionalStringProperty("fontStyle", run.fontStyle);
+                writer.OptionalStringProperty("textColor", run.textColor);
                 writer.FloatProperty("fontScale", run.fontScale);
                 writer.EndObject();
             }
