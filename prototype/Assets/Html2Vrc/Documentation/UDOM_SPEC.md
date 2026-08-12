@@ -60,9 +60,11 @@ Canonical `paint.shadows`는 `shadowOffsets`, `shadowBlurs`, `shadowSpreads`, `s
 
 Canonical text는 `lineHeight`, `letterSpacing`, `align: justify`, `verticalAlign`, `wrap`, `overflow`, `preserveWhitespace`를 내부 text metric과 flow 필드로 정규화한다. 숫자 line height는 TMP FontAsset의 face line height와 point size에서 필요한 추가 spacing을 계산해 baseline 간격을 design unit에 맞춘다. Letter spacing은 design unit을 TMP의 font-size-relative em 값으로 환산한다. `clip`은 TMP masking, `visible`은 overflow, `ellipsis`는 ellipsis 모드에 대응하며, whitespace 보존이 꺼져 있으면 연속 공백과 줄바꿈을 한 칸으로 축약한다. 생략된 canonical 기본값은 16px, 검정, top/start, wrap, clip이다.
 
+Canonical font resource URI가 기존 `.asset` TMP Font Asset을 가리키면 이를 Text와 TextInput의 text·placeholder에 직접 연결한다. `.ttf` 또는 `.otf` Unity Font를 가리키면 source GUID와 이름으로 `Assets/Html2VrcGenerated/Fonts` 아래의 dynamic TMP Font Asset을 한 번 생성해 문서와 노드 사이에서 공유한다. 동일 source는 재생성해도 같은 asset GUID를 유지한다. 누락되었거나 지원하지 않는 font 형식은 명시적 경고와 함께 TMP Settings의 기본 font로 폴백하며, 생성된 custom font가 기본 후보로 선택되지는 않는다.
+
 Resource URI는 canonical 명세대로 UDOM TextAsset이 있는 폴더를 기준으로 해석한다. `Assets/`로 시작하는 절대 Unity 에셋 경로도 지원한다. `..`로 정규화하더라도 결과가 `Assets/` 밖으로 나가면 참조하지 않고 경고를 남긴다.
 
-아직 지원하지 않는 canonical 기능은 묵시하지 않고 검증 오류나 명시적 폴백 경고로 반환한다. font resource는 프로젝트 기본 TMP font로 폴백하고 경고를 남긴다. Text 노드 자체의 linear/radial/conic gradient와 radius는 TMP 텍스트와 별도 박스 graphic이 필요하므로 첫 stop 색 또는 square corner와 경고를 사용한다. Embed의 gradient와 radius도 외부 오브젝트가 graphic을 소유하므로 첫 stop 또는 square corner로 진단한다. source asset 경로가 없는 raw JSON 검증에서는 상대 resource URI를 추측하지 않고 빈 Image와 경고를 사용한다. `bind`와 `on`의 symbolic ID는 임의 로직으로 실행하지 않고, 안전한 Unity/Udon binding manifest가 없다는 경고로 남는다. Button, Toggle, Slider, Text input과 Scroll의 canonical focus/blur도 같은 방식으로 보존·진단한다. Slider의 step은 정수 범위의 `1`일 때 Unity `wholeNumbers`로 적용하고 그 외의 step은 아직 경고와 연속 Slider 폴백을 사용한다. Text input은 빈 문자열을 포함한 value와 placeholder, multiline, readOnly, disabled를 native `TMP_InputField`로 적용한다.
+아직 지원하지 않는 canonical 기능은 묵시하지 않고 검증 오류나 명시적 폴백 경고로 반환한다. Text 노드 자체의 linear/radial/conic gradient와 radius는 TMP 텍스트와 별도 박스 graphic이 필요하므로 첫 stop 색 또는 square corner와 경고를 사용한다. Embed의 gradient와 radius도 외부 오브젝트가 graphic을 소유하므로 첫 stop 또는 square corner로 진단한다. source asset 경로가 없는 raw JSON 검증에서는 상대 resource URI를 추측하지 않고 빈 Image와 기본 TMP font 경고를 사용한다. `bind`와 `on`의 symbolic ID는 임의 로직으로 실행하지 않고, 안전한 Unity/Udon binding manifest가 없다는 경고로 남는다. Button, Toggle, Slider, Text input과 Scroll의 canonical focus/blur도 같은 방식으로 보존·진단한다. Slider의 step은 정수 범위의 `1`일 때 Unity `wholeNumbers`로 적용하고 그 외의 step은 아직 경고와 연속 Slider 폴백을 사용한다. Text input은 빈 문자열을 포함한 value와 placeholder, multiline, readOnly, disabled를 native `TMP_InputField`로 적용한다.
 
 ## 최상위 구조
 
@@ -159,6 +161,7 @@ Resource URI는 canonical 명세대로 UDOM TextAsset이 있는 폴더를 기준
 - `shadowOffsets`, `shadowBlurs`, `shadowSpreads`, `shadowColors`, `shadowInsets`: canonical shadow 배열 순서를 보존하는 offset X/Y와 layer별 paint 값.
 - `lineHeight`, `letterSpacing`: canonical text의 design-unit baseline 간격과 글자 사이 간격. `lineHeight: -1`은 font의 normal metric을 뜻한다.
 - `textWrap`, `textOverflow`, `preserveWhitespace`: canonical wrap/nowrap, visible/clip/ellipsis와 whitespace 보존 여부.
+- `fontAssetPath`: canonical font resource에서 해석한 Unity `Assets/` 경로. 기존 TMP Font Asset 또는 TMP asset을 생성할 TTF/OTF source를 가리킨다.
 - `positionAbsolute`: canonical 노드가 부모 flex 흐름에서 빠지고 top-left `x/y` 좌표를 사용하는지 나타내는 내부 플래그.
 - `displayNone`: canonical `layout.mode: none`으로 인해 노드와 subtree가 렌더링·레이아웃에서 제외되는지 나타내는 내부 플래그.
 - `stretchChildrenWidth`, `stretchChildrenHeight`: canonical flex의 기본 `alignItems: stretch`를 Unity Layout Group의 cross-axis 제어로 보존하는 내부 플래그.

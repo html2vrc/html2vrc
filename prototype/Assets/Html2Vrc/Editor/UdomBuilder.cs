@@ -627,7 +627,7 @@ namespace Html2Vrc.Editor
                     BuildChildren(node, nodeObject.transform, panelForChildren, context);
                     break;
                 case "text":
-                    ConfigureText(nodeObject, node, style, context.Font);
+                    ConfigureText(nodeObject, node, style, ResolveFont(style, context.Font));
                     break;
                 case "image":
                     ConfigureImage(nodeObject, node, style, context);
@@ -2115,7 +2115,8 @@ namespace Html2Vrc.Editor
             ConfigureStretch(textObject.GetComponent<RectTransform>());
             RemoveIfPresent<LayoutElement>(textObject);
             var text = GetOrAdd<TextMeshProUGUI>(textObject);
-            ConfigureInputTextGraphic(text, node.textInputValue, style, context.Font, false);
+            var font = ResolveFont(style, context.Font);
+            ConfigureInputTextGraphic(text, node.textInputValue, style, font, false);
 
             var placeholderId = node.id + InputPlaceholderSuffix;
             var placeholderObject = UpsertGeneratedObject(
@@ -2134,7 +2135,7 @@ namespace Html2Vrc.Editor
                 placeholder,
                 node.textInputPlaceholder,
                 style,
-                context.Font,
+                font,
                 true);
 
             input.targetGraphic = background;
@@ -2393,10 +2394,20 @@ namespace Html2Vrc.Editor
 
         private static TMP_FontAsset GetOrCreateDefaultFont()
         {
+            if (TMP_Settings.defaultFontAsset != null)
+            {
+                return TMP_Settings.defaultFontAsset;
+            }
+
             var candidates = AssetDatabase.FindAssets("t:TMP_FontAsset");
             for (var index = 0; index < candidates.Length; index++)
             {
                 var path = AssetDatabase.GUIDToAssetPath(candidates[index]);
+                if (path.StartsWith("Assets/Html2VrcGenerated/", StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
                 var candidate = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(path);
                 if (candidate != null)
                 {
@@ -2406,6 +2417,13 @@ namespace Html2Vrc.Editor
 
             throw new InvalidOperationException(
                 "TextMeshPro Font Asset을 찾을 수 없다. Window > TextMeshPro > Import TMP Essential Resources를 먼저 실행해야 한다.");
+        }
+
+        private static TMP_FontAsset ResolveFont(UdomStyle style, TMP_FontAsset fallback)
+        {
+            return style != null && !string.IsNullOrWhiteSpace(style.fontAssetPath)
+                ? UdomFontAssetUtility.LoadOrCreate(style.fontAssetPath, fallback)
+                : fallback;
         }
 
         private static T GetOrAdd<T>(GameObject target) where T : Component

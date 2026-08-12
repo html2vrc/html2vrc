@@ -393,6 +393,11 @@ namespace Html2Vrc.Editor
                 style.fontStyle = GetString(value, "fontStyle");
             }
 
+            if (value.TryGetValue("fontAssetPath", out _))
+            {
+                style.fontAssetPath = GetString(value, "fontAssetPath");
+            }
+
             if (value.TryGetValue("childAlignment", out _))
             {
                 style.childAlignment = GetString(value, "childAlignment");

@@ -122,6 +122,8 @@ Canonical `layout.mode: none`은 해당 노드와 전체 subtree를 Unity hierar
 
 Canonical text의 `lineHeight`, `letterSpacing`, justify 정렬, wrap/nowrap, visible/clip/ellipsis overflow와 `preserveWhitespace`를 TextMeshPro로 보존합니다. 절대 line height는 실제 TMP FontAsset metric에서 spacing을 역산하고, letter spacing은 design unit을 TMP em 단위로 변환합니다. 생략된 canonical 텍스트는 명세 기본값인 16px, 검정, top/start, wrap, clip을 사용합니다.
 
+Canonical font resource가 Unity `Assets/` 안의 기존 TMP Font Asset을 가리키면 그대로 사용합니다. TTF 또는 OTF 원본을 가리키면 source GUID 기반 안정 경로의 dynamic TMP Font Asset을 `Assets/Html2VrcGenerated/Fonts`에 생성해 Text와 TextInput에서 재사용합니다. 경로가 없거나 지원하지 않는 형식이면 진단을 남기고 TMP Settings의 기본 font로 폴백합니다.
+
 Canonical image의 `fit`은 `fill`, `contain`, `cover`, `none`을 지원합니다. 이미지 콘텐츠는 안정 ID를 가진 내부 자식에 배치되고 원본 비율·크기와 `position.x/y`에 따라 정렬되며, 노드 영역을 넘는 부분은 마스크로 잘립니다. 백분율 위치는 남는 공간에 대한 비율, 숫자는 왼쪽·위 기준 design-unit 오프셋, `auto`는 가운데 정렬로 해석합니다.
 
 Canonical `paint.border`의 왼쪽·위·오른쪽·아래 `solid` edge는 각 폭과 색을 유지한 단일 VRChat-safe SDF Image로 생성됩니다. Outer radius와 비대칭 폭에서 계산한 타원형 inner corner를 함께 사용하고, 서로 다른 edge 색은 폭 비율의 diagonal join으로 연결됩니다. 안정 border Material과 overlay는 레이아웃·raycast에 영향을 주지 않으며 재생성 사이에 GUID와 GameObject를 유지합니다.

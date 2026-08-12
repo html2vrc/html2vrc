@@ -3386,9 +3386,34 @@ namespace Html2Vrc.Editor
                     throw new FormatException($"{path}.font: resource '{fontId}' is not a font.");
                 }
 
-                warnings.Add(new UdomParseWarning(
-                    path + ".font",
-                    $"Canonical font '{fontId}' ({fontResource.Uri}) uses the project default TMP font until font asset generation is implemented."));
+                if (!string.IsNullOrWhiteSpace(fontResource.UnityPath))
+                {
+                    var extension = Path.GetExtension(fontResource.UnityPath);
+                    if (string.Equals(extension, ".asset", StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(extension, ".ttf", StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(extension, ".otf", StringComparison.OrdinalIgnoreCase))
+                    {
+                        style.fontAssetPath = fontResource.UnityPath;
+                        if (!UdomFontAssetUtility.CanLoad(fontResource.UnityPath))
+                        {
+                            warnings.Add(new UdomParseWarning(
+                                path + ".font",
+                                $"Canonical font '{fontId}' was not found as a supported Unity font asset at '{fontResource.UnityPath}' and uses the project default TMP font."));
+                        }
+                    }
+                    else
+                    {
+                        warnings.Add(new UdomParseWarning(
+                            path + ".font",
+                            $"Canonical font '{fontId}' uses unsupported Unity font asset '{fontResource.UnityPath}' and uses the project default TMP font."));
+                    }
+                }
+                else
+                {
+                    warnings.Add(new UdomParseWarning(
+                        path + ".font",
+                        $"Canonical font '{fontId}' uses relative URI '{fontResource.Uri}' and uses the project default TMP font. Copy it into Unity Assets/ to import or generate a TMP font asset."));
+                }
             }
 
             var bold = false;

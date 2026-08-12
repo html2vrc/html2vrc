@@ -163,6 +163,7 @@ namespace Html2Vrc.Editor
             writer.BoolProperty("preserveWhitespace", style.preserveWhitespace);
             writer.StringProperty("alignment", style.alignment);
             writer.StringProperty("fontStyle", style.fontStyle);
+            writer.OptionalStringProperty("fontAssetPath", style.fontAssetPath);
             writer.StringProperty("childAlignment", style.childAlignment);
             writer.StringProperty("justifyContent", style.justifyContent);
             writer.StringProperty("alignContent", style.alignContent);

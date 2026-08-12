@@ -100,6 +100,7 @@ namespace Html2Vrc
         public bool preserveWhitespace;
         public string alignment = "MiddleLeft";
         public string fontStyle = "Normal";
+        public string fontAssetPath;
         public string childAlignment = "UpperLeft";
         public string justifyContent = "Start";
         public string alignContent = "Stretch";

@@ -95,7 +95,7 @@ namespace Html2Vrc.Editor
             "backgroundGradientRadius", "backgroundGradientRadiusIsPercent",
             "cornerRadius", "cornerRadiusPercent", "borderWidth", "borderColor", "textColor", "fontSize",
             "lineHeight", "letterSpacing", "textWrap", "textOverflow", "preserveWhitespace",
-            "alignment", "fontStyle", "childAlignment", "justifyContent", "alignContent", "flexWrap",
+            "alignment", "fontStyle", "fontAssetPath", "childAlignment", "justifyContent", "alignContent", "flexWrap",
             "alignSelf", "alignSelfMargin", "rowGap", "columnGap",
             "shadowOffsets", "shadowBlurs", "shadowSpreads", "shadowColors", "shadowInsets",
             "stretchChildrenWidth", "stretchChildrenHeight", "useResolvedChildrenWidth", "useResolvedChildrenHeight",
@@ -496,6 +496,15 @@ namespace Html2Vrc.Editor
             if (!UdomBuilderUtility.TryParseFontStyle(style.fontStyle, out _))
             {
                 AddError(result, path + ".fontStyle", $"지원하지 않는 font style '{style.fontStyle}'.");
+            }
+
+            if (!string.IsNullOrWhiteSpace(style.fontAssetPath)
+                && !UdomFontAssetUtility.IsValidAssetPath(style.fontAssetPath))
+            {
+                AddError(
+                    result,
+                    path + ".fontAssetPath",
+                    "fontAssetPath는 . 또는 .. 세그먼트가 없는 Unity Assets/ 경로여야 한다.");
             }
 
             if (!UdomBuilderUtility.TryParseChildAlignment(style.childAlignment, out _))

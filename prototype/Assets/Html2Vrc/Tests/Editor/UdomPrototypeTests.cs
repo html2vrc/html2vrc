@@ -25,6 +25,10 @@ namespace Html2Vrc.Tests
         private const string SampleHtmlPath = "Assets/Html2Vrc/Samples/WorldSettings.html";
         private const string CanonicalRelativeImagePath =
             "Assets/Html2Vrc/Samples/CanonicalRelativeImage.udom.json";
+        private const string CanonicalRelativeFontPath =
+            "Assets/Html2Vrc/Samples/CanonicalRelativeFont.udom.json";
+        private const string LiberationSourceFontPath =
+            "Assets/TextMesh Pro/Fonts/LiberationSans.ttf";
         private TextAsset sample;
 
         [SetUp]
@@ -63,6 +67,8 @@ namespace Html2Vrc.Tests
                 UdomShadowAssetUtility.DeleteGeneratedAssets(sample, "shadow-panel::__shadow-1");
                 UdomShadowAssetUtility.DeleteGeneratedAssets(sample, "shadow-panel::__shadow-2");
             }
+
+            UdomFontAssetUtility.DeleteGeneratedAsset(LiberationSourceFontPath);
         }
 
         [Test]
@@ -340,6 +346,89 @@ namespace Html2Vrc.Tests
             Assert.That(escapingValidation.IsValid, Is.True, escapingValidation.Format());
             Assert.That(escapingValidation.Document.root.children[0].texture, Is.Null);
             Assert.That(escapingValidation.Format(), Does.Contain("uses relative URI '../../../../outside.png'"));
+        }
+
+        [Test]
+        public void CanonicalFontResource_LoadsTmpAssetAndGeneratesStableSourceFontAsset()
+        {
+            var source = AssetDatabase.LoadAssetAtPath<TextAsset>(CanonicalRelativeFontPath);
+            Assert.That(source, Is.Not.Null, "Canonical relative-font sample must import as TextAsset.");
+
+            var validation = UdomValidator.Validate(source.text, CanonicalRelativeFontPath);
+            Assert.That(validation.IsValid, Is.True, validation.Format());
+            Assert.That(validation.Issues, Is.Empty, validation.Format());
+            var generatedNode = validation.Document.root.children[0];
+            var directNode = validation.Document.root.children[1];
+            var inputNode = validation.Document.root.children[2];
+            Assert.That(generatedNode.style.fontAssetPath, Is.EqualTo(LiberationSourceFontPath));
+            Assert.That(
+                directNode.style.fontAssetPath,
+                Is.EqualTo("Assets/TextMesh Pro/Resources/Fonts & Materials/LiberationSans SDF.asset"));
+            Assert.That(inputNode.style.fontAssetPath, Is.EqualTo(LiberationSourceFontPath));
+
+            var normalized = UdomJsonWriter.Write(validation.Document);
+            var roundTrip = UdomValidator.Validate(normalized);
+            Assert.That(roundTrip.IsValid, Is.True, roundTrip.Format());
+            Assert.That(
+                roundTrip.Document.root.children[0].style.fontAssetPath,
+                Is.EqualTo(LiberationSourceFontPath));
+
+            var generatedAssetPath = UdomFontAssetUtility.GetGeneratedAssetPath(LiberationSourceFontPath);
+            Assert.That(generatedAssetPath, Does.StartWith("Assets/Html2VrcGenerated/Fonts/"));
+            Assert.That(AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(generatedAssetPath), Is.Null);
+
+            var build = UdomBuilder.GenerateOrRegenerate(validation.Document, null, source);
+            var generatedText = UdomBuilder.FindNode(build.Root, "generated-font-text")
+                .GetComponent<TextMeshProUGUI>();
+            var directText = UdomBuilder.FindNode(build.Root, "direct-font-text")
+                .GetComponent<TextMeshProUGUI>();
+            var inputText = UdomBuilder.FindNode(build.Root, "font-text-input::__input-text")
+                .GetComponent<TextMeshProUGUI>();
+            var placeholder = UdomBuilder.FindNode(build.Root, "font-text-input::__input-placeholder")
+                .GetComponent<TextMeshProUGUI>();
+            var generatedAsset = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(generatedAssetPath);
+            var directAsset = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(directNode.style.fontAssetPath);
+            Assert.That(generatedAsset, Is.Not.Null);
+            Assert.That(generatedAsset.atlasPopulationMode, Is.EqualTo(AtlasPopulationMode.Dynamic));
+            Assert.That(
+                generatedAsset.sourceFontFile,
+                Is.SameAs(AssetDatabase.LoadAssetAtPath<Font>(LiberationSourceFontPath)));
+            var generatedSubAssets = AssetDatabase.LoadAllAssetsAtPath(generatedAssetPath);
+            Assert.That(generatedSubAssets.OfType<Material>().Count(), Is.EqualTo(1));
+            Assert.That(generatedSubAssets.OfType<Texture2D>().Count(), Is.EqualTo(1));
+            Assert.That(generatedText.font, Is.SameAs(generatedAsset));
+            Assert.That(inputText.font, Is.SameAs(generatedAsset));
+            Assert.That(placeholder.font, Is.SameAs(generatedAsset));
+            Assert.That(directAsset, Is.Not.Null);
+            Assert.That(directText.font, Is.SameAs(directAsset));
+
+            var generatedGuid = AssetDatabase.AssetPathToGUID(generatedAssetPath);
+            var originalGeneratedObject = generatedText.gameObject;
+            var repeated = UdomBuilder.GenerateOrRegenerate(roundTrip.Document, build.Root, source);
+            Assert.That(repeated.Created, Is.Zero);
+            Assert.That(
+                UdomBuilder.FindNode(build.Root, "generated-font-text").gameObject,
+                Is.SameAs(originalGeneratedObject));
+            Assert.That(AssetDatabase.AssetPathToGUID(generatedAssetPath), Is.EqualTo(generatedGuid));
+            Assert.That(
+                UdomBuilder.FindNode(build.Root, "generated-font-text").GetComponent<TextMeshProUGUI>().font,
+                Is.SameAs(generatedAsset));
+
+            var missingJson = source.text.Replace(
+                "../../TextMesh Pro/Fonts/LiberationSans.ttf",
+                "missing.ttf");
+            var missingValidation = UdomValidator.Validate(missingJson, CanonicalRelativeFontPath);
+            Assert.That(missingValidation.IsValid, Is.True, missingValidation.Format());
+            Assert.That(missingValidation.Format(), Does.Contain("uses the project default TMP font"));
+            Assert.That(
+                missingValidation.Document.root.children[0].style.fontAssetPath,
+                Is.EqualTo("Assets/Html2Vrc/Samples/missing.ttf"));
+            var missingBuild = UdomBuilder.GenerateOrRegenerate(missingValidation.Document, build.Root, source);
+            var missingText = UdomBuilder.FindNode(missingBuild.Root, "generated-font-text")
+                .GetComponent<TextMeshProUGUI>();
+            Assert.That(missingText.font, Is.Not.Null);
+            Assert.That(missingText.font, Is.Not.SameAs(generatedAsset));
+            Object.DestroyImmediate(build.Root.gameObject);
         }
 
         [Test]
