@@ -3749,6 +3749,146 @@ namespace Html2Vrc.Tests
         }
 
         [Test]
+        public void HtmlConverter_TextFlowMapsCssMetricsWhitespaceAndOverflow()
+        {
+            const string html = @"
+              <main id=""html-text-flow-root"" data-canvas-size=""760 560""
+                style=""width: 760px; height: 560px; display: flex; flex-direction: column; align-items: flex-start; padding: 20px; gap: 12px"">
+                <p id=""html-text-metrics""
+                  style=""width: 560px; height: 100px; line-height: 1.5; font-size: 32px; letter-spacing: 4px;
+                    white-space: nowrap; text-overflow: clip; text-align: justify"">Alpha <strong>Beta</strong> Gamma<br>Delta</p>
+                <p id=""html-text-preserved""
+                  style=""width: 560px; height: 100px; font-size: 30px; line-height: 45px; letter-spacing: -1px;
+                    white-space: pre-wrap; text-overflow: ellipsis"">  First&#32;&#32;
+Second   line&#32;&#32;</p>
+                <p id=""html-text-pre-line""
+                  style=""width: 560px; height: 100px; white-space: pre-line"">  One   two
+ Three    four  </p>
+                <button id=""html-text-button"" data-action=""ClosePanel""
+                  style=""width: 300px; height: 64px; font-size: 20px; line-height: 120%; letter-spacing: 2px;
+                    white-space: pre; text-overflow: clip"">A  <em>B</em>  C</button>
+              </main>";
+
+            var conversion = HtmlToUdomConverter.Convert(html);
+
+            Assert.That(conversion.IsValid, Is.True, conversion.Format());
+            var metricsNode = conversion.Document.root.children[0];
+            var preservedNode = conversion.Document.root.children[1];
+            var preLineNode = conversion.Document.root.children[2];
+            var buttonNode = conversion.Document.root.children[3];
+            var buttonLabelNode = buttonNode.children[0];
+            Assert.That(metricsNode.text, Is.EqualTo("Alpha Beta Gamma\nDelta"));
+            Assert.That(metricsNode.style.fontSize, Is.EqualTo(32f));
+            Assert.That(metricsNode.style.lineHeight, Is.EqualTo(48f));
+            Assert.That(metricsNode.style.letterSpacing, Is.EqualTo(4f));
+            Assert.That(metricsNode.style.textWrap, Is.False);
+            Assert.That(metricsNode.style.textOverflow, Is.EqualTo("Clip"));
+            Assert.That(metricsNode.style.preserveWhitespace, Is.False);
+            Assert.That(metricsNode.style.alignment, Is.EqualTo("Justified"));
+            Assert.That(preservedNode.text, Is.EqualTo("  First  \nSecond   line  "));
+            Assert.That(preservedNode.style.lineHeight, Is.EqualTo(45f));
+            Assert.That(preservedNode.style.letterSpacing, Is.EqualTo(-1f));
+            Assert.That(preservedNode.style.textWrap, Is.True);
+            Assert.That(preservedNode.style.textOverflow, Is.EqualTo("Ellipsis"));
+            Assert.That(preservedNode.style.preserveWhitespace, Is.True);
+            Assert.That(preLineNode.text, Is.EqualTo("One two\nThree four"));
+            Assert.That(preLineNode.style.textWrap, Is.True);
+            Assert.That(preLineNode.style.preserveWhitespace, Is.False);
+            Assert.That(buttonLabelNode.text, Is.EqualTo("A  B  C"));
+            Assert.That(buttonLabelNode.style.fontSize, Is.EqualTo(20f));
+            Assert.That(buttonLabelNode.style.lineHeight, Is.EqualTo(24f).Within(0.001f));
+            Assert.That(buttonLabelNode.style.letterSpacing, Is.EqualTo(2f));
+            Assert.That(buttonLabelNode.style.textWrap, Is.False);
+            Assert.That(buttonLabelNode.style.textOverflow, Is.EqualTo("Clip"));
+            Assert.That(buttonLabelNode.style.preserveWhitespace, Is.True);
+
+            var normalized = UdomValidator.Validate(conversion.Json);
+            Assert.That(normalized.IsValid, Is.True, normalized.Format());
+            Assert.That(normalized.Document.root.children[0].text, Is.EqualTo("Alpha Beta Gamma\nDelta"));
+            Assert.That(normalized.Document.root.children[1].text, Is.EqualTo("  First  \nSecond   line  "));
+            Assert.That(normalized.Document.root.children[3].children[0].style.lineHeight, Is.EqualTo(24f).Within(0.001f));
+
+            var build = UdomBuilder.GenerateOrRegenerate(conversion.Document);
+            var root = build.Root;
+            var metrics = UdomBuilder.FindNode(root, "html-text-metrics").GetComponent<TextMeshProUGUI>();
+            var preserved = UdomBuilder.FindNode(root, "html-text-preserved").GetComponent<TextMeshProUGUI>();
+            var preLine = UdomBuilder.FindNode(root, "html-text-pre-line").GetComponent<TextMeshProUGUI>();
+            var buttonLabel = UdomBuilder.FindNode(root, "html-text-button-label").GetComponent<TextMeshProUGUI>();
+            var originalMetrics = metrics.gameObject;
+            var originalButtonLabel = buttonLabel.gameObject;
+            Assert.That(metrics.text, Is.EqualTo("Alpha Beta Gamma\nDelta"));
+            Assert.That(metrics.characterSpacing, Is.EqualTo(12.5f).Within(0.001f));
+            Assert.That(metrics.enableWordWrapping, Is.False);
+            Assert.That(metrics.overflowMode, Is.EqualTo(TextOverflowModes.Masking));
+            Assert.That(metrics.alignment, Is.EqualTo(TextAlignmentOptions.Justified));
+            Assert.That(preserved.text, Is.EqualTo("  First  \nSecond   line  "));
+            Assert.That(preserved.characterSpacing, Is.EqualTo(-100f / 30f).Within(0.001f));
+            Assert.That(preserved.enableWordWrapping, Is.True);
+            Assert.That(preserved.overflowMode, Is.EqualTo(TextOverflowModes.Ellipsis));
+            Assert.That(preLine.text, Is.EqualTo("One two\nThree four"));
+            Assert.That(buttonLabel.text, Is.EqualTo("A  B  C"));
+            Assert.That(buttonLabel.characterSpacing, Is.EqualTo(10f).Within(0.001f));
+            Assert.That(buttonLabel.enableWordWrapping, Is.False);
+            Assert.That(buttonLabel.overflowMode, Is.EqualTo(TextOverflowModes.Masking));
+
+            Canvas.ForceUpdateCanvases();
+            metrics.ForceMeshUpdate();
+            Assert.That(metrics.textInfo.lineCount, Is.EqualTo(2));
+            var baselineDistance = Mathf.Abs(
+                metrics.textInfo.lineInfo[0].baseline
+                - metrics.textInfo.lineInfo[1].baseline);
+            Assert.That(baselineDistance, Is.EqualTo(48f).Within(0.01f));
+
+            var restored = HtmlToUdomConverter.Convert(
+                html.Replace("line-height: 1.5", "line-height: normal")
+                    .Replace("letter-spacing: 4px", "letter-spacing: normal")
+                    .Replace("white-space: nowrap", "white-space: normal")
+                    .Replace("text-overflow: clip", "text-overflow: ellipsis")
+                    .Replace("text-align: justify", "text-align: right"));
+            Assert.That(restored.IsValid, Is.True, restored.Format());
+            UdomBuilder.GenerateOrRegenerate(restored.Document, root);
+            metrics = UdomBuilder.FindNode(root, "html-text-metrics").GetComponent<TextMeshProUGUI>();
+            buttonLabel = UdomBuilder.FindNode(root, "html-text-button-label").GetComponent<TextMeshProUGUI>();
+            Assert.That(metrics.gameObject, Is.SameAs(originalMetrics));
+            Assert.That(buttonLabel.gameObject, Is.SameAs(originalButtonLabel));
+            Assert.That(metrics.lineSpacing, Is.Zero);
+            Assert.That(metrics.characterSpacing, Is.Zero);
+            Assert.That(metrics.enableWordWrapping, Is.True);
+            Assert.That(metrics.overflowMode, Is.EqualTo(TextOverflowModes.Ellipsis));
+            Assert.That(metrics.alignment, Is.EqualTo(TextAlignmentOptions.Right));
+            Object.DestroyImmediate(root.gameObject);
+
+            var zeroLineHeight = HtmlToUdomConverter.Convert(html.Replace("line-height: 1.5", "line-height: 0"));
+            Assert.That(zeroLineHeight.IsValid, Is.False);
+            Assert.That(zeroLineHeight.Format(), Does.Contain("line-height"));
+
+            var percentageSpacing = HtmlToUdomConverter.Convert(
+                html.Replace("letter-spacing: 4px", "letter-spacing: 10%"));
+            Assert.That(percentageSpacing.IsValid, Is.False);
+            Assert.That(percentageSpacing.Format(), Does.Contain("letter-spacing"));
+
+            var nonFiniteSpacing = HtmlToUdomConverter.Convert(
+                html.Replace("letter-spacing: 4px", "letter-spacing: NaN"));
+            Assert.That(nonFiniteSpacing.IsValid, Is.False);
+            Assert.That(nonFiniteSpacing.Format(), Does.Contain("letter-spacing"));
+
+            var unsupportedWhitespace = HtmlToUdomConverter.Convert(
+                html.Replace("white-space: nowrap", "white-space: break-spaces"));
+            Assert.That(unsupportedWhitespace.IsValid, Is.False);
+            Assert.That(unsupportedWhitespace.Format(), Does.Contain("white-space"));
+
+            var unsupportedOverflow = HtmlToUdomConverter.Convert(
+                html.Replace("text-overflow: ellipsis", "text-overflow: fade"));
+            Assert.That(unsupportedOverflow.IsValid, Is.False);
+            Assert.That(unsupportedOverflow.Format(), Does.Contain("text-overflow"));
+
+            var unsupportedAlignment = HtmlToUdomConverter.Convert(
+                html.Replace("text-align: justify", "text-align: match-parent"));
+            Assert.That(unsupportedAlignment.IsValid, Is.False);
+            Assert.That(unsupportedAlignment.Format(), Does.Contain("text-align"));
+        }
+
+        [Test]
         public void HtmlConverter_PaintStateAndZIndexPreserveLayoutAndInputSemantics()
         {
             const string html = @"

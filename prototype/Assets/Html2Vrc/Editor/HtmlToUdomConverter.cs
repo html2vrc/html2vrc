@@ -226,12 +226,12 @@ namespace Html2Vrc.Editor
                 name = FirstNonEmpty(element.Get("data-name"), element.Get("aria-label"), id),
                 style = CreateDefaultStyle(element, type)
             };
-            ApplyStyle(element, node, path, result);
+            ApplyStyle(element, node, path, result, out var whiteSpaceMode);
 
             if (string.Equals(type, "Text", StringComparison.Ordinal))
             {
                 ValidateTextChildren(element, path, result);
-                node.text = GetText(element);
+                node.text = GetText(element, whiteSpaceMode);
             }
             else if (string.Equals(type, "Image", StringComparison.Ordinal))
             {
@@ -258,7 +258,7 @@ namespace Html2Vrc.Editor
             else if (string.Equals(type, "Button", StringComparison.Ordinal))
             {
                 ValidateTextChildren(element, path, result);
-                ConfigureButton(element, node, path, result);
+                ConfigureButton(element, node, path, result, whiteSpaceMode);
             }
             else if (string.Equals(type, "Embed", StringComparison.Ordinal))
             {
@@ -274,7 +274,7 @@ namespace Html2Vrc.Editor
                 ValidateTextChildren(element, path, result);
                 node.children = new[]
                 {
-                    CreateDerivedTextNode(node, GetText(element), "-label")
+                    CreateDerivedTextNode(node, GetText(element, whiteSpaceMode), "-label")
                 };
             }
             else
@@ -313,7 +313,8 @@ namespace Html2Vrc.Editor
             HtmlElement element,
             UdomNode node,
             string path,
-            HtmlToUdomResult result)
+            HtmlToUdomResult result,
+            string whiteSpaceMode)
         {
             var action = element.Get("data-action");
             if (string.IsNullOrWhiteSpace(action))
@@ -328,7 +329,7 @@ namespace Html2Vrc.Editor
             };
             node.children = new[]
             {
-                CreateDerivedTextNode(node, GetText(element), "-label")
+                CreateDerivedTextNode(node, GetText(element, whiteSpaceMode), "-label")
             };
         }
 
@@ -346,6 +347,11 @@ namespace Html2Vrc.Editor
                 {
                     size = new[] { width, height },
                     fontSize = parent.style.fontSize,
+                    lineHeight = parent.style.lineHeight,
+                    letterSpacing = parent.style.letterSpacing,
+                    textWrap = parent.style.textWrap,
+                    textOverflow = parent.style.textOverflow,
+                    preserveWhitespace = parent.style.preserveWhitespace,
                     textColor = parent.style.textColor,
                     alignment = "Center",
                     backgroundColor = "#00000000"
@@ -459,10 +465,12 @@ namespace Html2Vrc.Editor
             HtmlElement element,
             UdomNode node,
             string path,
-            HtmlToUdomResult result)
+            HtmlToUdomResult result,
+            out string whiteSpaceMode)
         {
             var style = node.style;
             var declarations = ParseStyle(element.Get("style"), path, result);
+            whiteSpaceMode = "normal";
             string display = null;
             string flexDirection = null;
             string alignItems = null;
@@ -475,6 +483,7 @@ namespace Html2Vrc.Editor
             float? rowGap = null;
             float? columnGap = null;
             float? aspectRatio = null;
+            string lineHeightSource = null;
             var widthDeclared = false;
             var heightDeclared = false;
             var widthAuto = false;
@@ -885,6 +894,23 @@ namespace Html2Vrc.Editor
                     case "font-size":
                         SetPixelValue(declaration.Value, path, declaration.Key, result, value => style.fontSize = value);
                         break;
+                    case "line-height":
+                        lineHeightSource = declaration.Value;
+                        break;
+                    case "letter-spacing":
+                        SetLetterSpacing(declaration.Value, path, result, style);
+                        break;
+                    case "white-space":
+                        SetWhiteSpace(
+                            declaration.Value,
+                            path,
+                            result,
+                            style,
+                            ref whiteSpaceMode);
+                        break;
+                    case "text-overflow":
+                        SetTextOverflow(declaration.Value, path, result, style);
+                        break;
                     case "text-align":
                         style.alignment = TextAlignment(declaration.Value, path, result);
                         break;
@@ -947,6 +973,10 @@ namespace Html2Vrc.Editor
                 }
             }
 
+            if (lineHeightSource != null)
+            {
+                SetLineHeight(lineHeightSource, path, result, style);
+            }
             if (hasBorderDeclaration)
             {
                 ApplyBorder(style, borderWidths, borderColors, borderStyles);
@@ -1144,6 +1174,162 @@ namespace Html2Vrc.Editor
             }
 
             style.zIndex = zIndex;
+        }
+
+        private static void SetLineHeight(
+            string source,
+            string path,
+            HtmlToUdomResult result,
+            UdomStyle style)
+        {
+            var value = source.Trim();
+            if (string.Equals(value, "normal", StringComparison.OrdinalIgnoreCase))
+            {
+                style.lineHeight = -1f;
+                return;
+            }
+
+            float lineHeight;
+            if (value.EndsWith("px", StringComparison.OrdinalIgnoreCase))
+            {
+                if (!TryParseNumber(value.Substring(0, value.Length - 2).Trim(), out lineHeight))
+                {
+                    AddTextMetricError(result, path, "line-height", source);
+                    return;
+                }
+            }
+            else if (value.EndsWith("%", StringComparison.Ordinal))
+            {
+                if (!TryParseNumber(value.Substring(0, value.Length - 1).Trim(), out var percentage))
+                {
+                    AddTextMetricError(result, path, "line-height", source);
+                    return;
+                }
+
+                lineHeight = style.fontSize * percentage / 100f;
+            }
+            else
+            {
+                if (!TryParseNumber(value, out var multiplier))
+                {
+                    AddTextMetricError(result, path, "line-height", source);
+                    return;
+                }
+
+                lineHeight = style.fontSize * multiplier;
+            }
+
+            if (float.IsNaN(lineHeight)
+                || float.IsInfinity(lineHeight)
+                || lineHeight <= 0f)
+            {
+                AddTextMetricError(result, path, "line-height", source);
+                return;
+            }
+
+            style.lineHeight = lineHeight;
+        }
+
+        private static void SetLetterSpacing(
+            string source,
+            string path,
+            HtmlToUdomResult result,
+            UdomStyle style)
+        {
+            if (string.Equals(source.Trim(), "normal", StringComparison.OrdinalIgnoreCase))
+            {
+                style.letterSpacing = 0f;
+                return;
+            }
+
+            if (!TryParseSignedPixelValue(source, out var spacing)
+                || float.IsNaN(spacing)
+                || float.IsInfinity(spacing))
+            {
+                AddError(
+                    result,
+                    path + "/@style",
+                    $"letter-spacing 값 '{source}'은 normal 또는 유한한 숫자·px여야 한다.");
+                return;
+            }
+
+            style.letterSpacing = spacing;
+        }
+
+        private static void SetWhiteSpace(
+            string source,
+            string path,
+            HtmlToUdomResult result,
+            UdomStyle style,
+            ref string whiteSpaceMode)
+        {
+            var value = source.Trim().ToLowerInvariant();
+            switch (value)
+            {
+                case "normal":
+                    style.preserveWhitespace = false;
+                    style.textWrap = true;
+                    break;
+                case "nowrap":
+                    style.preserveWhitespace = false;
+                    style.textWrap = false;
+                    break;
+                case "pre":
+                    style.preserveWhitespace = true;
+                    style.textWrap = false;
+                    break;
+                case "pre-wrap":
+                    style.preserveWhitespace = true;
+                    style.textWrap = true;
+                    break;
+                case "pre-line":
+                    style.preserveWhitespace = false;
+                    style.textWrap = true;
+                    break;
+                default:
+                    AddError(
+                        result,
+                        path + "/@style",
+                        $"white-space 값 '{source}'은 normal, nowrap, pre, pre-wrap, pre-line만 지원한다.");
+                    return;
+            }
+
+            whiteSpaceMode = value;
+        }
+
+        private static void SetTextOverflow(
+            string source,
+            string path,
+            HtmlToUdomResult result,
+            UdomStyle style)
+        {
+            switch (source.Trim().ToLowerInvariant())
+            {
+                case "clip":
+                    style.textOverflow = "Clip";
+                    break;
+                case "ellipsis":
+                    style.textOverflow = "Ellipsis";
+                    break;
+                default:
+                    AddError(
+                        result,
+                        path + "/@style",
+                        $"text-overflow 값 '{source}'은 clip 또는 ellipsis여야 한다.");
+                    break;
+            }
+        }
+
+        private static void AddTextMetricError(
+            HtmlToUdomResult result,
+            string path,
+            string property,
+            string source)
+        {
+            AddError(
+                result,
+                path + "/@style",
+                $"{property} 값 '{source}'은 normal, 양수 배수, 양수 percentage 또는 양수 px여야 한다.");
         }
 
         private static void SetBorderShorthand(
@@ -3715,11 +3901,15 @@ namespace Html2Vrc.Editor
             switch (value.Trim().ToLowerInvariant())
             {
                 case "left":
+                case "start":
                     return "MiddleLeft";
                 case "center":
                     return "Center";
                 case "right":
+                case "end":
                     return "MiddleRight";
+                case "justify":
+                    return "Justified";
                 default:
                     AddError(result, path + "/@style", $"text-align 값 '{value}'은 지원하지 않는다.");
                     return "MiddleLeft";
@@ -3742,31 +3932,62 @@ namespace Html2Vrc.Editor
             }
         }
 
-        private static string GetText(HtmlElement element)
+        private static string GetText(HtmlElement element, string whiteSpaceMode)
         {
-            var builder = new StringBuilder();
-            AppendText(element, builder);
-            return CollapseWhitespace(builder.ToString())
-                .Replace(" \n ", "\n")
-                .Replace(" \n", "\n")
-                .Replace("\n ", "\n");
+            var segments = new List<StringBuilder> { new StringBuilder() };
+            AppendText(element, segments);
+            var normalizedSegments = segments
+                .Select(segment => segment.ToString()
+                    .Replace("\r\n", "\n")
+                    .Replace('\r', '\n'))
+                .ToArray();
+            if (whiteSpaceMode == "pre" || whiteSpaceMode == "pre-wrap")
+            {
+                return string.Join("\n", normalizedSegments);
+            }
+
+            if (whiteSpaceMode == "pre-line")
+            {
+                return CollapsePreLineWhitespace(string.Join("\n", normalizedSegments));
+            }
+
+            return string.Join(
+                "\n",
+                normalizedSegments.Select(CollapseWhitespace).ToArray());
         }
 
-        private static void AppendText(HtmlElement element, StringBuilder builder)
+        private static void AppendText(HtmlElement element, List<StringBuilder> segments)
         {
-            builder.Append(element.Text);
-            for (var index = 0; index < element.Children.Count; index++)
+            for (var index = 0; index < element.Content.Count; index++)
             {
-                var child = element.Children[index];
+                var part = element.Content[index];
+                if (part.Text != null)
+                {
+                    segments[segments.Count - 1].Append(part.Text);
+                    continue;
+                }
+
+                var child = part.Child;
                 if (string.Equals(child.Tag, "br", StringComparison.OrdinalIgnoreCase))
                 {
-                    builder.Append('\n');
+                    segments.Add(new StringBuilder());
                 }
                 else
                 {
-                    AppendText(child, builder);
+                    AppendText(child, segments);
                 }
             }
+        }
+
+        private static string CollapsePreLineWhitespace(string value)
+        {
+            var lines = value.Split('\n');
+            for (var index = 0; index < lines.Length; index++)
+            {
+                lines[index] = Regex.Replace(lines[index], @"[ \t\f]+", " ").Trim(' ', '\t', '\f');
+            }
+
+            return string.Join("\n", lines);
         }
 
         private static string CollapseWhitespace(string value)
@@ -3881,11 +4102,18 @@ namespace Html2Vrc.Editor
             result.Issues.Add(new UdomValidationIssue(UdomIssueSeverity.Warning, path, message));
         }
 
+        private sealed class HtmlContentPart
+        {
+            public string Text;
+            public HtmlElement Child;
+        }
+
         private sealed class HtmlElement
         {
             public string Tag { get; }
             public Dictionary<string, string> Attributes { get; }
             public List<HtmlElement> Children { get; } = new List<HtmlElement>();
+            public List<HtmlContentPart> Content { get; } = new List<HtmlContentPart>();
             public StringBuilder Text { get; } = new StringBuilder();
 
             public HtmlElement(string tag, Dictionary<string, string> attributes)
@@ -3943,7 +4171,9 @@ namespace Html2Vrc.Editor
 
                     if (!token.StartsWith("<", StringComparison.Ordinal))
                     {
-                        stack.Peek().Text.Append(DecodeEntities(token));
+                        var decoded = DecodeEntities(token);
+                        stack.Peek().Text.Append(decoded);
+                        stack.Peek().Content.Add(new HtmlContentPart { Text = decoded });
                         continue;
                     }
 
@@ -3979,6 +4209,7 @@ namespace Html2Vrc.Editor
                     var attributes = ParseAttributes(inner.Substring(nameEnd), match.Index);
                     var element = new HtmlElement(tag, attributes);
                     stack.Peek().Children.Add(element);
+                    stack.Peek().Content.Add(new HtmlContentPart { Child = element });
                     if (!selfClosing && !VoidTags.Contains(tag))
                     {
                         stack.Push(element);
