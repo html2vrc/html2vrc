@@ -3055,11 +3055,82 @@ namespace Html2Vrc.Tests
         }
 
         [Test]
+        public void HtmlConverter_FlexWrapCssUsesCanonicalMultiLineLayout()
+        {
+            const string html = @"
+              <main id=""css-wrap-root"" data-canvas-size=""400 500""
+                style=""width: 400px; height: 500px; display: block"">
+                <section id=""css-wrap""
+                  style=""width: 340px; height: 220px; display: flex; flex-wrap: wrap; align-content: space-between; align-items: flex-start; padding: 10px; gap: 5px; row-gap: 20px; column-gap: 10px"">
+                  <div id=""css-wrap-a"" style=""width: 150px; height: 40px""></div>
+                  <div id=""css-wrap-b"" style=""width: 150px; height: 40px""></div>
+                  <div id=""css-wrap-c"" style=""width: 150px; height: 40px""></div>
+                </section>
+                <section id=""css-wrap-reverse""
+                  style=""width: 340px; height: 220px; display: flex; flex-wrap: wrap-reverse; align-content: center; align-items: flex-start; padding: 10px; gap: 20px 10px"">
+                  <div id=""css-wrap-reverse-a"" style=""width: 150px; height: 40px""></div>
+                  <div id=""css-wrap-reverse-b"" style=""width: 150px; height: 40px""></div>
+                  <div id=""css-wrap-reverse-c"" style=""width: 150px; height: 40px""></div>
+                </section>
+              </main>";
+
+            var conversion = HtmlToUdomConverter.Convert(html);
+
+            Assert.That(conversion.IsValid, Is.True, conversion.Format());
+            var wrap = conversion.Document.root.children[0];
+            var reverse = conversion.Document.root.children[1];
+            Assert.That(wrap.style.flexWrap, Is.EqualTo("Wrap"));
+            Assert.That(wrap.style.alignContent, Is.EqualTo("SpaceBetween"));
+            Assert.That(wrap.style.rowGap, Is.EqualTo(20f));
+            Assert.That(wrap.style.columnGap, Is.EqualTo(10f));
+            Assert.That(wrap.style.spacing, Is.EqualTo(10f));
+            Assert.That(wrap.style.useResolvedChildPositions, Is.True);
+            Assert.That(wrap.children[0].style.position, Is.EqualTo(new[] { 10f, 10f }));
+            Assert.That(wrap.children[1].style.position, Is.EqualTo(new[] { 170f, 10f }));
+            Assert.That(wrap.children[2].style.position, Is.EqualTo(new[] { 10f, 170f }));
+            Assert.That(reverse.style.flexWrap, Is.EqualTo("WrapReverse"));
+            Assert.That(reverse.style.alignContent, Is.EqualTo("Center"));
+            Assert.That(reverse.style.rowGap, Is.EqualTo(20f));
+            Assert.That(reverse.style.columnGap, Is.EqualTo(10f));
+            Assert.That(reverse.children[0].style.position, Is.EqualTo(new[] { 10f, 120f }));
+            Assert.That(reverse.children[1].style.position, Is.EqualTo(new[] { 170f, 120f }));
+            Assert.That(reverse.children[2].style.position, Is.EqualTo(new[] { 10f, 60f }));
+
+            var normalized = UdomValidator.Validate(conversion.Json);
+            Assert.That(normalized.IsValid, Is.True, normalized.Format());
+            Assert.That(normalized.Document.root.children[0].style.flexWrap, Is.EqualTo("Wrap"));
+            Assert.That(normalized.Document.root.children[1].style.rowGap, Is.EqualTo(20f));
+
+            var build = UdomBuilder.GenerateOrRegenerate(conversion.Document);
+            var root = build.Root;
+            var wrapObject = UdomBuilder.FindNode(root, "css-wrap").gameObject;
+            Assert.That(wrapObject.GetComponent<HorizontalLayoutGroup>(), Is.Null);
+            Assert.That(
+                UdomBuilder.FindNode(root, "css-wrap-c").GetComponent<RectTransform>().anchoredPosition,
+                Is.EqualTo(new Vector2(10f, -170f)));
+            Assert.That(
+                UdomBuilder.FindNode(root, "css-wrap-reverse-a").GetComponent<RectTransform>().anchoredPosition,
+                Is.EqualTo(new Vector2(10f, -120f)));
+
+            var originalC = UdomBuilder.FindNode(root, "css-wrap-c").gameObject;
+            var changed = HtmlToUdomConverter.Convert(
+                html.Replace(
+                    "flex-wrap: wrap; align-content: space-between",
+                    "flex-wrap: nowrap; align-content: space-between"));
+            Assert.That(changed.IsValid, Is.True, changed.Format());
+            Assert.That(changed.Document.root.children[0].style.useResolvedChildPositions, Is.False);
+            UdomBuilder.GenerateOrRegenerate(changed.Document, root);
+            Assert.That(UdomBuilder.FindNode(root, "css-wrap-c").gameObject, Is.SameAs(originalC));
+            Assert.That(wrapObject.GetComponent<HorizontalLayoutGroup>(), Is.Not.Null);
+            Object.DestroyImmediate(root.gameObject);
+        }
+
+        [Test]
         public void HtmlConverter_RejectsUnsupportedFlexCssValues()
         {
             const string html = @"
               <main id=""invalid-flex""
-                style=""display: flex; justify-content: left; align-items: baseline"">
+                style=""display: flex; justify-content: left; align-items: baseline; flex-wrap: balance; align-content: space-evenly; gap: 10px 20px 30px; row-gap: -1px; column-gap: 5%"">
                 <div id=""invalid-item""
                   style=""align-self: baseline; flex-shrink: -1; flex-basis: calc(50% - 2px); order: 1.5""></div>
               </main>";
@@ -3070,6 +3141,11 @@ namespace Html2Vrc.Tests
             Assert.That(conversion.Format(), Does.Contain("justify-content"));
             Assert.That(conversion.Format(), Does.Contain("align-items"));
             Assert.That(conversion.Format(), Does.Contain("align-self"));
+            Assert.That(conversion.Format(), Does.Contain("flex-wrap"));
+            Assert.That(conversion.Format(), Does.Contain("align-content"));
+            Assert.That(conversion.Format(), Does.Contain("gap"));
+            Assert.That(conversion.Format(), Does.Contain("row-gap"));
+            Assert.That(conversion.Format(), Does.Contain("column-gap"));
             Assert.That(conversion.Format(), Does.Contain("flex-shrink"));
             Assert.That(conversion.Format(), Does.Contain("flex-basis"));
             Assert.That(conversion.Format(), Does.Contain("order"));

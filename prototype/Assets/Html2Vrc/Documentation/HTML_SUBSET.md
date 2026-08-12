@@ -36,10 +36,13 @@
 - `display: flex | block | none`
 - `position: static | absolute`: absolute는 `left`, `top`을 부모 왼쪽 위 기준으로 적용
 - `flex-direction: row | row-reverse | column | column-reverse`
+- `flex-wrap: nowrap | wrap | wrap-reverse`
 - `justify-content: flex-start | start | center | flex-end | end | space-between | space-around | space-evenly`
 - `align-items: normal | flex-start | start | center | flex-end | end | stretch`
+- `align-content: normal | flex-start | start | center | flex-end | end | stretch | space-between | space-around`
 - `align-self: auto | normal | flex-start | start | center | flex-end | end | stretch`
-- `gap`
+- `gap`: 1~2개의 숫자 또는 `px` 값. 두 값이면 row, column 순서
+- `row-gap`, `column-gap`: 숫자 또는 `px`
 - `padding`, `margin`: CSS의 1~4개 값
 - `background-color`, `color`: `#RRGGBB` 또는 `#RRGGBBAA`
 - `font-size`
@@ -50,9 +53,9 @@
 
 `data-layout="vertical|horizontal|none"`으로 레이아웃을 명시할 수도 있다.
 
-HTML에서 만든 flex 트리도 canonical UDOM importer와 같은 크기·정렬 해석기를 사용한다. 따라서 grow/shrink/basis의 비율 재분배, reverse 순서, justify의 남는 공간 분배, align-self의 안정 margin wrapper 수명주기가 두 입력 경로에서 동일하다. 지원 값이 아닌 `baseline`, 임의 keyword, `calc(...)`, 소수 order와 음수 grow/shrink는 추측하지 않고 오류로 반환한다.
+HTML에서 만든 flex 트리도 canonical UDOM importer와 같은 크기·정렬 해석기를 사용한다. 따라서 grow/shrink/basis의 비율 재분배, reverse 순서, justify의 남는 공간 분배, wrap line 분할, align-content, 축별 gap, align-self와 wrap/nowrap 전환 시 안정 GameObject 수명주기가 두 입력 경로에서 동일하다. 지원 값이 아닌 `baseline`, 임의 keyword, `calc(...)`, 소수 order와 음수 grow/shrink는 추측하지 않고 오류로 반환한다.
 
-CSS 전체 호환은 목표가 아니다. `flex-basis` 이외의 percentage 길이, `calc`, flex shorthand, wrap, Grid, 선택자, 외부 스타일시트, 애니메이션과 지원 목록 밖의 속성은 오류로 표시한다.
+CSS 전체 호환은 목표가 아니다. `flex-basis` 이외의 percentage 길이, `calc`, flex shorthand, `align-content: space-evenly`, Grid, 선택자, 외부 스타일시트, 애니메이션과 지원 목록 밖의 속성은 오류로 표시한다.
 
 ## 안전한 버튼 동작
 

@@ -450,9 +450,13 @@ namespace Html2Vrc.Editor
             string flexDirection = null;
             string alignItems = null;
             string justifyContent = null;
+            string flexWrap = null;
+            string alignContent = null;
             string positionMode = null;
             float? left = null;
             float? top = null;
+            float? rowGap = null;
+            float? columnGap = null;
             foreach (var declaration in declarations)
             {
                 switch (declaration.Key)
@@ -501,6 +505,12 @@ namespace Html2Vrc.Editor
                             path,
                             result);
                         break;
+                    case "flex-wrap":
+                        flexWrap = NormalizeFlexWrap(declaration.Value, path, result);
+                        break;
+                    case "align-content":
+                        alignContent = NormalizeAlignContent(declaration.Value, path, result);
+                        break;
                     case "align-self":
                         var alignSelf = NormalizeFlexAlignment(
                             declaration.Value,
@@ -526,7 +536,32 @@ namespace Html2Vrc.Editor
 
                         break;
                     case "gap":
-                        SetPixelValue(declaration.Value, path, declaration.Key, result, value => style.spacing = value);
+                        SetGap(
+                            declaration.Value,
+                            path,
+                            declaration.Key,
+                            result,
+                            (row, column) =>
+                            {
+                                rowGap = row;
+                                columnGap = column;
+                            });
+                        break;
+                    case "row-gap":
+                        SetPixelValue(
+                            declaration.Value,
+                            path,
+                            declaration.Key,
+                            result,
+                            value => rowGap = value);
+                        break;
+                    case "column-gap":
+                        SetPixelValue(
+                            declaration.Value,
+                            path,
+                            declaration.Key,
+                            result,
+                            value => columnGap = value);
                         break;
                     case "padding":
                         SetEdges(declaration.Value, path, declaration.Key, result, value => style.padding = value);
@@ -654,6 +689,13 @@ namespace Html2Vrc.Editor
                     alignItems ?? (usesCssFlexDefaults ? "stretch" : "start"),
                     justifyContent ?? "start",
                     path);
+                style.flexWrap = flexWrap ?? "NoWrap";
+                style.alignContent = alignContent ?? "Stretch";
+                style.rowGap = rowGap ?? 0f;
+                style.columnGap = columnGap ?? 0f;
+                style.spacing = string.Equals(style.layout, "Vertical", StringComparison.OrdinalIgnoreCase)
+                    ? style.rowGap
+                    : style.columnGap;
             }
 
             if (positionMode != null)
@@ -756,6 +798,53 @@ namespace Html2Vrc.Editor
             }
         }
 
+        private static string NormalizeFlexWrap(
+            string value,
+            string path,
+            HtmlToUdomResult result)
+        {
+            switch (value.Trim().ToLowerInvariant())
+            {
+                case "nowrap":
+                    return "NoWrap";
+                case "wrap":
+                    return "Wrap";
+                case "wrap-reverse":
+                    return "WrapReverse";
+                default:
+                    AddError(result, path + "/@style", $"flex-wrap 값 '{value}'은 지원하지 않는다.");
+                    return null;
+            }
+        }
+
+        private static string NormalizeAlignContent(
+            string value,
+            string path,
+            HtmlToUdomResult result)
+        {
+            switch (value.Trim().ToLowerInvariant())
+            {
+                case "normal":
+                case "stretch":
+                    return "Stretch";
+                case "start":
+                case "flex-start":
+                    return "Start";
+                case "center":
+                    return "Center";
+                case "end":
+                case "flex-end":
+                    return "End";
+                case "space-between":
+                    return "SpaceBetween";
+                case "space-around":
+                    return "SpaceAround";
+                default:
+                    AddError(result, path + "/@style", $"align-content 값 '{value}'은 지원하지 않는다.");
+                    return null;
+            }
+        }
+
         private static void SetFlexBasis(
             string source,
             string path,
@@ -833,12 +922,13 @@ namespace Html2Vrc.Editor
             }
         }
 
-        private static Dictionary<string, string> ParseStyle(
+        private static List<KeyValuePair<string, string>> ParseStyle(
             string source,
             string path,
             HtmlToUdomResult result)
         {
-            var declarations = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            var declarations = new List<KeyValuePair<string, string>>();
+            var keys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             if (string.IsNullOrWhiteSpace(source))
             {
                 return declarations;
@@ -862,13 +952,13 @@ namespace Html2Vrc.Editor
 
                 var key = entry.Substring(0, separator).Trim().ToLowerInvariant();
                 var value = entry.Substring(separator + 1).Trim();
-                if (declarations.ContainsKey(key))
+                if (!keys.Add(key))
                 {
                     AddError(result, path + "/@style", $"CSS 속성 '{key}'가 중복됐다.");
                     continue;
                 }
 
-                declarations.Add(key, value);
+                declarations.Add(new KeyValuePair<string, string>(key, value));
             }
 
             return declarations;
@@ -894,6 +984,49 @@ namespace Html2Vrc.Editor
             }
 
             setter(number);
+        }
+
+        private static void SetGap(
+            string source,
+            string path,
+            string property,
+            HtmlToUdomResult result,
+            Action<float, float> setter)
+        {
+            var parts = source.Split(
+                new[] { ' ', '\t', '\r', '\n' },
+                StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length < 1 || parts.Length > 2)
+            {
+                AddError(result, path + "/@style", $"{property}은 1~2개의 0 이상 px 값만 지원한다.");
+                return;
+            }
+
+            if (!TryParsePixelValue(parts[0], out var row))
+            {
+                AddError(result, path + "/@style", $"{property}은 1~2개의 0 이상 px 값만 지원한다.");
+                return;
+            }
+
+            var column = row;
+            if (parts.Length == 2 && !TryParsePixelValue(parts[1], out column))
+            {
+                AddError(result, path + "/@style", $"{property}은 1~2개의 0 이상 px 값만 지원한다.");
+                return;
+            }
+
+            setter(row, column);
+        }
+
+        private static bool TryParsePixelValue(string source, out float value)
+        {
+            var normalized = source.Trim();
+            if (normalized.EndsWith("px", StringComparison.OrdinalIgnoreCase))
+            {
+                normalized = normalized.Substring(0, normalized.Length - 2).Trim();
+            }
+
+            return TryParseNumber(normalized, out value) && value >= 0f;
         }
 
         private static void SetEdges(
