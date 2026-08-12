@@ -93,7 +93,15 @@ namespace Html2Vrc.Editor
 
         public static bool TryParseFontStyle(string value, out FontStyles fontStyle)
         {
-            return Enum.TryParse((value ?? "Normal").Trim(), true, out fontStyle);
+            var normalized = (value ?? "Normal").Trim();
+            if (string.Equals(normalized, "BoldItalic", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(normalized, "ItalicBold", StringComparison.OrdinalIgnoreCase))
+            {
+                fontStyle = FontStyles.Bold | FontStyles.Italic;
+                return true;
+            }
+
+            return Enum.TryParse(normalized, true, out fontStyle);
         }
 
         public static bool TryParseChildAlignment(string value, out TextAnchor alignment)

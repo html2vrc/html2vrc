@@ -3889,6 +3889,117 @@ Second   line&#32;&#32;</p>
         }
 
         [Test]
+        public void HtmlConverter_FontWeightAndStyleMapToTmpAndDerivedLabels()
+        {
+            const string html = @"
+              <main id=""html-font-style-root"" data-canvas-size=""760 520""
+                style=""width: 760px; height: 520px; display: flex; flex-direction: column; align-items: flex-start; padding: 20px; gap: 12px"">
+                <p id=""html-font-bold-italic""
+                  style=""width: 500px; height: 54px; font-style: italic; font-weight: 700"">Bold italic</p>
+                <p id=""html-font-bold""
+                  style=""width: 500px; height: 54px; font-weight: bold; font-style: normal"">Bold keyword</p>
+                <p id=""html-font-italic""
+                  style=""width: 500px; height: 54px; font-weight: 599; font-style: italic"">Italic only</p>
+                <button id=""html-font-button"" data-action=""ClosePanel""
+                  style=""width: 300px; height: 64px; font-weight: bold; font-style: italic"">Styled button</button>
+                <ul id=""html-font-list"" style=""width: 500px; height: 90px"">
+                  <li id=""html-font-list-item""
+                    style=""width: 500px; height: 64px; font-style: italic; font-weight: 600"">Styled item</li>
+                </ul>
+              </main>";
+
+            var conversion = HtmlToUdomConverter.Convert(html);
+
+            Assert.That(conversion.IsValid, Is.True, conversion.Format());
+            var boldItalicNode = conversion.Document.root.children[0];
+            var boldNode = conversion.Document.root.children[1];
+            var italicNode = conversion.Document.root.children[2];
+            var buttonLabelNode = conversion.Document.root.children[3].children[0];
+            var listLabelNode = conversion.Document.root.children[4].children[0].children[0];
+            Assert.That(boldItalicNode.style.fontStyle, Is.EqualTo("BoldItalic"));
+            Assert.That(boldNode.style.fontStyle, Is.EqualTo("Bold"));
+            Assert.That(italicNode.style.fontStyle, Is.EqualTo("Italic"));
+            Assert.That(buttonLabelNode.style.fontStyle, Is.EqualTo("BoldItalic"));
+            Assert.That(listLabelNode.style.fontStyle, Is.EqualTo("BoldItalic"));
+
+            var normalized = UdomValidator.Validate(conversion.Json);
+            Assert.That(normalized.IsValid, Is.True, normalized.Format());
+            Assert.That(normalized.Document.root.children[0].style.fontStyle, Is.EqualTo("BoldItalic"));
+            Assert.That(normalized.Document.root.children[3].children[0].style.fontStyle, Is.EqualTo("BoldItalic"));
+            Assert.That(normalized.Document.root.children[4].children[0].children[0].style.fontStyle, Is.EqualTo("BoldItalic"));
+
+            var build = UdomBuilder.GenerateOrRegenerate(conversion.Document);
+            var root = build.Root;
+            var boldItalic = UdomBuilder.FindNode(root, "html-font-bold-italic").GetComponent<TextMeshProUGUI>();
+            var bold = UdomBuilder.FindNode(root, "html-font-bold").GetComponent<TextMeshProUGUI>();
+            var italic = UdomBuilder.FindNode(root, "html-font-italic").GetComponent<TextMeshProUGUI>();
+            var buttonLabel = UdomBuilder.FindNode(root, "html-font-button-label").GetComponent<TextMeshProUGUI>();
+            var listLabel = UdomBuilder.FindNode(root, "html-font-list-item-label").GetComponent<TextMeshProUGUI>();
+            var originalBoldItalic = boldItalic.gameObject;
+            var originalButtonLabel = buttonLabel.gameObject;
+            var originalListLabel = listLabel.gameObject;
+            Assert.That(boldItalic.fontStyle, Is.EqualTo(FontStyles.Bold | FontStyles.Italic));
+            Assert.That(bold.fontStyle, Is.EqualTo(FontStyles.Bold));
+            Assert.That(italic.fontStyle, Is.EqualTo(FontStyles.Italic));
+            Assert.That(buttonLabel.fontStyle, Is.EqualTo(FontStyles.Bold | FontStyles.Italic));
+            Assert.That(listLabel.fontStyle, Is.EqualTo(FontStyles.Bold | FontStyles.Italic));
+
+            var restored = HtmlToUdomConverter.Convert(
+                html.Replace(
+                        "font-style: italic; font-weight: 700",
+                        "font-style: normal; font-weight: 400")
+                    .Replace(
+                        "font-weight: bold; font-style: normal",
+                        "font-weight: normal; font-style: normal")
+                    .Replace(
+                        "font-weight: 599; font-style: italic",
+                        "font-weight: 400; font-style: normal")
+                    .Replace(
+                        "font-weight: bold; font-style: italic",
+                        "font-weight: normal; font-style: normal")
+                    .Replace(
+                        "font-style: italic; font-weight: 600",
+                        "font-style: normal; font-weight: 400"));
+            Assert.That(restored.IsValid, Is.True, restored.Format());
+            UdomBuilder.GenerateOrRegenerate(restored.Document, root);
+            boldItalic = UdomBuilder.FindNode(root, "html-font-bold-italic").GetComponent<TextMeshProUGUI>();
+            buttonLabel = UdomBuilder.FindNode(root, "html-font-button-label").GetComponent<TextMeshProUGUI>();
+            listLabel = UdomBuilder.FindNode(root, "html-font-list-item-label").GetComponent<TextMeshProUGUI>();
+            Assert.That(boldItalic.gameObject, Is.SameAs(originalBoldItalic));
+            Assert.That(buttonLabel.gameObject, Is.SameAs(originalButtonLabel));
+            Assert.That(listLabel.gameObject, Is.SameAs(originalListLabel));
+            Assert.That(boldItalic.fontStyle, Is.EqualTo(FontStyles.Normal));
+            Assert.That(buttonLabel.fontStyle, Is.EqualTo(FontStyles.Normal));
+            Assert.That(listLabel.fontStyle, Is.EqualTo(FontStyles.Normal));
+            Object.DestroyImmediate(root.gameObject);
+
+            var zeroWeight = HtmlToUdomConverter.Convert(
+                html.Replace("font-weight: 700", "font-weight: 0"));
+            Assert.That(zeroWeight.IsValid, Is.False);
+            Assert.That(zeroWeight.Format(), Does.Contain("font-weight"));
+
+            var excessiveWeight = HtmlToUdomConverter.Convert(
+                html.Replace("font-weight: 700", "font-weight: 1001"));
+            Assert.That(excessiveWeight.IsValid, Is.False);
+            Assert.That(excessiveWeight.Format(), Does.Contain("font-weight"));
+
+            var fractionalWeight = HtmlToUdomConverter.Convert(
+                html.Replace("font-weight: 700", "font-weight: 650.5"));
+            Assert.That(fractionalWeight.IsValid, Is.False);
+            Assert.That(fractionalWeight.Format(), Does.Contain("font-weight"));
+
+            var relativeWeight = HtmlToUdomConverter.Convert(
+                html.Replace("font-weight: 700", "font-weight: bolder"));
+            Assert.That(relativeWeight.IsValid, Is.False);
+            Assert.That(relativeWeight.Format(), Does.Contain("font-weight"));
+
+            var obliqueStyle = HtmlToUdomConverter.Convert(
+                html.Replace("font-style: italic; font-weight: 700", "font-style: oblique; font-weight: 700"));
+            Assert.That(obliqueStyle.IsValid, Is.False);
+            Assert.That(obliqueStyle.Format(), Does.Contain("font-style"));
+        }
+
+        [Test]
         public void HtmlConverter_PaintStateAndZIndexPreserveLayoutAndInputSemantics()
         {
             const string html = @"

@@ -349,6 +349,7 @@ namespace Html2Vrc.Editor
                     fontSize = parent.style.fontSize,
                     lineHeight = parent.style.lineHeight,
                     letterSpacing = parent.style.letterSpacing,
+                    fontStyle = parent.style.fontStyle,
                     textWrap = parent.style.textWrap,
                     textOverflow = parent.style.textOverflow,
                     preserveWhitespace = parent.style.preserveWhitespace,
@@ -497,6 +498,12 @@ namespace Html2Vrc.Editor
             List<CssBoxShadow> boxShadows = null;
             var hasBoxShadowDeclaration = false;
             CssBackgroundGradient backgroundGradient = null;
+            var fontBold = (style.fontStyle ?? string.Empty).IndexOf(
+                "Bold",
+                StringComparison.OrdinalIgnoreCase) >= 0;
+            var fontItalic = (style.fontStyle ?? string.Empty).IndexOf(
+                "Italic",
+                StringComparison.OrdinalIgnoreCase) >= 0;
             foreach (var declaration in declarations)
             {
                 switch (declaration.Key)
@@ -894,6 +901,12 @@ namespace Html2Vrc.Editor
                     case "font-size":
                         SetPixelValue(declaration.Value, path, declaration.Key, result, value => style.fontSize = value);
                         break;
+                    case "font-weight":
+                        SetFontWeight(declaration.Value, path, result, ref fontBold);
+                        break;
+                    case "font-style":
+                        SetFontStyle(declaration.Value, path, result, ref fontItalic);
+                        break;
                     case "line-height":
                         lineHeightSource = declaration.Value;
                         break;
@@ -977,6 +990,9 @@ namespace Html2Vrc.Editor
             {
                 SetLineHeight(lineHeightSource, path, result, style);
             }
+            style.fontStyle = fontBold
+                ? (fontItalic ? "BoldItalic" : "Bold")
+                : (fontItalic ? "Italic" : "Normal");
             if (hasBorderDeclaration)
             {
                 ApplyBorder(style, borderWidths, borderColors, borderStyles);
@@ -1228,6 +1244,65 @@ namespace Html2Vrc.Editor
             }
 
             style.lineHeight = lineHeight;
+        }
+
+        private static void SetFontWeight(
+            string source,
+            string path,
+            HtmlToUdomResult result,
+            ref bool bold)
+        {
+            var value = source.Trim();
+            if (string.Equals(value, "normal", StringComparison.OrdinalIgnoreCase))
+            {
+                bold = false;
+                return;
+            }
+
+            if (string.Equals(value, "bold", StringComparison.OrdinalIgnoreCase))
+            {
+                bold = true;
+                return;
+            }
+
+            if (!TryParseNumber(value, out var weight)
+                || float.IsNaN(weight)
+                || float.IsInfinity(weight)
+                || weight < 1f
+                || weight > 1000f
+                || Math.Abs(weight - Math.Round(weight)) > 0.0001f)
+            {
+                AddError(
+                    result,
+                    path + "/@style",
+                    $"font-weight 값 '{source}'은 normal, bold 또는 1~1000 정수여야 한다.");
+                return;
+            }
+
+            bold = weight >= 600f;
+        }
+
+        private static void SetFontStyle(
+            string source,
+            string path,
+            HtmlToUdomResult result,
+            ref bool italic)
+        {
+            switch (source.Trim().ToLowerInvariant())
+            {
+                case "normal":
+                    italic = false;
+                    break;
+                case "italic":
+                    italic = true;
+                    break;
+                default:
+                    AddError(
+                        result,
+                        path + "/@style",
+                        $"font-style 값 '{source}'은 normal 또는 italic이어야 한다.");
+                    break;
+            }
         }
 
         private static void SetLetterSpacing(

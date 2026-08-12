@@ -52,6 +52,7 @@
 - 제한형 HTML CSS의 background/background-image 단일 radial-gradient를 canonical mixed-unit radial paint로 변환했다. Ellipse의 px·percentage X/Y 반지름, circle의 절대 반지름, 중심 keyword·축 순서, 기본 geometry, 공통 stop 보간·currentColor, normalized JSON, LUT 픽셀·material geometry·rounded mask, geometry 변경 재사용과 none→단색 복원, percentage circle·누락/음수 반지름·size keyword·잘못된 중심·단일 stop·rgb 오류를 확인했다.
 - 제한형 HTML CSS의 background/background-image 단일 conic-gradient를 canonical clockwise conic paint로 변환했다. From의 모든 angle 단위와 음수 정규화, mixed-unit·keyword 중심, percentage·angle stop, 기본 geometry, 공통 stop 보간·fix-up·currentColor, normalized JSON, LUT 픽셀·material start/center·rounded mask, geometry 변경 재사용과 none→단색 복원, 잘못된 angle·중심·prelude 순서·범위·px·단일 stop·rgb 오류를 확인했다.
 - 제한형 HTML CSS의 line-height·letter-spacing·white-space·text-overflow와 start/end/justify text-align을 canonical TMP text-flow로 변환했다. 최종 font-size 기준 unitless·percentage line height, signed spacing, normal/nowrap/pre/pre-wrap/pre-line, clip/ellipsis, mixed inline content 순서와 모든 모드의 `<br>`, Button 파생 label 복사, normalized JSON, 실제 TMP baseline·em spacing·wrap·overflow·정렬, 기본값 재생성, 범위·percentage spacing·비유한 값·미지원 keyword 진단을 확인했다.
+- 제한형 HTML CSS의 normal·bold·1~1000 정수 font-weight와 normal·italic font-style을 Normal/Bold/Italic/BoldItalic로 조합했다. 600 경계, 선언 순서 독립성, Button·`li` 파생 label 전파, normalized JSON, 실제 TMP flags, 안정 GameObject 기본값 복원과 범위·소수·상대 weight·oblique 진단을 확인했고 공용 validator가 canonical `BoldItalic`도 읽도록 맞췄다.
 - 제한형 HTML CSS의 숫자·percentage opacity, visible/hidden visibility, auto·정수 z-index를 canonical paint state와 stacking에 연결했다. 중첩 alpha, hidden layout·입력 차단, opacity 0 입력 유지, flex 위치와 paint 순서 분리, margin·transform wrapper, normalized JSON, 기본값 복원 시 CanvasGroup·paint state 제거와 native Layout Group·GameObject 재사용, 범위·collapse·소수 오류를 확인했다.
 - canonical flex의 wrap·wrap-reverse, alignContent 여섯 모드, 물리 row/column gap을 결정론적인 multi-line 배치로 해석했다. Line별 grow/max 재분배, reverse 주·교차축, alignSelf와 stretch, top-left Rect bake, nowrap 전환과 normalized JSON round-trip을 확인했다.
 - canonical font resource의 문서 상대 경로를 기존 TMP Font Asset 또는 TTF/OTF Unity Font로 해석했다. Source font는 GUID 기반 안정 경로의 dynamic TMP asset으로 생성하며 Text·TextInput·placeholder 적용, normalized JSON round-trip, 반복 재생성의 asset GUID·GameObject 재사용, 누락 경로의 기본 TMP font 폴백을 확인했다.
@@ -91,7 +92,7 @@
 
 ## 자동 회귀 검증
 
-HTML2VRC 전용 Unity Test Framework 테스트 52개를 실행한다. 검증 범위는 다음과 같다.
+HTML2VRC 전용 Unity Test Framework 테스트 56개를 실행한다. 검증 범위는 다음과 같다.
 
 1. 샘플 UDOM Validation 성공과 잘못된 속성/중복 ID 거부
 2. Canvas, TextMeshProUGUI, Image, Button, ScrollRect, LayoutGroup과 VRChat용 `VRCUiShape` 생성
@@ -148,11 +149,12 @@ HTML2VRC 전용 Unity Test Framework 테스트 52개를 실행한다. 검증 범
 53. 제한형 HTML radial-gradient의 mixed-unit ellipse·absolute circle·중심 위치·기본 geometry, 공통 stop 보간, LUT·rounded mask, geometry 변경 재사용·none 정리와 미지원 문법 진단 검증
 54. 제한형 HTML conic-gradient의 from angle·mixed-unit 중심·percentage/angle stop·기본 geometry, 공통 보간·fix-up, LUT·rounded mask, geometry 변경 재사용·none 정리와 미지원 문법 진단 검증
 55. 제한형 HTML text-flow의 상대·절대 line-height, signed letter-spacing, white-space·text-overflow·justify, mixed-content·br 순서, 파생 label, TMP metric·재생성과 미지원 문법 진단 검증
+56. 제한형 HTML font-weight·font-style의 keyword·정수 경계와 조합, Button·li 파생 label, normalized BoldItalic, TMP flags·안정 재생성과 미지원 문법 진단 검증
 
 최종 자동 테스트 결과:
 
-- 전체 55개
-- 통과 55개
+- 전체 56개
+- 통과 56개
 - 실패 0개
 - 건너뜀 0개
 - Unity 종료 코드 0
