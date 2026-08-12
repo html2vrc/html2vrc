@@ -14,6 +14,7 @@ using UnityEngine.UI;
 
 #if UDONSHARP
 using Html2Vrc.VRChat;
+using VRC.SDKBase.Validation;
 #endif
 
 namespace Html2Vrc.Tests
@@ -43,6 +44,11 @@ namespace Html2Vrc.Tests
             if (!EditorApplication.isPlaying)
             {
                 EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+            }
+
+            if (sample != null)
+            {
+                UdomGradientAssetUtility.DeleteGeneratedAssets(sample, "gradient-panel");
             }
         }
 
@@ -116,7 +122,7 @@ namespace Html2Vrc.Tests
             Assert.That(validation.Format(), Does.Contain("Symbolic event 'profile.saveName'"));
             Assert.That(validation.Format(), Does.Contain("Symbolic binding 'gallery.offset'"));
 
-            var build = UdomBuilder.GenerateOrRegenerate(validation.Document);
+            var build = UdomBuilder.GenerateOrRegenerate(validation.Document, null, sample);
             var root = build.Root;
             var toggle = UdomBuilder.FindNode(root, "music").GetComponent<Toggle>();
             var slider = UdomBuilder.FindNode(root, "volume").GetComponent<Slider>();
@@ -220,7 +226,7 @@ namespace Html2Vrc.Tests
             var validation = UdomValidator.Validate(json);
 
             Assert.That(validation.IsValid, Is.True, validation.Format());
-            Assert.That(validation.Format(), Does.Contain("linear-gradient"));
+            Assert.That(validation.Format(), Does.Not.Contain("linear-gradient"));
             Assert.That(validation.Format(), Does.Contain("square corners"));
             Assert.That(validation.Format(), Does.Contain("project default TMP font"));
             Assert.That(validation.Format(), Does.Contain("Symbolic binding 'settings.musicEnabled'"));
@@ -231,18 +237,27 @@ namespace Html2Vrc.Tests
             var profileCard = document.root.children[1];
             var toggleNode = profileCard.children[2];
             Assert.That(document.root.style.backgroundColor, Is.EqualTo("#171A2BFF"));
+            Assert.That(document.root.style.backgroundType, Is.EqualTo("linear-gradient"));
+            Assert.That(document.root.style.backgroundGradientAngle, Is.EqualTo(135f));
+            Assert.That(document.root.style.backgroundGradientPositions, Is.EqualTo(new[] { 0f, 1f }));
+            Assert.That(
+                document.root.style.backgroundGradientColors,
+                Is.EqualTo(new[] { "#171A2BFF", "#35245DFF" }));
             Assert.That(profileCard.style.childAlignment, Is.EqualTo("MiddleLeft"));
             Assert.That(titleNode.style.fontStyle, Is.EqualTo("Bold"));
             Assert.That(toggleNode.type, Is.EqualTo("Toggle"));
             Assert.That(toggleNode.toggleValue, Is.True);
 
             var build = UdomBuilder.GenerateOrRegenerate(document);
+            var rootImage = UdomBuilder.FindNode(build.Root, "settings-screen").GetComponent<Image>();
             var title = UdomBuilder.FindNode(build.Root, "settings-title").GetComponent<TextMeshProUGUI>();
             var profileImage = UdomBuilder.FindNode(
                 build.Root,
                 "profile-image::__image-content").GetComponent<Image>();
             var toggle = UdomBuilder.FindNode(build.Root, "music-toggle").GetComponent<Toggle>();
             var checkmark = UdomBuilder.FindNode(build.Root, "music-toggle::__toggle-checkmark");
+            Assert.That(rootImage.material.shader.name, Is.EqualTo(UdomGradientAssetUtility.ShaderName));
+            Assert.That(rootImage.material.GetTexture("_GradientTex"), Is.Not.Null);
             Assert.That(title.text, Is.EqualTo("Settings"));
             Assert.That((title.fontStyle & FontStyles.Bold) != 0, Is.True);
             Assert.That(profileImage, Is.Not.Null);
@@ -738,6 +753,108 @@ namespace Html2Vrc.Tests
             Assert.That(UdomBuilder.FindNode(root, "border-panel::__border"), Is.Null);
             Assert.That(UdomBuilder.FindNode(root, "border-panel::__border-top"), Is.Null);
             Assert.That(UdomBuilder.FindNode(root, "border-panel::__border-bottom"), Is.Null);
+        }
+
+        [Test]
+        public void CanonicalLinearGradient_GeneratesMultiStopLutMaterialAndRegeneratesStably()
+        {
+            var json = LoadRepositoryFile(
+                "packages",
+                "udom",
+                "fixtures",
+                "valid",
+                "unity-linear-gradient.udom.json");
+            var validation = UdomValidator.Validate(json);
+
+            Assert.That(validation.IsValid, Is.True, validation.Format());
+            Assert.That(validation.Issues, Is.Empty, validation.Format());
+            var panelNode = validation.Document.root.children.Single(node => node.id == "gradient-panel");
+            Assert.That(panelNode.style.backgroundType, Is.EqualTo("linear-gradient"));
+            Assert.That(panelNode.style.backgroundGradientAngle, Is.EqualTo(90f));
+            Assert.That(panelNode.style.backgroundGradientPositions, Is.EqualTo(new[] { 0f, 0.5f, 1f }));
+            Assert.That(
+                panelNode.style.backgroundGradientColors,
+                Is.EqualTo(new[] { "#FF0000FF", "#00FF00FF", "#0000FFFF" }));
+
+            var build = UdomBuilder.GenerateOrRegenerate(validation.Document, null, sample);
+            var root = build.Root;
+            var panel = UdomBuilder.FindNode(root, "gradient-panel");
+            var image = panel.GetComponent<Image>();
+            var material = image.material;
+            var texture = material.GetTexture("_GradientTex") as Texture2D;
+            Assert.That(texture, Is.Not.Null);
+            var materialPath = AssetDatabase.GetAssetPath(material);
+            var texturePath = AssetDatabase.GetAssetPath(texture);
+            var materialGuid = AssetDatabase.AssetPathToGUID(materialPath);
+            var textureGuid = AssetDatabase.AssetPathToGUID(texturePath);
+            Assert.That(image.color, Is.EqualTo(Color.white).Using(ColorComparer.Instance));
+            Assert.That(material.shader.name, Is.EqualTo(UdomGradientAssetUtility.ShaderName));
+            Assert.That(
+                materialPath,
+                Does.StartWith("Assets/Html2VrcGenerated/Gradients/"));
+            Assert.That(
+                texturePath,
+                Does.StartWith("Assets/Html2VrcGenerated/Gradients/"));
+            Assert.That(texture.width, Is.EqualTo(UdomGradientAssetUtility.LutWidth));
+            Assert.That(texture.wrapMode, Is.EqualTo(TextureWrapMode.Clamp));
+            Assert.That(texture.filterMode, Is.EqualTo(FilterMode.Bilinear));
+            Assert.That(
+                UdomGradientAssetUtility.Evaluate(
+                    0.25f,
+                    panelNode.style.backgroundGradientPositions,
+                    panelNode.style.backgroundGradientColors),
+                Is.EqualTo(new Color(0.5f, 0.5f, 0f, 1f)).Using(ColorComparer.Instance));
+            Assert.That(
+                UdomGradientAssetUtility.Evaluate(
+                    0.75f,
+                    panelNode.style.backgroundGradientPositions,
+                    panelNode.style.backgroundGradientColors),
+                Is.EqualTo(new Color(0f, 0.5f, 0.5f, 1f)).Using(ColorComparer.Instance));
+            Assert.That(texture.GetPixel(0, 0), Is.EqualTo(Color.red).Using(ColorComparer.Instance));
+            Assert.That(texture.GetPixel(texture.width / 2, 0), Is.EqualTo(Color.green).Using(ColorComparer.Instance));
+            Assert.That(texture.GetPixel(texture.width - 1, 0), Is.EqualTo(Color.blue).Using(ColorComparer.Instance));
+            var axis = material.GetVector("_GradientAxis");
+            Assert.That(axis.x, Is.EqualTo(360f).Within(0.001f));
+            Assert.That(axis.y, Is.EqualTo(0f).Within(0.001f));
+
+#if UDONSHARP
+            var validationClone = Object.Instantiate(panel.gameObject);
+            try
+            {
+                WorldValidation.RemoveIllegalComponents(
+                    new List<GameObject> { validationClone },
+                    WorldValidation.WhiteListConfiguration.VRCSDK3);
+                var validatedImage = validationClone.GetComponent<Image>();
+                Assert.That(validatedImage, Is.Not.Null);
+                Assert.That(
+                    validatedImage.material.shader.name,
+                    Is.EqualTo(UdomGradientAssetUtility.ShaderName));
+            }
+            finally
+            {
+                Object.DestroyImmediate(validationClone);
+            }
+#endif
+
+            panelNode.style.backgroundGradientAngle = 180f;
+            UdomBuilder.GenerateOrRegenerate(validation.Document, root, sample);
+            var regeneratedMaterial = image.material;
+            var regeneratedTexture = regeneratedMaterial.GetTexture("_GradientTex") as Texture2D;
+            Assert.That(AssetDatabase.GetAssetPath(regeneratedMaterial), Is.EqualTo(materialPath));
+            Assert.That(AssetDatabase.GetAssetPath(regeneratedTexture), Is.EqualTo(texturePath));
+            Assert.That(AssetDatabase.AssetPathToGUID(materialPath), Is.EqualTo(materialGuid));
+            Assert.That(AssetDatabase.AssetPathToGUID(texturePath), Is.EqualTo(textureGuid));
+            axis = regeneratedMaterial.GetVector("_GradientAxis");
+            Assert.That(axis.x, Is.EqualTo(0f).Within(0.001f));
+            Assert.That(axis.y, Is.EqualTo(-160f).Within(0.001f));
+
+            panelNode.style.backgroundType = "color";
+            panelNode.style.backgroundColor = "#123456FF";
+            UdomBuilder.GenerateOrRegenerate(validation.Document, root, sample);
+            Assert.That(image.material.shader.name, Is.Not.EqualTo(UdomGradientAssetUtility.ShaderName));
+            Assert.That(
+                image.color,
+                Is.EqualTo(UdomBuilderUtility.ParseColor("#123456FF", Color.clear)).Using(ColorComparer.Instance));
         }
 
         [Test]

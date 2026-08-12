@@ -341,6 +341,16 @@ namespace Html2Vrc.Editor
             if (string.Equals(canonicalType, "text", StringComparison.Ordinal))
             {
                 node.text = RequireText(value, "value", path + ".value");
+                if (string.Equals(node.style.backgroundType, "linear-gradient", StringComparison.Ordinal))
+                {
+                    warnings.Add(new UdomParseWarning(
+                        path + ".style.paint.backgrounds[0]",
+                        "Canonical linear-gradient on a text node uses its first stop color because TMP text and its box background require separate graphics."));
+                    node.style.backgroundType = "color";
+                    node.style.backgroundGradientPositions = Array.Empty<float>();
+                    node.style.backgroundGradientColors = Array.Empty<string>();
+                }
+
                 if (!mappedStyle.HasWidth && !fillParentByDefault)
                 {
                     node.style.size[0] = parentSize != null && parentSize.Length >= 1
@@ -1307,13 +1317,26 @@ namespace Html2Vrc.Editor
                      || string.Equals(type, "radial-gradient", StringComparison.Ordinal)
                      || string.Equals(type, "conic-gradient", StringComparison.Ordinal))
             {
-                result.Style.backgroundColor = MapGradientFallback(
+                result.Style.backgroundColor = MapGradient(
                     background,
                     path + ".backgrounds[0]",
-                    type);
-                warnings.Add(new UdomParseWarning(
-                    path + ".backgrounds[0]",
-                    $"Canonical {type} is approximated with its first stop color until a gradient backend is available."));
+                    type,
+                    out var gradientAngle,
+                    out var gradientPositions,
+                    out var gradientColors);
+                if (string.Equals(type, "linear-gradient", StringComparison.Ordinal))
+                {
+                    result.Style.backgroundType = type;
+                    result.Style.backgroundGradientAngle = gradientAngle;
+                    result.Style.backgroundGradientPositions = gradientPositions;
+                    result.Style.backgroundGradientColors = gradientColors;
+                }
+                else
+                {
+                    warnings.Add(new UdomParseWarning(
+                        path + ".backgrounds[0]",
+                        $"Canonical {type} is approximated with its first stop color until a matching Unity backend is available."));
+                }
             }
             else
             {
@@ -1386,17 +1409,25 @@ namespace Html2Vrc.Editor
             }
         }
 
-        private static string MapGradientFallback(
+        private static string MapGradient(
             Dictionary<string, object> value,
             string path,
-            string type)
+            string type,
+            out float angle,
+            out float[] positions,
+            out string[] colors)
         {
+            angle = 180f;
             if (string.Equals(type, "linear-gradient", StringComparison.Ordinal))
             {
                 EnsureOnlyKeys(value, path, "type", "angle", "stops");
                 if (value.TryGetValue("angle", out var angleValue))
                 {
-                    RequireFloat(angleValue, path + ".angle");
+                    angle = RequireFloat(angleValue, path + ".angle");
+                    if (float.IsNaN(angle) || float.IsInfinity(angle))
+                    {
+                        throw new FormatException($"{path}.angle: gradient angle must be finite.");
+                    }
                 }
             }
             else if (string.Equals(type, "radial-gradient", StringComparison.Ordinal))
@@ -1423,6 +1454,8 @@ namespace Html2Vrc.Editor
 
             var previousPosition = -1f;
             string firstColor = null;
+            positions = new float[stops.Count];
+            colors = new string[stops.Count];
             for (var index = 0; index < stops.Count; index++)
             {
                 var stopPath = $"{path}.stops[{index}]";
@@ -1436,6 +1469,8 @@ namespace Html2Vrc.Editor
 
                 previousPosition = position;
                 var color = RequireString(stop, "color", stopPath + ".color");
+                positions[index] = position;
+                colors[index] = color;
                 if (index == 0)
                 {
                     firstColor = color;

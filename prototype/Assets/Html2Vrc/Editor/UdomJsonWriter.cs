@@ -126,6 +126,10 @@ namespace Html2Vrc.Editor
             writer.FloatArrayProperty("margin", style.margin);
             writer.FloatProperty("spacing", style.spacing);
             writer.StringProperty("backgroundColor", style.backgroundColor);
+            writer.StringProperty("backgroundType", style.backgroundType);
+            writer.FloatProperty("backgroundGradientAngle", style.backgroundGradientAngle);
+            writer.FloatArrayProperty("backgroundGradientPositions", style.backgroundGradientPositions);
+            writer.StringArrayProperty("backgroundGradientColors", style.backgroundGradientColors);
             writer.FloatArrayProperty("borderWidth", style.borderWidth);
             writer.StringArrayProperty("borderColor", style.borderColor);
             writer.StringProperty("textColor", style.textColor);

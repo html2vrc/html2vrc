@@ -204,6 +204,32 @@ namespace Html2Vrc.Editor
                 style.backgroundColor = GetString(value, "backgroundColor");
             }
 
+            if (value.TryGetValue("backgroundType", out _))
+            {
+                style.backgroundType = GetString(value, "backgroundType");
+            }
+
+            if (value.TryGetValue("backgroundGradientAngle", out var backgroundGradientAngle))
+            {
+                style.backgroundGradientAngle = GetFloat(
+                    backgroundGradientAngle,
+                    path + ".backgroundGradientAngle");
+            }
+
+            if (value.TryGetValue("backgroundGradientPositions", out var backgroundGradientPositions))
+            {
+                style.backgroundGradientPositions = GetFloatArray(
+                    backgroundGradientPositions,
+                    path + ".backgroundGradientPositions");
+            }
+
+            if (value.TryGetValue("backgroundGradientColors", out var backgroundGradientColors))
+            {
+                style.backgroundGradientColors = GetStringArray(
+                    backgroundGradientColors,
+                    path + ".backgroundGradientColors");
+            }
+
             if (value.TryGetValue("borderWidth", out var borderWidth))
             {
                 style.borderWidth = GetFloatArray(borderWidth, path + ".borderWidth");

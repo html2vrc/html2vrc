@@ -89,6 +89,7 @@ namespace Html2Vrc.Editor
             "scrollAxisExplicit", "scrollHorizontal", "scrollVertical", "scrollInitialOffset",
             "style", "binding", "embed", "children",
             "visible", "opacity", "position", "layout", "padding", "margin", "spacing", "backgroundColor",
+            "backgroundType", "backgroundGradientAngle", "backgroundGradientPositions", "backgroundGradientColors",
             "borderWidth", "borderColor", "textColor", "fontSize", "alignment", "fontStyle", "childAlignment",
             "flexibleWidth", "flexibleHeight",
             "action", "targetSlot", "fallbackLabel"
@@ -404,6 +405,7 @@ namespace Html2Vrc.Editor
             }
 
             ValidateColor(style.backgroundColor, path + ".backgroundColor", result);
+            ValidateBackground(style, path, result);
             ValidateColorArray(style.borderColor, path + ".borderColor", result);
             ValidateColor(style.textColor, path + ".textColor", result);
 
@@ -598,6 +600,60 @@ namespace Html2Vrc.Editor
             for (var index = 0; index < value.Length; index++)
             {
                 ValidateColor(value[index], $"{path}[{index}]", result);
+            }
+        }
+
+        private static void ValidateBackground(UdomStyle style, string path, UdomValidationResult result)
+        {
+            if (string.Equals(style.backgroundType, "color", StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            if (!string.Equals(style.backgroundType, "linear-gradient", StringComparison.OrdinalIgnoreCase))
+            {
+                AddError(result, path + ".backgroundType", $"unsupported background type '{style.backgroundType}'.");
+                return;
+            }
+
+            if (float.IsNaN(style.backgroundGradientAngle) || float.IsInfinity(style.backgroundGradientAngle))
+            {
+                AddError(result, path + ".backgroundGradientAngle", "gradient angle must be finite.");
+            }
+
+            var positions = style.backgroundGradientPositions;
+            var colors = style.backgroundGradientColors;
+            if (positions == null
+                || colors == null
+                || positions.Length < 2
+                || positions.Length != colors.Length)
+            {
+                AddError(
+                    result,
+                    path + ".backgroundGradientPositions",
+                    "linear gradient requires matching position and color arrays with at least two stops.");
+                return;
+            }
+
+            var previous = -1f;
+            for (var index = 0; index < positions.Length; index++)
+            {
+                var position = positions[index];
+                if (float.IsNaN(position)
+                    || float.IsInfinity(position)
+                    || position < 0f
+                    || position > 1f
+                    || position < previous)
+                {
+                    AddError(
+                        result,
+                        $"{path}.backgroundGradientPositions[{index}]",
+                        "gradient stop positions must be finite, ordered, and between zero and one.");
+                    return;
+                }
+
+                previous = position;
+                ValidateColor(colors[index], $"{path}.backgroundGradientColors[{index}]", result);
             }
         }
 

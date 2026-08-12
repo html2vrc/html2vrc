@@ -324,8 +324,8 @@ ReactUnity에서는 CSS 값 정규화, 속성 매핑, uGUI와 UI Toolkit 백엔�
 | UDOM 표현 | PC 우선 백엔드 | PC 폴백 | Android/Quest 기본 |
 |---|---|---|---|
 | Color background | Unity Image | 공용 Material | 동일 |
-| 2색 linear gradient | Vertex Gradient | UIEffect 기반 Material | Vertex Gradient 또는 단색 |
-| 다중·임의 각도 linear gradient | UIEffect 기반 Material | Gradient LUT | 단순 Gradient 또는 단색 |
+| 2색 linear gradient | Gradient LUT Material (Unity 프로토타입 구현) | UIEffect 기반 Material | 단색 |
+| 다중·임의 각도 linear gradient | Gradient LUT Material (Unity 프로토타입 구현) | Gradient LUT | 단순 Gradient 또는 단색 |
 | radial gradient | UIEffect 기반 Material | Gradient LUT | 단순 Gradient 또는 단색 |
 | conic gradient | 지원 Shader | 부분 이미지 | 단색 또는 비활성화 |
 | border radius | Rounded Corners 기반 Material | 9-slice | Material 또는 9-slice |
@@ -575,8 +575,8 @@ AI는 특정 Unity 라이브러리 API보다 HTML, CSS, React와 일반적인 Un
 
 ### 3단계: 선명한 패널
 
-- Vertex Gradient
-- 다중·각도·radial gradient
+- 다중·임의 각도 linear gradient (VRChat-safe LUT Material 구현)
+- radial gradient
 - border radius
 - square-corner per-edge border (Unity 프로토타입 구현, radius 결합은 후속)
 - Mask와 ScrollView 조합
@@ -585,7 +585,7 @@ AI는 특정 Unity 라이브러리 API보다 HTML, CSS, React와 일반적인 Un
 
 - shadow와 outline
 - blur
-- Gradient LUT
+- Gradient LUT 품질·성능 프로파일 확장
 - 부분 Texture Bake
 - PC 기준 프로파일
 - Android/Quest degradation 단계

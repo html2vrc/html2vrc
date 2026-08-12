@@ -106,6 +106,8 @@ Canonical image의 `fit`은 `fill`, `contain`, `cover`, `none`을 지원합니�
 
 Canonical `paint.border`의 왼쪽·위·오른쪽·아래 `solid` edge는 각 폭과 색을 유지한 Unity Image overlay로 생성됩니다. Border 계층은 안정 ID를 사용하고 레이아웃에서 제외되므로 UI 자식 배치에 영향을 주지 않으며, 재생성할 때 사라진 edge와 빈 overlay도 정리됩니다.
 
+Canonical `linear-gradient`는 임의 각도와 여러 color stop을 보존해 Unity UI 전용 Material로 생성됩니다. 색상은 1025×1 LUT Texture에 결정론적으로 기록되고, 노드 크기와 각도를 전달받는 VRChat 호환 Shader가 이를 렌더링합니다. UDOM TextAsset에서 생성할 때 Material과 LUT는 `Assets/Html2VrcGenerated/Gradients` 아래 안정 경로에 재사용되며, 월드 계층에는 별도 사용자 런타임 컴포넌트를 추가하지 않습니다.
+
 ## Embed
 
 Embed는 HTML2VRC 레이아웃에 기존 Unity GameObject나 VRChat 프리팹을 연결합니다. 연결된 오브젝트의 내부 구조는 HTML2VRC가 소유하지 않습니다.

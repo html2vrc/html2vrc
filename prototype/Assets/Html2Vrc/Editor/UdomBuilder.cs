@@ -144,6 +144,7 @@ namespace Html2Vrc.Editor
             public HashSet<string> DesiredIds;
             public UdomBuildResult Result;
             public TMP_FontAsset Font;
+            public TextAsset SourceAsset;
         }
 
         private struct CanvasFitSettings
@@ -206,7 +207,8 @@ namespace Html2Vrc.Editor
                 ExistingDuplicates = duplicates,
                 DesiredIds = new HashSet<string>(StringComparer.Ordinal),
                 Result = result,
-                Font = GetOrCreateDefaultFont()
+                Font = GetOrCreateDefaultFont(),
+                SourceAsset = sourceAsset
             };
 
             CollectExternalSlots(document.root, root);
@@ -522,6 +524,7 @@ namespace Html2Vrc.Editor
                     throw new InvalidOperationException($"Validated node type unexpectedly unsupported: {node.type}");
             }
 
+            ConfigureBackground(nodeObject, node.id, style, context);
             ConfigureBorder(nodeObject, node, style, context);
 
             return nodeObject;
@@ -717,6 +720,42 @@ namespace Html2Vrc.Editor
             image.color = UdomBuilderUtility.ParseColor(style.backgroundColor, Color.clear);
             image.raycastTarget = false;
             ConfigureLayout(target, style);
+        }
+
+        private static void ConfigureBackground(
+            GameObject target,
+            string stableId,
+            UdomStyle style,
+            BuildContext context)
+        {
+            var image = target.GetComponent<Image>();
+            if (!string.Equals(
+                    style.backgroundType,
+                    "linear-gradient",
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                UdomGradientAssetUtility.Clear(image);
+                return;
+            }
+
+            if (image == null)
+            {
+                return;
+            }
+
+            var boxSize = target.GetComponent<RectTransform>().rect.size;
+            if (boxSize.x <= 0f || boxSize.y <= 0f)
+            {
+                boxSize = GetVector2(style.size, new Vector2(100f, 100f));
+            }
+
+            Undo.RecordObject(image, "Configure UDOM linear gradient");
+            UdomGradientAssetUtility.Configure(
+                image,
+                style,
+                boxSize,
+                context.SourceAsset,
+                stableId);
         }
 
         private static void ConfigureBorder(
