@@ -961,6 +961,103 @@ namespace Html2Vrc.Tests
         }
 
         [Test]
+        public void CanonicalAbsolutePosition_LeavesFlexFlowAndUsesTopLeftCoordinates()
+        {
+            var json = LoadRepositoryFile(
+                "packages",
+                "udom",
+                "fixtures",
+                "valid",
+                "unity-absolute-position.udom.json");
+            var validation = UdomValidator.Validate(json);
+
+            Assert.That(validation.IsValid, Is.True, validation.Format());
+            Assert.That(validation.Issues, Is.Empty, validation.Format());
+
+            var document = validation.Document;
+            var firstNode = document.root.children[0];
+            var overlayNode = document.root.children[1];
+            var secondNode = document.root.children[2];
+            var directNode = document.root.children[3];
+            Assert.That(overlayNode.style.positionAbsolute, Is.True);
+            Assert.That(overlayNode.style.position, Is.EqualTo(new[] { 60f, 30f }));
+            Assert.That(overlayNode.style.size, Is.EqualTo(new[] { 120f, 70f }));
+            Assert.That(directNode.style.positionAbsolute, Is.True);
+            Assert.That(directNode.style.position, Is.EqualTo(new[] { 300f, 100f }));
+            Assert.That(firstNode.style.size[1], Is.EqualTo(100f).Within(0.001f));
+            Assert.That(secondNode.style.size[1], Is.EqualTo(245f).Within(0.001f));
+            Assert.That(overlayNode.style.size[1], Is.EqualTo(70f));
+            Assert.That(overlayNode.style.flexibleHeight, Is.EqualTo(100f));
+
+            var normalized = UdomJsonWriter.Write(document);
+            var roundTrip = UdomValidator.Validate(normalized);
+            Assert.That(roundTrip.IsValid, Is.True, roundTrip.Format());
+            Assert.That(roundTrip.Document.root.children[1].style.positionAbsolute, Is.True);
+            Assert.That(roundTrip.Document.root.children[1].style.position, Is.EqualTo(new[] { 60f, 30f }));
+
+            var build = UdomBuilder.GenerateOrRegenerate(document);
+            var root = build.Root;
+            var panel = UdomBuilder.FindNode(root, "absolute-root").gameObject;
+            var first = UdomBuilder.FindNode(root, "flow-first").gameObject;
+            var second = UdomBuilder.FindNode(root, "flow-second").gameObject;
+            var overlayMargin = UdomBuilder.FindNode(root, "absolute-overlay::__margin").gameObject;
+            var overlayTransform = UdomBuilder.FindNode(
+                root,
+                "absolute-overlay::__transform-layout").gameObject;
+            var direct = UdomBuilder.FindNode(root, "absolute-direct").gameObject;
+            var overlayLayout = overlayMargin.GetComponent<LayoutElement>();
+            var overlayRect = overlayMargin.GetComponent<RectTransform>();
+            var directLayout = direct.GetComponent<LayoutElement>();
+            var directRect = direct.GetComponent<RectTransform>();
+
+            Assert.That(overlayMargin.transform.parent, Is.SameAs(panel.transform));
+            Assert.That(overlayTransform.transform.parent, Is.SameAs(overlayMargin.transform));
+            Assert.That(overlayLayout.ignoreLayout, Is.True);
+            Assert.That(overlayRect.anchorMin, Is.EqualTo(new Vector2(0f, 1f)));
+            Assert.That(overlayRect.anchorMax, Is.EqualTo(new Vector2(0f, 1f)));
+            Assert.That(overlayRect.pivot, Is.EqualTo(new Vector2(0f, 1f)));
+            Assert.That(overlayRect.anchoredPosition, Is.EqualTo(new Vector2(60f, -30f)));
+            Assert.That(overlayRect.sizeDelta, Is.EqualTo(new Vector2(134f, 88f)));
+            Assert.That(directLayout.ignoreLayout, Is.True);
+            Assert.That(directRect.anchorMin, Is.EqualTo(new Vector2(0f, 1f)));
+            Assert.That(directRect.pivot, Is.EqualTo(new Vector2(0f, 1f)));
+            Assert.That(directRect.anchoredPosition, Is.EqualTo(new Vector2(300f, -100f)));
+
+            Canvas.ForceUpdateCanvases();
+            LayoutRebuilder.ForceRebuildLayoutImmediate(panel.GetComponent<RectTransform>());
+            Assert.That(first.GetComponent<RectTransform>().rect.height, Is.EqualTo(100f).Within(0.001f));
+            Assert.That(second.GetComponent<RectTransform>().rect.height, Is.EqualTo(245f).Within(0.001f));
+            Assert.That(first.GetComponent<LayoutElement>().ignoreLayout, Is.False);
+            Assert.That(second.GetComponent<LayoutElement>().ignoreLayout, Is.False);
+
+            var regenerated = UdomBuilder.GenerateOrRegenerate(document, root);
+            Assert.That(regenerated.Created, Is.Zero);
+            Assert.That(
+                UdomBuilder.FindNode(root, "absolute-overlay::__margin").gameObject,
+                Is.SameAs(overlayMargin));
+            Assert.That(UdomBuilder.FindNode(root, "absolute-direct").gameObject, Is.SameAs(direct));
+
+            overlayNode.style.positionAbsolute = false;
+            UdomBuilder.GenerateOrRegenerate(document, root);
+            Assert.That(overlayLayout.ignoreLayout, Is.False);
+            Assert.That(overlayRect.anchoredPosition, Is.Not.EqualTo(new Vector2(60f, -30f)));
+
+            overlayNode.style.positionAbsolute = true;
+            UdomBuilder.GenerateOrRegenerate(document, root);
+            Assert.That(overlayLayout.ignoreLayout, Is.True);
+            Assert.That(overlayRect.anchorMin, Is.EqualTo(new Vector2(0f, 1f)));
+            Assert.That(overlayRect.anchoredPosition, Is.EqualTo(new Vector2(60f, -30f)));
+
+            Object.DestroyImmediate(root.gameObject);
+
+            var invalid = UdomValidator.Validate(json.Replace(
+                "\"position\": \"absolute\"",
+                "\"position\": \"fixed\""));
+            Assert.That(invalid.IsValid, Is.False);
+            Assert.That(invalid.Format(), Does.Contain("position"));
+        }
+
+        [Test]
         public void CanonicalBorder_RendersAsymmetricRoundedContourAndRegeneratesStably()
         {
             var json = LoadRepositoryFile(

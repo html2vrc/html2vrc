@@ -61,6 +61,7 @@ namespace Html2Vrc
         public bool visible = true;
         public float opacity = 1f;
         public float[] position = { 0f, 0f };
+        public bool positionAbsolute;
         public float[] size = { 100f, 100f };
         public float[] minSize = { 0f, 0f };
         public float[] maxSize = { -1f, -1f };

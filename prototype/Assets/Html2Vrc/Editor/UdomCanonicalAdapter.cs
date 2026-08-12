@@ -1276,6 +1276,16 @@ namespace Html2Vrc.Editor
             RequireDefaultString(value, "overflowX", "visible", path + ".overflowX");
             RequireDefaultString(value, "overflowY", "visible", path + ".overflowY");
 
+            var positionMode = GetString(value, "position") ?? "flow";
+            if (string.Equals(positionMode, "absolute", StringComparison.Ordinal))
+            {
+                result.Style.positionAbsolute = true;
+            }
+            else if (!string.Equals(positionMode, "flow", StringComparison.Ordinal))
+            {
+                throw new FormatException($"{path}.position: unsupported canonical position '{positionMode}'.");
+            }
+
             var parentWidth = parentSize != null && parentSize.Length == 2 ? parentSize[0] : 100f;
             var parentHeight = parentSize != null && parentSize.Length == 2 ? parentSize[1] : 100f;
             if (value.TryGetValue("x", out var xValue)
@@ -1532,17 +1542,24 @@ namespace Html2Vrc.Editor
                 return;
             }
 
+            var flowChildCount = 0;
             var requiresConstraintResolution = false;
             for (var index = 0; index < children.Length; index++)
             {
-                if (HasLayoutConstraint(children[index].style))
+                var childStyle = children[index].style;
+                if (childStyle != null && childStyle.positionAbsolute)
+                {
+                    continue;
+                }
+
+                flowChildCount++;
+                if (HasLayoutConstraint(childStyle))
                 {
                     requiresConstraintResolution = true;
-                    break;
                 }
             }
 
-            if (!requiresConstraintResolution)
+            if (flowChildCount == 0 || !requiresConstraintResolution)
             {
                 return;
             }
@@ -1562,11 +1579,16 @@ namespace Html2Vrc.Editor
             var allocatedOuterSizes = new float[children.Length];
             var flexibleWeights = new float[children.Length];
             var maximumOuterSizes = new float[children.Length];
-            var totalOuterSize = Math.Max(0, children.Length - 1) * style.spacing;
+            var totalOuterSize = Math.Max(0, flowChildCount - 1) * style.spacing;
 
             for (var index = 0; index < children.Length; index++)
             {
                 var childStyle = children[index].style ?? new UdomStyle();
+                if (childStyle.positionAbsolute)
+                {
+                    continue;
+                }
+
                 var margins = GetAxisMargins(childStyle, mainAxis);
                 var preserveAspect = HasAspectRatio(childStyle)
                                      && IsAutoSize(childStyle, crossAxis)
@@ -1632,6 +1654,11 @@ namespace Html2Vrc.Editor
             for (var index = 0; index < children.Length; index++)
             {
                 var childStyle = children[index].style ?? new UdomStyle();
+                if (childStyle.positionAbsolute)
+                {
+                    continue;
+                }
+
                 var size = childStyle.size != null && childStyle.size.Length >= 2
                     ? new[] { childStyle.size[0], childStyle.size[1] }
                     : new[] { 100f, 100f };

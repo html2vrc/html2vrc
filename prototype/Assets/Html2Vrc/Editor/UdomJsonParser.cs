@@ -174,6 +174,13 @@ namespace Html2Vrc.Editor
                 style.position = GetFloatArray(position, path + ".position");
             }
 
+            if (value.TryGetValue("positionAbsolute", out var positionAbsolute))
+            {
+                style.positionAbsolute = GetBoolean(
+                    positionAbsolute,
+                    path + ".positionAbsolute");
+            }
+
             if (value.TryGetValue("size", out var size))
             {
                 style.size = GetFloatArray(size, path + ".size");

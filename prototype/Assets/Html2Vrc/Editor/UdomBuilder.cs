@@ -264,6 +264,7 @@ namespace Html2Vrc.Editor
             EditorUtility.SetDirty(root);
             PrefabUtility.RecordPrefabInstancePropertyModifications(root);
             Canvas.ForceUpdateCanvases();
+            RefreshAbsoluteLayout(document.root, context);
             RefreshVisualLayout(document.root, context);
             Canvas.ForceUpdateCanvases();
             RefreshPaintLayout(document.root, context);
@@ -751,10 +752,21 @@ namespace Html2Vrc.Editor
             var size = GetVector2(style.size, new Vector2(100f, 100f));
             Undo.RecordObject(rect, "Configure UDOM RectTransform");
 
-            rect.anchorMin = new Vector2(0.5f, 0.5f);
-            rect.anchorMax = new Vector2(0.5f, 0.5f);
-            rect.pivot = new Vector2(0.5f, 0.5f);
-            rect.anchoredPosition = position;
+            if (style.positionAbsolute)
+            {
+                rect.anchorMin = new Vector2(0f, 1f);
+                rect.anchorMax = new Vector2(0f, 1f);
+                rect.pivot = new Vector2(0f, 1f);
+                rect.anchoredPosition = new Vector2(position.x, -position.y);
+            }
+            else
+            {
+                rect.anchorMin = new Vector2(0.5f, 0.5f);
+                rect.anchorMax = new Vector2(0.5f, 0.5f);
+                rect.pivot = new Vector2(0.5f, 0.5f);
+                rect.anchoredPosition = position;
+            }
+
             rect.sizeDelta = size;
             rect.localScale = Vector3.one;
             rect.localRotation = Quaternion.identity;
@@ -767,7 +779,7 @@ namespace Html2Vrc.Editor
             layoutElement.preferredHeight = size.y;
             layoutElement.flexibleWidth = style.flexibleWidth;
             layoutElement.flexibleHeight = style.flexibleHeight;
-            layoutElement.ignoreLayout = parent.GetComponent<LayoutGroup>() == null;
+            layoutElement.ignoreLayout = style.positionAbsolute || parent.GetComponent<LayoutGroup>() == null;
         }
 
         private static Transform ConfigureTransformHierarchy(
@@ -1219,6 +1231,7 @@ namespace Html2Vrc.Editor
                     AddMarginToMaximumSize(style, 0, margin.x + margin.z),
                     AddMarginToMaximumSize(style, 1, margin.y + margin.w)
                 },
+                positionAbsolute = style.positionAbsolute,
                 flexibleWidth = style.flexibleWidth,
                 flexibleHeight = style.flexibleHeight
             };
@@ -1449,6 +1462,48 @@ namespace Html2Vrc.Editor
             for (var index = 0; index < children.Length; index++)
             {
                 RefreshVisualLayout(children[index], context);
+            }
+        }
+
+        private static void RefreshAbsoluteLayout(UdomNode node, BuildContext context)
+        {
+            if (node == null)
+            {
+                return;
+            }
+
+            var style = node.style ?? new UdomStyle();
+            if (style.positionAbsolute)
+            {
+                var hasMargin = HasNonZero(style.margin);
+                var hasTransform = HasTransform(style);
+                var hasStackedShadows = HasRenderableOuterShadow(style)
+                                        || RequiresSiblingInsetShadow(node, style);
+                var stableId = hasMargin
+                    ? node.id + MarginSuffix
+                    : hasTransform
+                        ? node.id + TransformLayoutSuffix
+                        : hasStackedShadows
+                            ? node.id + ShadowLayoutSuffix
+                            : node.id;
+                var layout = FindNode(context.Root, stableId);
+                if (layout != null && layout.transform.parent != null)
+                {
+                    if (hasMargin)
+                    {
+                        ConfigureMarginWrapper(layout.gameObject, style, layout.transform.parent);
+                    }
+                    else
+                    {
+                        ConfigureRect(layout.gameObject, style, layout.transform.parent);
+                    }
+                }
+            }
+
+            var children = node.children ?? Array.Empty<UdomNode>();
+            for (var index = 0; index < children.Length; index++)
+            {
+                RefreshAbsoluteLayout(children[index], context);
             }
         }
 
