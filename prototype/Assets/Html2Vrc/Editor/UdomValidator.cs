@@ -90,6 +90,8 @@ namespace Html2Vrc.Editor
             "style", "binding", "embed", "children",
             "visible", "opacity", "position", "layout", "padding", "margin", "spacing", "backgroundColor",
             "backgroundType", "backgroundGradientAngle", "backgroundGradientPositions", "backgroundGradientColors",
+            "backgroundGradientCenter", "backgroundGradientCenterIsPercent",
+            "backgroundGradientRadius", "backgroundGradientRadiusIsPercent",
             "cornerRadius", "cornerRadiusPercent", "borderWidth", "borderColor", "textColor", "fontSize", "alignment", "fontStyle", "childAlignment",
             "stretchChildrenWidth", "stretchChildrenHeight",
             "flexibleWidth", "flexibleHeight",
@@ -641,15 +643,52 @@ namespace Html2Vrc.Editor
                 return;
             }
 
-            if (!string.Equals(style.backgroundType, "linear-gradient", StringComparison.OrdinalIgnoreCase))
+            var isLinear = string.Equals(
+                style.backgroundType,
+                "linear-gradient",
+                StringComparison.OrdinalIgnoreCase);
+            var isRadial = string.Equals(
+                style.backgroundType,
+                "radial-gradient",
+                StringComparison.OrdinalIgnoreCase);
+            if (!isLinear && !isRadial)
             {
                 AddError(result, path + ".backgroundType", $"unsupported background type '{style.backgroundType}'.");
                 return;
             }
 
-            if (float.IsNaN(style.backgroundGradientAngle) || float.IsInfinity(style.backgroundGradientAngle))
+            if (isLinear
+                && (float.IsNaN(style.backgroundGradientAngle)
+                    || float.IsInfinity(style.backgroundGradientAngle)))
             {
                 AddError(result, path + ".backgroundGradientAngle", "gradient angle must be finite.");
+            }
+
+            if (isRadial)
+            {
+                ValidateVector(
+                    style.backgroundGradientCenter,
+                    2,
+                    path + ".backgroundGradientCenter",
+                    result,
+                    requirePositive: false);
+                ValidateBooleanVector(
+                    style.backgroundGradientCenterIsPercent,
+                    2,
+                    path + ".backgroundGradientCenterIsPercent",
+                    result);
+                ValidateVector(
+                    style.backgroundGradientRadius,
+                    2,
+                    path + ".backgroundGradientRadius",
+                    result,
+                    requirePositive: false,
+                    requireNonNegative: true);
+                ValidateBooleanVector(
+                    style.backgroundGradientRadiusIsPercent,
+                    2,
+                    path + ".backgroundGradientRadiusIsPercent",
+                    result);
             }
 
             var positions = style.backgroundGradientPositions;
@@ -662,7 +701,7 @@ namespace Html2Vrc.Editor
                 AddError(
                     result,
                     path + ".backgroundGradientPositions",
-                    "linear gradient requires matching position and color arrays with at least two stops.");
+                    "gradient requires matching position and color arrays with at least two stops.");
                 return;
             }
 
@@ -685,6 +724,18 @@ namespace Html2Vrc.Editor
 
                 previous = position;
                 ValidateColor(colors[index], $"{path}.backgroundGradientColors[{index}]", result);
+            }
+        }
+
+        private static void ValidateBooleanVector(
+            bool[] value,
+            int expectedLength,
+            string path,
+            UdomValidationResult result)
+        {
+            if (value == null || value.Length != expectedLength)
+            {
+                AddError(result, path, $"{expectedLength}개의 boolean 값이 필요하다.");
             }
         }
 

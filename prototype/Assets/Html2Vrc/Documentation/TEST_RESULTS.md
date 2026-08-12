@@ -27,12 +27,13 @@
 - canonical image의 fill/contain/cover/none 크기 계산, percentage·numeric·auto 위치, RectMask2D clipping, Texture2D 로딩과 안정 내부 콘텐츠 재생성을 확인했다.
 - canonical per-edge solid border의 비대칭 폭·색 정규화, 레이아웃 비간섭 overlay 생성, anchor/offset, draw order, 안정 재생성과 edge·overlay 정리를 확인했다.
 - canonical linear-gradient의 임의 각도와 다중 stop을 1025×1 LUT Texture와 UI Material로 생성하고, 에셋 경로·재사용·단색 전환 정리와 VRChat 허용 컴포넌트 검사 뒤 Image/Shader 보존을 확인했다.
+- canonical radial-gradient의 center/radius mixed unit 보존, 최종 Layout Rect 기반 타원 계산, 다중 stop LUT, radius SDF 합성, linear 전환 시 Material/Texture GUID 재사용과 VRChat 허용 컴포넌트 검사를 확인했다.
 - canonical per-corner radius의 절대값·percentage 해석, SDF Material, 최종 Layout Rect 기반 갱신, 과도한 반지름 비율 정규화, gradient 합성, 투명 image 자식 stencil clipping, Material 안정 재사용·정리와 VRChat 허용 컴포넌트 검사를 확인했다.
 
 자동 검증 결과:
 
-- `npm run check`: UDOM conformance 24/24, React 5/5, TypeScript typecheck와 build 통과
-- Unity EditMode `Html2Vrc.Tests.UdomPrototypeTests`: **25/25 통과, 실패 0**
+- `npm run check`: UDOM conformance 25/25, React 5/5, TypeScript typecheck와 build 통과
+- Unity EditMode `Html2Vrc.Tests.UdomPrototypeTests`: **26/26 통과, 실패 0**
 - Unity 종료 코드 0, C# 컴파일 오류 0
 - Windows CRLF에서 기존 HTML 재생성 테스트가 문자열을 교체하지 못하던 문제도 함께 수정했다.
 
@@ -62,7 +63,7 @@
 
 ## 자동 회귀 검증
 
-HTML2VRC 전용 Unity Test Framework 테스트 25개를 실행한다. 검증 범위는 다음과 같다.
+HTML2VRC 전용 Unity Test Framework 테스트 26개를 실행한다. 검증 범위는 다음과 같다.
 
 1. 샘플 UDOM Validation 성공과 잘못된 속성/중복 ID 거부
 2. Canvas, TextMeshProUGUI, Image, Button, ScrollRect, LayoutGroup과 VRChat용 `VRCUiShape` 생성
@@ -89,11 +90,12 @@ HTML2VRC 전용 Unity Test Framework 테스트 25개를 실행한다. 검증 범
 23. canonical per-edge solid border의 폭·색 보존, 레이아웃 비간섭 overlay, anchor/offset, draw order와 edge·overlay 재생성 수명주기
 24. canonical linear-gradient의 다중 stop LUT·각도 축, 영속 Material/Texture 안정 재사용, 단색 전환과 VRChat 허용 컴포넌트 검사
 25. canonical per-corner radius의 SDF Material, 인접 반지름 정규화, gradient 합성, stencil Mask 자식 clipping과 VRChat 허용 컴포넌트 검사
+26. canonical radial-gradient의 mixed unit center/radius 타원, 최종 Rect 계산, rounded Mask 합성, linear 전환 재사용과 VRChat 허용 컴포넌트 검사
 
 최종 자동 테스트 결과:
 
-- 전체 25개
-- 통과 25개
+- 전체 26개
+- 통과 26개
 - 실패 0개
 - 건너뜀 0개
 - Unity 종료 코드 0

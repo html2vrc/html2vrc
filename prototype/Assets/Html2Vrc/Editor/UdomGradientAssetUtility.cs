@@ -9,6 +9,7 @@ namespace Html2Vrc.Editor
     public static class UdomGradientAssetUtility
     {
         public const string ShaderName = "HTML2VRC/UI Linear Gradient";
+        public const string RadialShaderName = "HTML2VRC/UI Radial Gradient";
         public const int LutWidth = 1025;
 
         private const string GeneratedRoot = "Assets/Html2VrcGenerated";
@@ -21,10 +22,11 @@ namespace Html2Vrc.Editor
             TextAsset sourceAsset,
             string stableId)
         {
-            var shader = Shader.Find(ShaderName);
+            var shaderName = GetShaderName(style != null ? style.backgroundType : null);
+            var shader = Shader.Find(shaderName);
             if (shader == null)
             {
-                throw new InvalidOperationException($"Required gradient shader '{ShaderName}' was not found.");
+                throw new InvalidOperationException($"Required gradient shader '{shaderName}' was not found.");
             }
 
             var sourcePath = sourceAsset != null ? AssetDatabase.GetAssetPath(sourceAsset) : null;
@@ -87,10 +89,48 @@ namespace Html2Vrc.Editor
         public static void ApplyLayoutProperties(Material material, UdomStyle style, Vector2 boxSize)
         {
             var size = new Vector2(Mathf.Max(0.0001f, boxSize.x), Mathf.Max(0.0001f, boxSize.y));
-            var radians = style.backgroundGradientAngle * Mathf.Deg2Rad;
-            var axis = new Vector2(Mathf.Sin(radians) * size.x, Mathf.Cos(radians) * size.y);
-            material.SetVector("_GradientAxis", new Vector4(axis.x, axis.y, 0f, 0f));
+            if (string.Equals(
+                    style.backgroundType,
+                    "radial-gradient",
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                var center = ResolveVector(
+                    style.backgroundGradientCenter,
+                    style.backgroundGradientCenterIsPercent,
+                    size,
+                    new Vector2(50f, 50f));
+                var radius = ResolveVector(
+                    style.backgroundGradientRadius,
+                    style.backgroundGradientRadiusIsPercent,
+                    size,
+                    new Vector2(50f, 50f));
+                material.SetVector(
+                    "_GradientCenter",
+                    new Vector4(-size.x * 0.5f + center.x, size.y * 0.5f - center.y, 0f, 0f));
+                material.SetVector(
+                    "_GradientRadius",
+                    new Vector4(Mathf.Max(0f, radius.x), Mathf.Max(0f, radius.y), 0f, 0f));
+            }
+            else
+            {
+                var radians = style.backgroundGradientAngle * Mathf.Deg2Rad;
+                var axis = new Vector2(Mathf.Sin(radians) * size.x, Mathf.Cos(radians) * size.y);
+                material.SetVector("_GradientAxis", new Vector4(axis.x, axis.y, 0f, 0f));
+            }
+
             UdomRoundedCornerAssetUtility.ApplyProperties(material, style, size);
+        }
+
+        public static bool IsGradientType(string backgroundType)
+        {
+            return string.Equals(backgroundType, "linear-gradient", StringComparison.OrdinalIgnoreCase)
+                   || string.Equals(backgroundType, "radial-gradient", StringComparison.OrdinalIgnoreCase);
+        }
+
+        public static bool IsShader(string shaderName)
+        {
+            return string.Equals(shaderName, ShaderName, StringComparison.Ordinal)
+                   || string.Equals(shaderName, RadialShaderName, StringComparison.Ordinal);
         }
 
         public static void DeleteGeneratedAssets(TextAsset sourceAsset, string stableId)
@@ -120,7 +160,7 @@ namespace Html2Vrc.Editor
         public static void Clear(Image image)
         {
             if (image == null || image.material == null || image.material.shader == null
-                || !string.Equals(image.material.shader.name, ShaderName, StringComparison.Ordinal))
+                || !IsShader(image.material.shader.name))
             {
                 return;
             }
@@ -174,9 +214,15 @@ namespace Html2Vrc.Editor
         {
             var current = image.material;
             if (current != null
-                && current.shader == shader
+                && current.shader != null
+                && IsShader(current.shader.name)
                 && string.IsNullOrEmpty(AssetDatabase.GetAssetPath(current)))
             {
+                if (current.shader != shader)
+                {
+                    current.shader = shader;
+                }
+
                 return current;
             }
 
@@ -185,6 +231,31 @@ namespace Html2Vrc.Editor
                 name = image.name + " Gradient",
                 hideFlags = HideFlags.DontSave
             };
+        }
+
+        private static string GetShaderName(string backgroundType)
+        {
+            return string.Equals(
+                backgroundType,
+                "radial-gradient",
+                StringComparison.OrdinalIgnoreCase)
+                ? RadialShaderName
+                : ShaderName;
+        }
+
+        private static Vector2 ResolveVector(
+            float[] values,
+            bool[] isPercent,
+            Vector2 boxSize,
+            Vector2 fallbackPercent)
+        {
+            var x = values != null && values.Length >= 1 ? values[0] : fallbackPercent.x;
+            var y = values != null && values.Length >= 2 ? values[1] : fallbackPercent.y;
+            var xIsPercent = isPercent == null || isPercent.Length < 1 || isPercent[0];
+            var yIsPercent = isPercent == null || isPercent.Length < 2 || isPercent[1];
+            return new Vector2(
+                xIsPercent ? boxSize.x * x / 100f : x,
+                yIsPercent ? boxSize.y * y / 100f : y);
         }
 
         private static Texture2D CreateTexture(string name)

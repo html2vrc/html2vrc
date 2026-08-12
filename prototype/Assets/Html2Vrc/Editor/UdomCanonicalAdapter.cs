@@ -341,11 +341,12 @@ namespace Html2Vrc.Editor
             if (string.Equals(canonicalType, "text", StringComparison.Ordinal))
             {
                 node.text = RequireText(value, "value", path + ".value");
-                if (string.Equals(node.style.backgroundType, "linear-gradient", StringComparison.Ordinal))
+                if (IsNativeGradient(node.style.backgroundType))
                 {
+                    var gradientType = node.style.backgroundType;
                     warnings.Add(new UdomParseWarning(
                         path + ".style.paint.backgrounds[0]",
-                        "Canonical linear-gradient on a text node uses its first stop color because TMP text and its box background require separate graphics."));
+                        $"Canonical {gradientType} on a text node uses its first stop color because TMP text and its box background require separate graphics."));
                     node.style.backgroundType = "color";
                     node.style.backgroundGradientPositions = Array.Empty<float>();
                     node.style.backgroundGradientColors = Array.Empty<string>();
@@ -377,6 +378,18 @@ namespace Html2Vrc.Editor
 
             MapElementProperties(node, elementName, value, path, mappedStyle, resources, warnings);
             ValidateEventMap(elementName, value, path, warnings);
+
+            if (string.Equals(node.type, "Embed", StringComparison.OrdinalIgnoreCase)
+                && IsNativeGradient(node.style.backgroundType))
+            {
+                var gradientType = node.style.backgroundType;
+                warnings.Add(new UdomParseWarning(
+                    path + ".style.paint.backgrounds[0]",
+                    $"Canonical {gradientType} on an embed anchor uses its first stop color because the external object owns its graphics."));
+                node.style.backgroundType = "color";
+                node.style.backgroundGradientPositions = Array.Empty<float>();
+                node.style.backgroundGradientColors = Array.Empty<string>();
+            }
 
             if (string.Equals(node.type, "Embed", StringComparison.OrdinalIgnoreCase)
                 && HasCornerRadius(node.style))
@@ -1346,13 +1359,21 @@ namespace Html2Vrc.Editor
                     type,
                     out var gradientAngle,
                     out var gradientPositions,
-                    out var gradientColors);
-                if (string.Equals(type, "linear-gradient", StringComparison.Ordinal))
+                    out var gradientColors,
+                    out var gradientCenter,
+                    out var gradientCenterIsPercent,
+                    out var gradientRadius,
+                    out var gradientRadiusIsPercent);
+                if (IsNativeGradient(type))
                 {
                     result.Style.backgroundType = type;
                     result.Style.backgroundGradientAngle = gradientAngle;
                     result.Style.backgroundGradientPositions = gradientPositions;
                     result.Style.backgroundGradientColors = gradientColors;
+                    result.Style.backgroundGradientCenter = gradientCenter;
+                    result.Style.backgroundGradientCenterIsPercent = gradientCenterIsPercent;
+                    result.Style.backgroundGradientRadius = gradientRadius;
+                    result.Style.backgroundGradientRadiusIsPercent = gradientRadiusIsPercent;
                 }
                 else
                 {
@@ -1494,9 +1515,17 @@ namespace Html2Vrc.Editor
             string type,
             out float angle,
             out float[] positions,
-            out string[] colors)
+            out string[] colors,
+            out float[] center,
+            out bool[] centerIsPercent,
+            out float[] radius,
+            out bool[] radiusIsPercent)
         {
             angle = 180f;
+            center = new[] { 50f, 50f };
+            centerIsPercent = new[] { true, true };
+            radius = new[] { 50f, 50f };
+            radiusIsPercent = new[] { true, true };
             if (string.Equals(type, "linear-gradient", StringComparison.Ordinal))
             {
                 EnsureOnlyKeys(value, path, "type", "angle", "stops");
@@ -1512,8 +1541,20 @@ namespace Html2Vrc.Editor
             else if (string.Equals(type, "radial-gradient", StringComparison.Ordinal))
             {
                 EnsureOnlyKeys(value, path, "type", "center", "radius", "stops");
-                ValidateOptionalXyLength(value, "center", path + ".center");
-                ValidateOptionalXyLength(value, "radius", path + ".radius");
+                MapGradientXyLength(
+                    value,
+                    "center",
+                    path + ".center",
+                    requireNonNegative: false,
+                    out center,
+                    out centerIsPercent);
+                MapGradientXyLength(
+                    value,
+                    "radius",
+                    path + ".radius",
+                    requireNonNegative: true,
+                    out radius,
+                    out radiusIsPercent);
             }
             else
             {
@@ -1557,6 +1598,82 @@ namespace Html2Vrc.Editor
             }
 
             return firstColor;
+        }
+
+        private static bool IsNativeGradient(string type)
+        {
+            return string.Equals(type, "linear-gradient", StringComparison.Ordinal)
+                   || string.Equals(type, "radial-gradient", StringComparison.Ordinal);
+        }
+
+        private static void MapGradientXyLength(
+            Dictionary<string, object> container,
+            string key,
+            string path,
+            bool requireNonNegative,
+            out float[] values,
+            out bool[] isPercent)
+        {
+            values = new[] { 50f, 50f };
+            isPercent = new[] { true, true };
+            if (!container.TryGetValue(key, out var raw))
+            {
+                return;
+            }
+
+            var xy = RequireObject(raw, path);
+            EnsureOnlyKeys(xy, path, "x", "y");
+            var axisKeys = new[] { "x", "y" };
+            for (var index = 0; index < axisKeys.Length; index++)
+            {
+                var axisKey = axisKeys[index];
+                if (!xy.TryGetValue(axisKey, out var axisValue))
+                {
+                    throw new FormatException($"{path}: both x and y are required.");
+                }
+
+                var axisPath = path + "." + axisKey;
+                if (axisValue is string text
+                    && string.Equals(text, "auto", StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                if (axisValue is string percentageText
+                    && percentageText.EndsWith("%", StringComparison.Ordinal))
+                {
+                    if (!TryResolveLength(axisValue, 100f, axisPath, out var percentage)
+                        || float.IsNaN(percentage)
+                        || float.IsInfinity(percentage)
+                        || (requireNonNegative && percentage < 0f))
+                    {
+                        throw new FormatException(
+                            $"{axisPath}: gradient {(requireNonNegative ? "radius" : "center")} must be finite"
+                            + (requireNonNegative ? " and non-negative." : "."));
+                    }
+
+                    values[index] = percentage;
+                    isPercent[index] = true;
+                    continue;
+                }
+
+                if (!TryResolveLength(axisValue, 100f, axisPath, out var absolute))
+                {
+                    continue;
+                }
+
+                if (float.IsNaN(absolute)
+                    || float.IsInfinity(absolute)
+                    || (requireNonNegative && absolute < 0f))
+                {
+                    throw new FormatException(
+                        $"{axisPath}: gradient {(requireNonNegative ? "radius" : "center")} must be finite"
+                        + (requireNonNegative ? " and non-negative." : "."));
+                }
+
+                values[index] = absolute;
+                isPercent[index] = false;
+            }
         }
 
         private static void ValidateOptionalXyLength(

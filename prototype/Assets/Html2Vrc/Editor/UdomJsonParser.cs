@@ -230,6 +230,38 @@ namespace Html2Vrc.Editor
                     path + ".backgroundGradientColors");
             }
 
+            if (value.TryGetValue("backgroundGradientCenter", out var backgroundGradientCenter))
+            {
+                style.backgroundGradientCenter = GetFloatArray(
+                    backgroundGradientCenter,
+                    path + ".backgroundGradientCenter");
+            }
+
+            if (value.TryGetValue(
+                    "backgroundGradientCenterIsPercent",
+                    out var backgroundGradientCenterIsPercent))
+            {
+                style.backgroundGradientCenterIsPercent = GetBooleanArray(
+                    backgroundGradientCenterIsPercent,
+                    path + ".backgroundGradientCenterIsPercent");
+            }
+
+            if (value.TryGetValue("backgroundGradientRadius", out var backgroundGradientRadius))
+            {
+                style.backgroundGradientRadius = GetFloatArray(
+                    backgroundGradientRadius,
+                    path + ".backgroundGradientRadius");
+            }
+
+            if (value.TryGetValue(
+                    "backgroundGradientRadiusIsPercent",
+                    out var backgroundGradientRadiusIsPercent))
+            {
+                style.backgroundGradientRadiusIsPercent = GetBooleanArray(
+                    backgroundGradientRadiusIsPercent,
+                    path + ".backgroundGradientRadiusIsPercent");
+            }
+
             if (value.TryGetValue("cornerRadius", out var cornerRadius))
             {
                 style.cornerRadius = GetFloatArray(cornerRadius, path + ".cornerRadius");
@@ -358,6 +390,18 @@ namespace Html2Vrc.Editor
             }
 
             throw new FormatException($"{path}: boolean이 필요하다.");
+        }
+
+        private static bool[] GetBooleanArray(object value, string path)
+        {
+            var array = RequireArray(value, path);
+            var result = new bool[array.Count];
+            for (var index = 0; index < array.Count; index++)
+            {
+                result[index] = GetBoolean(array[index], $"{path}[{index}]");
+            }
+
+            return result;
         }
 
         private static Dictionary<string, object> RequireObject(object value, string path)

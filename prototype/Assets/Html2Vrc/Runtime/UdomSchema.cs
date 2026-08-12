@@ -71,6 +71,10 @@ namespace Html2Vrc
         public float backgroundGradientAngle = 180f;
         public float[] backgroundGradientPositions = Array.Empty<float>();
         public string[] backgroundGradientColors = Array.Empty<string>();
+        public float[] backgroundGradientCenter = { 50f, 50f };
+        public bool[] backgroundGradientCenterIsPercent = { true, true };
+        public float[] backgroundGradientRadius = { 50f, 50f };
+        public bool[] backgroundGradientRadiusIsPercent = { true, true };
         public float[] cornerRadius = { 0f, 0f, 0f, 0f };
         public float[] cornerRadiusPercent = { -1f, -1f, -1f, -1f };
         public float[] borderWidth = { 0f, 0f, 0f, 0f };

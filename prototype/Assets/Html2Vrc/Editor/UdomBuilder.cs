@@ -730,10 +730,7 @@ namespace Html2Vrc.Editor
             BuildContext context)
         {
             var image = target.GetComponent<Image>();
-            var hasGradient = string.Equals(
-                style.backgroundType,
-                "linear-gradient",
-                StringComparison.OrdinalIgnoreCase);
+            var hasGradient = UdomGradientAssetUtility.IsGradientType(style.backgroundType);
             var hasRadius = UdomRoundedCornerAssetUtility.HasRadius(style);
             if (image == null)
             {
@@ -817,7 +814,7 @@ namespace Html2Vrc.Editor
                     ? material.shader.name
                     : string.Empty;
                 var boxSize = marker.GetComponent<RectTransform>().rect.size;
-                if (string.Equals(shaderName, UdomGradientAssetUtility.ShaderName, StringComparison.Ordinal))
+                if (UdomGradientAssetUtility.IsShader(shaderName))
                 {
                     UdomGradientAssetUtility.ApplyLayoutProperties(material, style, boxSize);
                     SavePaintMaterial(material);

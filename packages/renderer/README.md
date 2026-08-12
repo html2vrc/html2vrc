@@ -326,7 +326,7 @@ ReactUnity에서는 CSS 값 정규화, 속성 매핑, uGUI와 UI Toolkit 백엔�
 | Color background | Unity Image | 공용 Material | 동일 |
 | 2색 linear gradient | Gradient LUT Material (Unity 프로토타입 구현) | UIEffect 기반 Material | 단색 |
 | 다중·임의 각도 linear gradient | Gradient LUT Material (Unity 프로토타입 구현) | Gradient LUT | 단순 Gradient 또는 단색 |
-| radial gradient | UIEffect 기반 Material | Gradient LUT | 단순 Gradient 또는 단색 |
+| radial gradient | Radial Gradient LUT Material (Unity 프로토타입 구현) | Gradient LUT | 단순 Gradient 또는 단색 |
 | conic gradient | 지원 Shader | 부분 이미지 | 단색 또는 비활성화 |
 | border radius | SDF Rounded Corners Material (Unity 프로토타입 구현) | 9-slice | Material 또는 9-slice |
 | 단순 border | Material 또는 추가 Image | 9-slice | 동일 |
@@ -381,7 +381,7 @@ Android/Quest 출력이 요청되면 다음은 유지해야 한다.
 - backdrop blur
 - 일반 blur와 glow
 - 복잡한 다중 shadow
-- 고비용 conic 또는 radial gradient
+- 고비용 conic 또는 다중 effect 조합
 - 중첩 투명 레이어와 고비용 blend
 
 Radius, 단순 Gradient와 단순 Shadow처럼 비용이 낮은 효과는 backend가 지원하면 유지할 수 있다. 모바일에서 심미 효과를 제거하더라도 콘텐츠를 함께 제거하거나 전체 화면을 저해상도 Texture로 바꾸면 안 된다.
@@ -576,7 +576,7 @@ AI는 특정 Unity 라이브러리 API보다 HTML, CSS, React와 일반적인 Un
 ### 3단계: 선명한 패널
 
 - 다중·임의 각도 linear gradient (VRChat-safe LUT Material 구현)
-- radial gradient
+- radial gradient (VRChat-safe elliptical LUT Material 구현)
 - per-corner border radius (VRChat-safe SDF Material + stencil Mask 구현)
 - per-edge border (outer radius clip 구현, 정확한 inner border contour는 후속)
 - Mask와 ScrollView 조합

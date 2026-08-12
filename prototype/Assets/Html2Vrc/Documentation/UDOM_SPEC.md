@@ -32,11 +32,13 @@ Canonical `paint.border`는 왼쪽·위·오른쪽·아래 edge별 `width`, `col
 
 Canonical `linear-gradient`는 임의 각도와 두 개 이상의 color stop을 보존한다. Unity 생성기는 1025×1 RGBA LUT Texture와 UI stencil·clip을 지원하는 Material을 만들고, 노드 크기를 반영한 축으로 LUT를 샘플링한다. canonical 각도 `0`은 아래에서 위, `90`은 왼쪽에서 오른쪽이다. source TextAsset이 있으면 생성 에셋은 `Assets/Html2VrcGenerated/Gradients` 아래에서 source GUID와 node ID 기반 안정 경로로 갱신되고, raw document 생성은 저장되지 않는 임시 에셋을 사용한다. 결과 GameObject에는 VRChat 검사를 통과하지 못할 사용자 런타임 컴포넌트를 추가하지 않는다.
 
-Canonical `paint.radius`는 `[topLeft, topRight, bottomRight, bottomLeft]` design-unit 배열로 보존한다. percentage는 박스의 짧은 변을 기준으로 해석하고, 같은 변에 닿는 두 radius의 합이 변보다 크면 네 값을 같은 비율로 줄인다. 단색 배경은 rounded-corner SDF Material, linear-gradient는 같은 SDF 계산을 합성한 gradient Material을 사용한다. 자식이 있는 노드는 Unity `Mask`로 같은 곡선을 stencil에 기록하며, 투명한 image 부모는 Graphic을 표시하지 않은 채 자식만 자른다. source TextAsset 기반 Material은 `Assets/Html2VrcGenerated/RoundedCorners` 아래 source GUID와 node ID 기반 안정 경로로 갱신된다.
+Canonical `radial-gradient`는 같은 LUT와 별도 VRChat-safe UI Shader로 렌더링한다. `center.x/y`와 타원형 `radius.x/y`는 design-unit과 percentage 여부를 내부 모델에 함께 보존하고, percentage는 Layout이 끝난 최종 Rect의 width/height 축을 기준으로 해석한다. 생략되거나 `auto`인 축은 canonical 기본값 `50%`를 사용한다. Material과 LUT는 linear gradient와 같은 안정 경로를 사용하며 두 gradient 종류 사이를 전환해도 에셋 GUID를 유지한다.
+
+Canonical `paint.radius`는 `[topLeft, topRight, bottomRight, bottomLeft]` design-unit 배열로 보존한다. percentage는 박스의 짧은 변을 기준으로 해석하고, 같은 변에 닿는 두 radius의 합이 변보다 크면 네 값을 같은 비율로 줄인다. 단색 배경은 rounded-corner SDF Material, linear/radial gradient는 같은 SDF 계산을 합성한 gradient Material을 사용한다. 자식이 있는 노드는 Unity `Mask`로 같은 곡선을 stencil에 기록하며, 투명한 image 부모는 Graphic을 표시하지 않은 채 자식만 자른다. source TextAsset 기반 Material은 `Assets/Html2VrcGenerated/RoundedCorners` 아래 source GUID와 node ID 기반 안정 경로로 갱신된다.
 
 Resource URI는 canonical 명세대로 UDOM TextAsset이 있는 폴더를 기준으로 해석한다. `Assets/`로 시작하는 절대 Unity 에셋 경로도 지원한다. `..`로 정규화하더라도 결과가 `Assets/` 밖으로 나가면 참조하지 않고 경고를 남긴다.
 
-아직 지원하지 않는 canonical 기능은 묵시하지 않고 검증 오류나 명시적 폴백 경고로 반환한다. 현재 변환과 그림자는 오류로 거부한다. radial/conic gradient는 첫 color stop, font resource는 프로젝트 기본 TMP font로 폴백하고 각각 경고를 남긴다. Text 노드 자체의 linear-gradient와 radius는 TMP 텍스트와 별도 박스 graphic이 필요하므로 첫 stop 색 또는 square corner와 경고를 사용한다. Embed radius도 외부 오브젝트가 graphic을 소유하므로 square corner로 진단한다. source asset 경로가 없는 raw JSON 검증에서는 상대 resource URI를 추측하지 않고 빈 Image와 경고를 사용한다. `bind`와 `on`의 symbolic ID는 임의 로직으로 실행하지 않고, 안전한 Unity/Udon binding manifest가 없다는 경고로 남는다. Button, Toggle, Slider, Text input과 Scroll의 canonical focus/blur도 같은 방식으로 보존·진단한다. Slider의 step은 정수 범위의 `1`일 때 Unity `wholeNumbers`로 적용하고 그 외의 step은 아직 경고와 연속 Slider 폴백을 사용한다. Text input은 빈 문자열을 포함한 value와 placeholder, multiline, readOnly, disabled를 native `TMP_InputField`로 적용한다.
+아직 지원하지 않는 canonical 기능은 묵시하지 않고 검증 오류나 명시적 폴백 경고로 반환한다. 현재 변환과 그림자는 오류로 거부한다. conic gradient는 첫 color stop, font resource는 프로젝트 기본 TMP font로 폴백하고 각각 경고를 남긴다. Text 노드 자체의 linear/radial gradient와 radius는 TMP 텍스트와 별도 박스 graphic이 필요하므로 첫 stop 색 또는 square corner와 경고를 사용한다. Embed의 gradient와 radius도 외부 오브젝트가 graphic을 소유하므로 첫 stop 또는 square corner로 진단한다. source asset 경로가 없는 raw JSON 검증에서는 상대 resource URI를 추측하지 않고 빈 Image와 경고를 사용한다. `bind`와 `on`의 symbolic ID는 임의 로직으로 실행하지 않고, 안전한 Unity/Udon binding manifest가 없다는 경고로 남는다. Button, Toggle, Slider, Text input과 Scroll의 canonical focus/blur도 같은 방식으로 보존·진단한다. Slider의 step은 정수 범위의 `1`일 때 Unity `wholeNumbers`로 적용하고 그 외의 step은 아직 경고와 연속 Slider 폴백을 사용한다. Text input은 빈 문자열을 포함한 value와 placeholder, multiline, readOnly, disabled를 native `TMP_InputField`로 적용한다.
 
 ## 최상위 구조
 
@@ -124,6 +126,8 @@ Resource URI는 canonical 명세대로 UDOM TextAsset이 있는 폴더를 기준
 - `backgroundType`: `color` 또는 `linear-gradient`.
 - `backgroundGradientAngle`: canonical degree 각도. `0`은 아래→위, `90`은 왼쪽→오른쪽.
 - `backgroundGradientPositions`, `backgroundGradientColors`: 위치가 0~1로 정렬된 두 개 이상의 대응 color stop 배열.
+- `backgroundGradientCenter`, `backgroundGradientRadius`: radial gradient의 X/Y 값.
+- `backgroundGradientCenterIsPercent`, `backgroundGradientRadiusIsPercent`: 대응 X/Y 값이 최종 Rect 축 기준 percentage인지 보존하는 내부 boolean 배열.
 - `cornerRadius`: 내부 정규화 형식의 `[topLeft, topRight, bottomRight, bottomLeft]` design-unit 반지름.
 - `cornerRadiusPercent`: 같은 순서의 percentage 배열. `-1`은 대응 `cornerRadius`가 절대값임을 뜻하고, 0 이상은 최종 Rect의 짧은 변을 기준으로 해석한다.
 - `stretchChildrenWidth`, `stretchChildrenHeight`: canonical flex의 기본 `alignItems: stretch`를 Unity Layout Group의 cross-axis 제어로 보존하는 내부 플래그.

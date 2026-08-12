@@ -44,6 +44,10 @@
     "valid": true
   },
   {
+    "file": "valid/unity-radial-gradient.udom.json",
+    "valid": true
+  },
+  {
     "file": "valid/unity-radius.udom.json",
     "valid": true
   },

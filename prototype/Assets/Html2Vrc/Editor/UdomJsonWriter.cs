@@ -130,6 +130,14 @@ namespace Html2Vrc.Editor
             writer.FloatProperty("backgroundGradientAngle", style.backgroundGradientAngle);
             writer.FloatArrayProperty("backgroundGradientPositions", style.backgroundGradientPositions);
             writer.StringArrayProperty("backgroundGradientColors", style.backgroundGradientColors);
+            writer.FloatArrayProperty("backgroundGradientCenter", style.backgroundGradientCenter);
+            writer.BoolArrayProperty(
+                "backgroundGradientCenterIsPercent",
+                style.backgroundGradientCenterIsPercent);
+            writer.FloatArrayProperty("backgroundGradientRadius", style.backgroundGradientRadius);
+            writer.BoolArrayProperty(
+                "backgroundGradientRadiusIsPercent",
+                style.backgroundGradientRadiusIsPercent);
             writer.FloatArrayProperty("cornerRadius", style.cornerRadius);
             writer.FloatArrayProperty("cornerRadiusPercent", style.cornerRadiusPercent);
             writer.FloatArrayProperty("borderWidth", style.borderWidth);
@@ -283,6 +291,30 @@ namespace Html2Vrc.Editor
                     {
                         AppendEscaped(values[index]);
                     }
+                }
+
+                builder.Append(']');
+                needsComma = true;
+            }
+
+            public void BoolArrayProperty(string name, bool[] values)
+            {
+                PropertyName(name);
+                if (values == null)
+                {
+                    Null();
+                    return;
+                }
+
+                builder.Append('[');
+                for (var index = 0; index < values.Length; index++)
+                {
+                    if (index > 0)
+                    {
+                        builder.Append(", ");
+                    }
+
+                    builder.Append(values[index] ? "true" : "false");
                 }
 
                 builder.Append(']');
