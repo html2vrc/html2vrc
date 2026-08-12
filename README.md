@@ -106,6 +106,8 @@ Canonical 2D transform은 `origin`과 배열 순서의 `translate`, `rotate`, `s
 
 Canonical layout의 `minWidth`, `minHeight`, `maxWidth`, `maxHeight`, `aspectRatio`를 지원합니다. 숫자와 percentage 제약은 부모의 design box에서 해석하고, 한 축이 `auto`인 aspect ratio는 반대 축과 min/max를 함께 만족하도록 계산합니다. 제약이 있는 flex 행·열은 max에 닿은 grow 공간을 남은 항목에 재분배하며, cross-axis stretch도 항목별 min/max를 지킨 고정 Unity Rect로 생성합니다.
 
+Canonical flex item의 `grow`, 기본값 1인 `shrink`, 숫자·percentage·`auto` `basis`를 지원합니다. Basis에서 시작한 여유 공간은 grow 비율로, 부족한 공간은 `shrink × basis` 비율로 나누며 min/max에 닿은 항목을 고정한 뒤 나머지 항목에 재분배합니다. Margin과 gap은 줄이지 않고, 활성 Scroll 축은 콘텐츠 overflow를 유지합니다.
+
 Canonical flex의 `row-reverse`, `column-reverse`, 정수 `flexItem.order`를 지원합니다. 항목은 `(order, 원본 자식 순서)`로 안정 정렬하고 reverse 방향의 main-start에서 배치하며, margin·transform·shadow wrapper가 있어도 같은 GameObject와 안정 ID를 재사용합니다.
 
 Canonical `position: absolute` 항목은 부모 flex의 크기 분배와 gap에서 제외하고, `x/y`를 부모 design box의 왼쪽·위 기준 숫자 또는 percentage 좌표로 배치합니다. 직접 노드와 margin·transform·shadow wrapper 모두 같은 top-left anchor 규칙을 사용하며 absolute와 flow 사이를 재생성해도 안정 GameObject를 유지합니다.

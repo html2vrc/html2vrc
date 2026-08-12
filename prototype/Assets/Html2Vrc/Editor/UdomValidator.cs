@@ -98,7 +98,7 @@ namespace Html2Vrc.Editor
             "alignment", "fontStyle", "childAlignment",
             "shadowOffsets", "shadowBlurs", "shadowSpreads", "shadowColors", "shadowInsets",
             "stretchChildrenWidth", "stretchChildrenHeight", "useResolvedChildrenWidth", "useResolvedChildrenHeight",
-            "reverseChildren", "flexOrder",
+            "reverseChildren", "flexOrder", "flexShrink", "flexBasis", "flexBasisIsPercent",
             "flexibleWidth", "flexibleHeight",
             "transformOrigin", "transformOriginIsPercent", "transformOperationTypes",
             "transformOperationValues", "transformOperationValuesArePercent",
@@ -385,7 +385,13 @@ namespace Html2Vrc.Editor
             }
 
             ValidateVector(style.position, 2, path + ".position", result, requirePositive: false);
-            ValidateVector(style.size, 2, path + ".size", result, requirePositive: true);
+            ValidateVector(
+                style.size,
+                2,
+                path + ".size",
+                result,
+                requirePositive: false,
+                requireNonNegative: true);
             ValidateVector(style.minSize, 2, path + ".minSize", result, requirePositive: false, requireNonNegative: true);
             ValidateMaximumSize(style.maxSize, path + ".maxSize", result);
             ValidateBooleanVector(style.autoSize, 2, path + ".autoSize", result);
@@ -482,6 +488,25 @@ namespace Html2Vrc.Editor
             if (!UdomBuilderUtility.TryParseChildAlignment(style.childAlignment, out _))
             {
                 AddError(result, path + ".childAlignment", $"지원하지 않는 child alignment '{style.childAlignment}'.");
+            }
+
+            if ((style.flexShrink < 0f && !Mathf.Approximately(style.flexShrink, -1f))
+                || float.IsNaN(style.flexShrink)
+                || float.IsInfinity(style.flexShrink))
+            {
+                AddError(result, path + ".flexShrink", "flexShrink는 -1 또는 0 이상의 유한한 값이어야 한다.");
+            }
+
+            if ((style.flexBasis < 0f && !Mathf.Approximately(style.flexBasis, -1f))
+                || float.IsNaN(style.flexBasis)
+                || float.IsInfinity(style.flexBasis))
+            {
+                AddError(result, path + ".flexBasis", "flexBasis는 -1 또는 0 이상의 유한한 값이어야 한다.");
+            }
+
+            if (style.flexBasisIsPercent && style.flexBasis < 0f)
+            {
+                AddError(result, path + ".flexBasisIsPercent", "percentage flexBasis에는 0 이상의 값이 필요하다.");
             }
 
             ValidateTransform(style, path, result);

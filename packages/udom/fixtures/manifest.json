@@ -76,6 +76,10 @@
     "valid": true
   },
   {
+    "file": "valid/unity-flex-sizing.udom.json",
+    "valid": true
+  },
+  {
     "file": "valid/unity-absolute-position.udom.json",
     "valid": true
   },

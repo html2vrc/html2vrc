@@ -1029,6 +1029,7 @@ namespace Html2Vrc.Editor
             style.textColor = "#000000FF";
             style.alignment = "TopLeft";
             style.textOverflow = "Clip";
+            style.flexShrink = 1f;
             if (fillParentByDefault && parentSize != null && parentSize.Length == 2)
             {
                 style.size = new[] { parentSize[0], parentSize[1] };
@@ -1303,9 +1304,9 @@ namespace Html2Vrc.Editor
             if (value.TryGetValue("width", out var widthValue)
                 && TryResolveLength(widthValue, parentWidth, path + ".width", out var width))
             {
-                if (width <= 0f)
+                if (width < 0f)
                 {
-                    throw new FormatException($"{path}.width: resolved width must be greater than zero.");
+                    throw new FormatException($"{path}.width: resolved width must be non-negative.");
                 }
 
                 result.Style.size[0] = width;
@@ -1316,9 +1317,9 @@ namespace Html2Vrc.Editor
             if (value.TryGetValue("height", out var heightValue)
                 && TryResolveLength(heightValue, parentHeight, path + ".height", out var height))
             {
-                if (height <= 0f)
+                if (height < 0f)
                 {
-                    throw new FormatException($"{path}.height: resolved height must be greater than zero.");
+                    throw new FormatException($"{path}.height: resolved height must be non-negative.");
                 }
 
                 result.Style.size[1] = height;
@@ -1419,26 +1420,68 @@ namespace Html2Vrc.Editor
             {
                 var flexItem = RequireObject(flexItemValue, path + ".flexItem");
                 EnsureOnlyKeys(flexItem, path + ".flexItem", "grow", "shrink", "basis", "alignSelf", "order");
-                RejectPresent(flexItem, path + ".flexItem", "shrink", "flex shrink is not supported yet");
-                RejectPresent(flexItem, path + ".flexItem", "basis", "flex basis is not supported yet");
                 RejectPresent(flexItem, path + ".flexItem", "alignSelf", "flex alignSelf is not supported yet");
                 if (flexItem.TryGetValue("order", out var orderValue))
                 {
                     result.Style.flexOrder = RequireInteger(orderValue, path + ".flexItem.order");
                 }
 
+                if (flexItem.TryGetValue("shrink", out var shrinkValue))
+                {
+                    var shrink = RequireFloat(shrinkValue, path + ".flexItem.shrink");
+                    if (shrink < 0f || float.IsNaN(shrink) || float.IsInfinity(shrink))
+                    {
+                        throw new FormatException(
+                            $"{path}.flexItem.shrink: flex shrink must be finite and non-negative.");
+                    }
+
+                    result.Style.flexShrink = shrink;
+                }
+
+                if (flexItem.TryGetValue("basis", out var basisValue))
+                {
+                    MapFlexBasis(
+                        basisValue,
+                        path + ".flexItem.basis",
+                        result.Style);
+                }
+
                 if (flexItem.TryGetValue("grow", out var growValue))
                 {
                     var grow = RequireFloat(growValue, path + ".flexItem.grow");
-                    if (grow < 0f)
+                    if (grow < 0f || float.IsNaN(grow) || float.IsInfinity(grow))
                     {
-                        throw new FormatException($"{path}.flexItem.grow: flex grow cannot be negative.");
+                        throw new FormatException(
+                            $"{path}.flexItem.grow: flex grow must be finite and non-negative.");
                     }
 
                     result.Style.flexibleWidth = grow;
                     result.Style.flexibleHeight = grow;
                 }
             }
+        }
+
+        private static void MapFlexBasis(object value, string path, UdomStyle style)
+        {
+            if (value is string text && string.Equals(text, "auto", StringComparison.Ordinal))
+            {
+                style.flexBasis = -1f;
+                style.flexBasisIsPercent = false;
+                return;
+            }
+
+            var isPercent = value is string percentageText
+                            && percentageText.EndsWith("%", StringComparison.Ordinal);
+            if (!TryResolveLength(value, 100f, path, out var basis)
+                || basis < 0f
+                || float.IsNaN(basis)
+                || float.IsInfinity(basis))
+            {
+                throw new FormatException($"{path}: flex basis must be finite and non-negative, or 'auto'.");
+            }
+
+            style.flexBasis = basis;
+            style.flexBasisIsPercent = isPercent;
         }
 
         private static float MapConstraintLength(
@@ -1548,7 +1591,7 @@ namespace Html2Vrc.Editor
             }
 
             var flowChildCount = 0;
-            var requiresConstraintResolution = false;
+            var requiresSizeResolution = false;
             for (var index = 0; index < children.Length; index++)
             {
                 var childStyle = children[index].style;
@@ -1558,13 +1601,13 @@ namespace Html2Vrc.Editor
                 }
 
                 flowChildCount++;
-                if (HasLayoutConstraint(childStyle))
+                if (HasLayoutConstraint(childStyle) || HasCanonicalFlexSizing(childStyle))
                 {
-                    requiresConstraintResolution = true;
+                    requiresSizeResolution = true;
                 }
             }
 
-            if (flowChildCount == 0 || !requiresConstraintResolution)
+            if (flowChildCount == 0 || !requiresSizeResolution)
             {
                 return;
             }
@@ -1581,9 +1624,20 @@ namespace Html2Vrc.Editor
             var stretchCross = crossAxis == 0
                 ? style.stretchChildrenWidth
                 : style.stretchChildrenHeight;
+            var allowsCrossOverflow = string.Equals(node.type, "ScrollView", StringComparison.OrdinalIgnoreCase)
+                                      && (crossAxis == 0 && node.scrollHorizontal
+                                          || crossAxis == 1 && node.scrollVertical);
+            var stretchCrossForSizing = stretchCross && !allowsCrossOverflow;
+            var resolveCrossAxis = stretchCrossForSizing
+                                   && RequiresCrossAxisResolution(children, crossAxis);
+            var allowsMainOverflow = string.Equals(node.type, "ScrollView", StringComparison.OrdinalIgnoreCase)
+                                     && (mainAxis == 0 && node.scrollHorizontal
+                                         || mainAxis == 1 && node.scrollVertical);
             var allocatedOuterSizes = new float[children.Length];
-            var flexibleWeights = new float[children.Length];
+            var minimumOuterSizes = new float[children.Length];
             var maximumOuterSizes = new float[children.Length];
+            var growWeights = new double[children.Length];
+            var scaledShrinkWeights = new double[children.Length];
             var totalOuterSize = Math.Max(0, flowChildCount - 1) * style.spacing;
 
             for (var index = 0; index < children.Length; index++)
@@ -1597,33 +1651,38 @@ namespace Html2Vrc.Editor
                 var margins = GetAxisMargins(childStyle, mainAxis);
                 var preserveAspect = HasAspectRatio(childStyle)
                                      && IsAutoSize(childStyle, crossAxis)
-                                     && !stretchCross;
+                                     && !stretchCrossForSizing;
                 var minimum = GetEffectiveMinimumSize(childStyle, mainAxis, preserveAspect);
                 var maximum = GetEffectiveMaximumSize(childStyle, mainAxis, preserveAspect);
-                var baseSize = childStyle.size != null && childStyle.size.Length >= 2
+                var fallbackSize = childStyle.size != null && childStyle.size.Length >= 2
                     ? childStyle.size[mainAxis]
                     : 100f;
+                var baseSize = ResolveFlexBaseSize(childStyle, mainAvailable, fallbackSize);
                 var contentSize = Clamp(baseSize, minimum, Math.Max(minimum, maximum));
                 allocatedOuterSizes[index] = contentSize + margins;
+                minimumOuterSizes[index] = minimum + margins;
                 maximumOuterSizes[index] = float.IsPositiveInfinity(maximum)
                     ? float.PositiveInfinity
                     : maximum + margins;
-                flexibleWeights[index] = mainAxis == 0
+                growWeights[index] = mainAxis == 0
                     ? Math.Max(0f, childStyle.flexibleWidth)
                     : Math.Max(0f, childStyle.flexibleHeight);
+                scaledShrinkWeights[index] = childStyle.flexShrink >= 0f
+                    ? (double)childStyle.flexShrink * contentSize
+                    : 0d;
                 totalOuterSize += allocatedOuterSizes[index];
             }
 
             var remaining = mainAvailable - totalOuterSize;
             while (remaining > 0.0001f)
             {
-                var totalWeight = 0f;
+                var totalWeight = 0d;
                 for (var index = 0; index < children.Length; index++)
                 {
-                    if (flexibleWeights[index] > 0f
+                    if (growWeights[index] > 0f
                         && allocatedOuterSizes[index] + 0.0001f < maximumOuterSizes[index])
                     {
-                        totalWeight += flexibleWeights[index];
+                        totalWeight += growWeights[index];
                     }
                 }
 
@@ -1635,13 +1694,13 @@ namespace Html2Vrc.Editor
                 var distributed = 0f;
                 for (var index = 0; index < children.Length; index++)
                 {
-                    if (flexibleWeights[index] <= 0f
+                    if (growWeights[index] <= 0f
                         || allocatedOuterSizes[index] + 0.0001f >= maximumOuterSizes[index])
                     {
                         continue;
                     }
 
-                    var share = remaining * flexibleWeights[index] / totalWeight;
+                    var share = (float)(remaining * growWeights[index] / totalWeight);
                     var room = maximumOuterSizes[index] - allocatedOuterSizes[index];
                     var addition = Math.Min(share, room);
                     allocatedOuterSizes[index] += addition;
@@ -1654,6 +1713,48 @@ namespace Html2Vrc.Editor
                 }
 
                 remaining -= distributed;
+            }
+
+            var deficit = allowsMainOverflow ? 0f : -remaining;
+            while (deficit > 0.0001f)
+            {
+                var totalWeight = 0d;
+                for (var index = 0; index < children.Length; index++)
+                {
+                    if (scaledShrinkWeights[index] > 0f
+                        && allocatedOuterSizes[index] > minimumOuterSizes[index] + 0.0001f)
+                    {
+                        totalWeight += scaledShrinkWeights[index];
+                    }
+                }
+
+                if (totalWeight <= 0f)
+                {
+                    break;
+                }
+
+                var distributed = 0f;
+                for (var index = 0; index < children.Length; index++)
+                {
+                    if (scaledShrinkWeights[index] <= 0f
+                        || allocatedOuterSizes[index] <= minimumOuterSizes[index] + 0.0001f)
+                    {
+                        continue;
+                    }
+
+                    var share = (float)(deficit * scaledShrinkWeights[index] / totalWeight);
+                    var room = allocatedOuterSizes[index] - minimumOuterSizes[index];
+                    var reduction = Math.Min(share, room);
+                    allocatedOuterSizes[index] -= reduction;
+                    distributed += reduction;
+                }
+
+                if (distributed <= 0.0001f)
+                {
+                    break;
+                }
+
+                deficit -= distributed;
             }
 
             for (var index = 0; index < children.Length; index++)
@@ -1671,14 +1772,16 @@ namespace Html2Vrc.Editor
                     0f,
                     allocatedOuterSizes[index] - GetAxisMargins(childStyle, mainAxis));
 
-                if (stretchCross)
+                if (stretchCrossForSizing)
                 {
                     size[crossAxis] = ClampSizeAxis(
                         childStyle,
                         crossAxis,
                         Math.Max(0f, crossAvailable - GetAxisMargins(childStyle, crossAxis)));
                 }
-                else if (HasAspectRatio(childStyle) && IsAutoSize(childStyle, crossAxis))
+                else if (!stretchCrossForSizing
+                         && HasAspectRatio(childStyle)
+                         && IsAutoSize(childStyle, crossAxis))
                 {
                     size = ResolveAspectSize(
                         childStyle,
@@ -1703,7 +1806,7 @@ namespace Html2Vrc.Editor
                 }
             }
 
-            if (stretchCross)
+            if (resolveCrossAxis)
             {
                 if (crossAxis == 0)
                 {
@@ -1726,6 +1829,53 @@ namespace Html2Vrc.Editor
             return axis == 0
                 ? style.margin[0] + style.margin[2]
                 : style.margin[1] + style.margin[3];
+        }
+
+        private static float ResolveFlexBaseSize(
+            UdomStyle style,
+            float mainAvailable,
+            float fallback)
+        {
+            if (style.flexBasis < 0f)
+            {
+                return fallback;
+            }
+
+            return style.flexBasisIsPercent
+                ? mainAvailable * style.flexBasis / 100f
+                : style.flexBasis;
+        }
+
+        private static bool HasCanonicalFlexSizing(UdomStyle style)
+        {
+            return style != null && (style.flexShrink >= 0f || style.flexBasis >= 0f);
+        }
+
+        private static bool HasCrossAxisConstraint(UdomStyle style, int crossAxis)
+        {
+            return GetMinimumSize(style, crossAxis) > 0f
+                   || (style.maxSize != null
+                       && style.maxSize.Length >= 2
+                       && style.maxSize[crossAxis] >= 0f)
+                   || (HasAspectRatio(style)
+                       && IsAutoSize(style, crossAxis));
+        }
+
+        private static bool RequiresCrossAxisResolution(UdomNode[] children, int crossAxis)
+        {
+            for (var index = 0; index < children.Length; index++)
+            {
+                var childStyle = children[index] != null ? children[index].style : null;
+                if (childStyle != null
+                    && !childStyle.displayNone
+                    && !childStyle.positionAbsolute
+                    && HasCrossAxisConstraint(childStyle, crossAxis))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private static bool HasAspectRatio(UdomStyle style)

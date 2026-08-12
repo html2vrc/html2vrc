@@ -107,6 +107,9 @@ namespace Html2Vrc
         public bool useResolvedChildrenHeight;
         public bool reverseChildren;
         public int flexOrder;
+        public float flexShrink = -1f;
+        public float flexBasis = -1f;
+        public bool flexBasisIsPercent;
         public float flexibleWidth;
         public float flexibleHeight;
         public float[] transformOrigin = { 50f, 50f };

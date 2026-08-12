@@ -170,6 +170,9 @@ namespace Html2Vrc.Editor
             writer.BoolProperty("useResolvedChildrenHeight", style.useResolvedChildrenHeight);
             writer.BoolProperty("reverseChildren", style.reverseChildren);
             writer.IntProperty("flexOrder", style.flexOrder);
+            writer.FloatProperty("flexShrink", style.flexShrink);
+            writer.FloatProperty("flexBasis", style.flexBasis);
+            writer.BoolProperty("flexBasisIsPercent", style.flexBasisIsPercent);
             writer.FloatProperty("flexibleWidth", style.flexibleWidth);
             writer.FloatProperty("flexibleHeight", style.flexibleHeight);
             writer.FloatArrayProperty("transformOrigin", style.transformOrigin);

@@ -438,6 +438,23 @@ namespace Html2Vrc.Editor
                 style.flexOrder = GetInteger(flexOrder, path + ".flexOrder");
             }
 
+            if (value.TryGetValue("flexShrink", out var flexShrink))
+            {
+                style.flexShrink = GetFloat(flexShrink, path + ".flexShrink");
+            }
+
+            if (value.TryGetValue("flexBasis", out var flexBasis))
+            {
+                style.flexBasis = GetFloat(flexBasis, path + ".flexBasis");
+            }
+
+            if (value.TryGetValue("flexBasisIsPercent", out var flexBasisIsPercent))
+            {
+                style.flexBasisIsPercent = GetBoolean(
+                    flexBasisIsPercent,
+                    path + ".flexBasisIsPercent");
+            }
+
             if (value.TryGetValue("flexibleWidth", out var flexibleWidth))
             {
                 style.flexibleWidth = GetFloat(flexibleWidth, path + ".flexibleWidth");

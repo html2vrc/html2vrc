@@ -961,6 +961,150 @@ namespace Html2Vrc.Tests
         }
 
         [Test]
+        public void CanonicalFlexSizing_ResolvesShrinkBasisAndConstraintRedistribution()
+        {
+            var json = LoadRepositoryFile(
+                "packages",
+                "udom",
+                "fixtures",
+                "valid",
+                "unity-flex-sizing.udom.json");
+            var validation = UdomValidator.Validate(json);
+
+            Assert.That(validation.IsValid, Is.True, validation.Format());
+            Assert.That(validation.Issues, Is.Empty, validation.Format());
+
+            var document = validation.Document;
+            var shrinkRow = document.root.children[0];
+            var basisRow = document.root.children[1];
+            var shrinkDefault = shrinkRow.children[0].style;
+            var shrinkDouble = shrinkRow.children[1].style;
+            var shrinkFixed = shrinkRow.children[2].style;
+            var basisAbsolute = basisRow.children[0].style;
+            var basisPercent = basisRow.children[1].style;
+            var basisAuto = basisRow.children[2].style;
+
+            Assert.That(shrinkDefault.flexShrink, Is.EqualTo(1f));
+            Assert.That(shrinkDouble.flexShrink, Is.EqualTo(2f));
+            Assert.That(shrinkFixed.flexShrink, Is.Zero);
+            Assert.That(shrinkDefault.size[0], Is.EqualTo(257.1429f).Within(0.001f));
+            Assert.That(shrinkDouble.size[0], Is.EqualTo(142.8571f).Within(0.001f));
+            Assert.That(shrinkFixed.size[0], Is.EqualTo(100f).Within(0.001f));
+
+            Assert.That(basisAbsolute.flexBasis, Is.EqualTo(100f));
+            Assert.That(basisAbsolute.flexBasisIsPercent, Is.False);
+            Assert.That(basisPercent.flexBasis, Is.EqualTo(25f));
+            Assert.That(basisPercent.flexBasisIsPercent, Is.True);
+            Assert.That(basisAuto.flexBasis, Is.EqualTo(-1f));
+            Assert.That(basisAuto.flexBasisIsPercent, Is.False);
+            Assert.That(basisAbsolute.size[0], Is.EqualTo(260f).Within(0.001f));
+            Assert.That(basisPercent.size[0], Is.EqualTo(150f).Within(0.001f));
+            Assert.That(basisAuto.size[0], Is.EqualTo(80f).Within(0.001f));
+
+            var normalized = UdomJsonWriter.Write(document);
+            var roundTrip = UdomValidator.Validate(normalized);
+            Assert.That(roundTrip.IsValid, Is.True, roundTrip.Format());
+            Assert.That(roundTrip.Document.root.children[0].children[1].style.flexShrink, Is.EqualTo(2f));
+            Assert.That(roundTrip.Document.root.children[1].children[0].style.flexBasis, Is.EqualTo(100f));
+            Assert.That(
+                roundTrip.Document.root.children[1].children[1].style.flexBasisIsPercent,
+                Is.True);
+
+            var build = UdomBuilder.GenerateOrRegenerate(document);
+            var root = build.Root;
+            var shrinkRowObject = UdomBuilder.FindNode(root, "shrink-row").gameObject;
+            var basisRowObject = UdomBuilder.FindNode(root, "basis-row").gameObject;
+            var shrinkDefaultObject = UdomBuilder.FindNode(root, "shrink-default").gameObject;
+            var shrinkDoubleObject = UdomBuilder.FindNode(root, "shrink-double").gameObject;
+            var shrinkFixedObject = UdomBuilder.FindNode(root, "shrink-fixed").gameObject;
+            var basisAbsoluteObject = UdomBuilder.FindNode(root, "basis-absolute").gameObject;
+            var basisPercentObject = UdomBuilder.FindNode(root, "basis-percent").gameObject;
+            var basisAutoObject = UdomBuilder.FindNode(root, "basis-auto").gameObject;
+            var basisAutoMargin = UdomBuilder.FindNode(root, "basis-auto::__margin").gameObject;
+
+            Canvas.ForceUpdateCanvases();
+            LayoutRebuilder.ForceRebuildLayoutImmediate(
+                shrinkRowObject.GetComponent<RectTransform>());
+            LayoutRebuilder.ForceRebuildLayoutImmediate(
+                basisRowObject.GetComponent<RectTransform>());
+            Assert.That(
+                shrinkDefaultObject.GetComponent<RectTransform>().rect.width,
+                Is.EqualTo(257.1429f).Within(0.001f));
+            Assert.That(
+                shrinkDoubleObject.GetComponent<RectTransform>().rect.width,
+                Is.EqualTo(142.8571f).Within(0.001f));
+            Assert.That(
+                shrinkFixedObject.GetComponent<RectTransform>().rect.width,
+                Is.EqualTo(100f).Within(0.001f));
+            Assert.That(
+                basisAbsoluteObject.GetComponent<RectTransform>().rect.width,
+                Is.EqualTo(260f).Within(0.001f));
+            Assert.That(
+                basisPercentObject.GetComponent<RectTransform>().rect.width,
+                Is.EqualTo(150f).Within(0.001f));
+            Assert.That(
+                basisAutoObject.GetComponent<RectTransform>().rect.width,
+                Is.EqualTo(80f).Within(0.001f));
+            Assert.That(
+                basisAutoMargin.GetComponent<RectTransform>().rect.width,
+                Is.EqualTo(90f).Within(0.001f));
+            Assert.That(
+                basisAbsoluteObject.GetComponent<LayoutElement>().flexibleWidth,
+                Is.Zero);
+
+            var regenerated = UdomBuilder.GenerateOrRegenerate(document, root);
+            Assert.That(regenerated.Created, Is.Zero);
+            Assert.That(
+                UdomBuilder.FindNode(root, "basis-absolute").gameObject,
+                Is.SameAs(basisAbsoluteObject));
+            Assert.That(
+                UdomBuilder.FindNode(root, "basis-auto::__margin").gameObject,
+                Is.SameAs(basisAutoMargin));
+
+            Object.DestroyImmediate(root.gameObject);
+
+            var invalidShrink = UdomValidator.Validate(json.Replace(
+                "\"shrink\": 2",
+                "\"shrink\": -1"));
+            Assert.That(invalidShrink.IsValid, Is.False);
+            Assert.That(invalidShrink.Format(), Does.Contain("shrink"));
+            var invalidBasis = UdomValidator.Validate(json.Replace(
+                "\"basis\": \"25%\"",
+                "\"basis\": \"-5%\""));
+            Assert.That(invalidBasis.IsValid, Is.False);
+            Assert.That(invalidBasis.Format(), Does.Contain("basis"));
+
+            const string zeroShrinkJson = @"{
+              ""asset"": { ""version"": ""0.1"" },
+              ""viewport"": { ""width"": 100, ""height"": 50 },
+              ""root"": {
+                ""type"": ""element"", ""id"": ""zero-root"", ""name"": ""view"",
+                ""style"": { ""layout"": {
+                  ""mode"": ""flex"", ""width"": 100, ""height"": 50,
+                  ""flex"": { ""direction"": ""row"", ""alignItems"": ""start"" }
+                } },
+                ""children"": [
+                  {
+                    ""type"": ""element"", ""id"": ""zero-shrunk"", ""name"": ""view"",
+                    ""style"": { ""layout"": { ""width"": 100, ""height"": 20 } }
+                  },
+                  {
+                    ""type"": ""element"", ""id"": ""zero-fixed"", ""name"": ""view"",
+                    ""style"": { ""layout"": {
+                      ""width"": 100, ""height"": 20,
+                      ""flexItem"": { ""shrink"": 0 }
+                    } }
+                  }
+                ]
+              }
+            }";
+            var zeroShrink = UdomValidator.Validate(zeroShrinkJson);
+            Assert.That(zeroShrink.IsValid, Is.True, zeroShrink.Format());
+            Assert.That(zeroShrink.Document.root.children[0].style.size[0], Is.Zero);
+            Assert.That(zeroShrink.Document.root.children[1].style.size[0], Is.EqualTo(100f));
+        }
+
+        [Test]
         public void CanonicalAbsolutePosition_LeavesFlexFlowAndUsesTopLeftCoordinates()
         {
             var json = LoadRepositoryFile(
