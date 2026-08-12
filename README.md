@@ -114,6 +114,8 @@ Canonical flex의 `wrap`과 `wrap-reverse`, `alignContent`, `rowGap`과 `columnG
 
 제한형 HTML 입력도 `flex-wrap`, `align-content`, `gap`, `row-gap`, `column-gap`을 같은 canonical multi-line 해석기로 처리합니다. CSS 두 값 `gap`은 row·column 순서로 보존하며, wrap에서 nowrap으로 전환해도 기존 생성 GameObject를 재사용합니다.
 
+제한형 HTML의 `overflow`, `overflow-x`, `overflow-y`도 CSS source-order로 해석합니다. 최종 양축이 hidden이면 canonical 경로와 같은 `RectMask2D`를 사용하고, 양축 visible로 복원하면 기존 노드와 자식을 유지한 채 마스크만 제거합니다.
+
 Canonical flex item의 `alignSelf`는 `auto`, `start`, `center`, `end`, `stretch`를 지원합니다. 개별 항목이 부모의 `alignItems`를 교차축에서 override하고, 기존 margin과 min/max 제약을 보존하며, overflow가 있어도 canonical start 기준을 유지합니다. Unity에서는 기존 안정 margin wrapper를 재사용하므로 정렬을 바꿔 재생성해도 원본 GameObject와 transform·shadow 계층이 유지됩니다.
 
 Canonical flex의 `justify`는 `start`, `center`, `end`, `space-between`, `space-around`, `space-evenly`를 지원합니다. 고정 gap을 먼저 적용한 뒤 남은 주축 공간을 정렬 또는 분배하고, reverse 방향에서는 canonical main-start/main-end가 뒤집힌 물리 좌표와 안정 형제 순서에 함께 반영됩니다.
@@ -290,7 +292,7 @@ VRChat 패키지는 VPM manifest에 고정되어 있습니다. UDOM 파서와 Un
 4. `Generate / Regenerate`를 누릅니다.
 5. 생성 루트의 `External References`에서 `world-light` 슬롯을 연결합니다.
 
-지원 범위는 `div`, 제목과 문단, `img`, `button`, 목록, ScrollView, Embed와 일부 인라인 CSS입니다. 제한형 CSS flex는 reverse 방향, justify/align, 항목별 order·align-self·grow/shrink/basis를 canonical UDOM과 같은 계산기로 처리하며, `display: none`과 top-left absolute 배치도 지원합니다. `script`, `onclick`, 외부 CSS와 임의 JavaScript는 실행하지 않고 오류로 표시합니다. 자세한 계약은 `Assets/Html2Vrc/Documentation/HTML_SUBSET.md`에 있습니다.
+지원 범위는 `div`, 제목과 문단, `img`, `button`, 목록, ScrollView, Embed와 일부 인라인 CSS입니다. 제한형 CSS flex는 reverse 방향, wrap, justify/align, 축별 gap, 항목별 order·align-self·grow/shrink/basis를 canonical UDOM과 같은 계산기로 처리하며, `display: none`, top-left absolute 배치와 양축 hidden overflow도 지원합니다. `script`, `onclick`, 외부 CSS와 임의 JavaScript는 실행하지 않고 오류로 표시합니다. 자세한 계약은 `Assets/Html2Vrc/Documentation/HTML_SUBSET.md`에 있습니다.
 
 HTML 입력부터 독립된 샘플 Scene까지 한 번에 확인하려면 `Tools > HTML2VRC > Build HTML World Settings Scene`을 실행합니다. 결과는 `Assets/Html2Vrc/Samples/WorldSettingsHtmlSample.unity`에 저장됩니다. VRChat에서 바로 확인하려면 `Tools > HTML2VRC > VRChat > Build & Test HTML Sample World`를 실행합니다.
 

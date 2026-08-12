@@ -457,6 +457,8 @@ namespace Html2Vrc.Editor
             float? top = null;
             float? rowGap = null;
             float? columnGap = null;
+            var overflowX = "visible";
+            var overflowY = "visible";
             foreach (var declaration in declarations)
             {
                 switch (declaration.Key)
@@ -532,6 +534,42 @@ namespace Html2Vrc.Editor
                         {
                             AddError(result, path + "/@style", $"position 값 '{declaration.Value}'은 지원하지 않는다.");
                             positionMode = null;
+                        }
+
+                        break;
+                    case "overflow":
+                        SetOverflow(
+                            declaration.Value,
+                            path,
+                            declaration.Key,
+                            result,
+                            (x, y) =>
+                            {
+                                overflowX = x;
+                                overflowY = y;
+                            });
+                        break;
+                    case "overflow-x":
+                        var normalizedOverflowX = NormalizeOverflowValue(
+                            declaration.Value,
+                            declaration.Key,
+                            path,
+                            result);
+                        if (normalizedOverflowX != null)
+                        {
+                            overflowX = normalizedOverflowX;
+                        }
+
+                        break;
+                    case "overflow-y":
+                        var normalizedOverflowY = NormalizeOverflowValue(
+                            declaration.Value,
+                            declaration.Key,
+                            path,
+                            result);
+                        if (normalizedOverflowY != null)
+                        {
+                            overflowY = normalizedOverflowY;
                         }
 
                         break;
@@ -627,6 +665,8 @@ namespace Html2Vrc.Editor
                         break;
                 }
             }
+
+            ConfigureOverflow(style, overflowX, overflowY, path, result);
 
             var explicitLayout = element.Get("data-layout");
             var hasExplicitLayout = false;
@@ -984,6 +1024,76 @@ namespace Html2Vrc.Editor
             }
 
             setter(number);
+        }
+
+        private static void SetOverflow(
+            string source,
+            string path,
+            string property,
+            HtmlToUdomResult result,
+            Action<string, string> setter)
+        {
+            var parts = source.Split(
+                new[] { ' ', '\t', '\r', '\n' },
+                StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length < 1 || parts.Length > 2)
+            {
+                AddError(result, path + "/@style", $"{property}는 1~2개의 overflow 값만 지원한다.");
+                return;
+            }
+
+            var x = NormalizeOverflowValue(parts[0], property, path, result);
+            var y = parts.Length == 1
+                ? x
+                : NormalizeOverflowValue(parts[1], property, path, result);
+            if (x != null && y != null)
+            {
+                setter(x, y);
+            }
+        }
+
+        private static string NormalizeOverflowValue(
+            string source,
+            string property,
+            string path,
+            HtmlToUdomResult result)
+        {
+            var value = source.Trim().ToLowerInvariant();
+            if (value == "visible" || value == "hidden" || value == "scroll")
+            {
+                return value;
+            }
+
+            AddError(
+                result,
+                path + "/@style",
+                $"{property} 값 '{source}'은 지원하지 않는다. visible, hidden, scroll만 해석할 수 있다.");
+            return null;
+        }
+
+        private static void ConfigureOverflow(
+            UdomStyle style,
+            string overflowX,
+            string overflowY,
+            string path,
+            HtmlToUdomResult result)
+        {
+            if (overflowX == "hidden" && overflowY == "hidden")
+            {
+                style.clipContent = true;
+                return;
+            }
+
+            if (overflowX == "visible" && overflowY == "visible")
+            {
+                style.clipContent = false;
+                return;
+            }
+
+            AddError(
+                result,
+                path + "/@style",
+                $"overflow는 양축 visible 또는 양축 hidden 조합만 지원한다. 현재 '{overflowX}'/'{overflowY}'이다.");
         }
 
         private static void SetGap(

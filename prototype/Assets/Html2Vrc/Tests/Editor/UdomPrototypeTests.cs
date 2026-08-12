@@ -3180,6 +3180,69 @@ namespace Html2Vrc.Tests
         }
 
         [Test]
+        public void HtmlConverter_OverflowHiddenClipsAndRestoresVisibleContent()
+        {
+            const string html = @"
+              <main id=""html-overflow-root"" data-canvas-size=""500 360""
+                style=""width: 500px; height: 360px; display: block"">
+                <section id=""html-overflow-shorthand""
+                  style=""width: 220px; height: 140px; display: block; overflow: hidden; background-color: #18243AFF"">
+                  <div id=""html-overflow-child""
+                    style=""width: 100px; height: 100px; position: absolute; left: 180px; top: 90px; background-color: #FF5577FF""></div>
+                </section>
+                <section id=""html-overflow-longhand""
+                  style=""width: 220px; height: 140px; display: block; overflow: visible hidden; overflow-x: hidden""></section>
+              </main>";
+
+            var conversion = HtmlToUdomConverter.Convert(html);
+
+            Assert.That(conversion.IsValid, Is.True, conversion.Format());
+            Assert.That(conversion.Document.root.children[0].style.clipContent, Is.True);
+            Assert.That(conversion.Document.root.children[1].style.clipContent, Is.True);
+            var normalized = UdomValidator.Validate(conversion.Json);
+            Assert.That(normalized.IsValid, Is.True, normalized.Format());
+            Assert.That(normalized.Document.root.children[0].style.clipContent, Is.True);
+
+            var build = UdomBuilder.GenerateOrRegenerate(conversion.Document);
+            var root = build.Root;
+            var shorthand = UdomBuilder.FindNode(root, "html-overflow-shorthand").gameObject;
+            var longhand = UdomBuilder.FindNode(root, "html-overflow-longhand").gameObject;
+            var child = UdomBuilder.FindNode(root, "html-overflow-child").gameObject;
+            Assert.That(shorthand.GetComponent<RectMask2D>(), Is.Not.Null);
+            Assert.That(longhand.GetComponent<RectMask2D>(), Is.Not.Null);
+
+            var visible = HtmlToUdomConverter.Convert(html.Replace(
+                "overflow: hidden; background-color",
+                "overflow: visible; background-color"));
+            Assert.That(visible.IsValid, Is.True, visible.Format());
+            Assert.That(visible.Document.root.children[0].style.clipContent, Is.False);
+            UdomBuilder.GenerateOrRegenerate(visible.Document, root);
+            Assert.That(UdomBuilder.FindNode(root, "html-overflow-shorthand").gameObject, Is.SameAs(shorthand));
+            Assert.That(UdomBuilder.FindNode(root, "html-overflow-child").gameObject, Is.SameAs(child));
+            Assert.That(shorthand.GetComponent<RectMask2D>(), Is.Null);
+            Assert.That(longhand.GetComponent<RectMask2D>(), Is.Not.Null);
+            Object.DestroyImmediate(root.gameObject);
+
+            var mixed = HtmlToUdomConverter.Convert(html.Replace(
+                "overflow: hidden; background-color",
+                "overflow: hidden visible; background-color"));
+            Assert.That(mixed.IsValid, Is.False);
+            Assert.That(mixed.Format(), Does.Contain("overflow"));
+
+            var scroll = HtmlToUdomConverter.Convert(html.Replace(
+                "overflow: hidden; background-color",
+                "overflow: scroll; background-color"));
+            Assert.That(scroll.IsValid, Is.False);
+            Assert.That(scroll.Format(), Does.Contain("scroll"));
+
+            var unknown = HtmlToUdomConverter.Convert(html.Replace(
+                "overflow: hidden; background-color",
+                "overflow: auto; background-color"));
+            Assert.That(unknown.IsValid, Is.False);
+            Assert.That(unknown.Format(), Does.Contain("auto"));
+        }
+
+        [Test]
         public void HtmlConverter_RejectsUnsupportedFlexCssValues()
         {
             const string html = @"
