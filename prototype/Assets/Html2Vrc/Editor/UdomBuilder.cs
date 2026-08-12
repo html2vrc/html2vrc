@@ -734,8 +734,8 @@ namespace Html2Vrc.Editor
 
             var layoutElement = GetOrAdd<LayoutElement>(target);
             Undo.RecordObject(layoutElement, "Configure UDOM LayoutElement");
-            layoutElement.minWidth = -1f;
-            layoutElement.minHeight = -1f;
+            layoutElement.minWidth = GetMinimumSize(style, 0);
+            layoutElement.minHeight = GetMinimumSize(style, 1);
             layoutElement.preferredWidth = size.x;
             layoutElement.preferredHeight = size.y;
             layoutElement.flexibleWidth = style.flexibleWidth;
@@ -1182,6 +1182,16 @@ namespace Html2Vrc.Editor
             {
                 position = style.position,
                 size = new[] { size.x + margin.x + margin.z, size.y + margin.y + margin.w },
+                minSize = new[]
+                {
+                    GetMinimumSize(style, 0) + margin.x + margin.z,
+                    GetMinimumSize(style, 1) + margin.y + margin.w
+                },
+                maxSize = new[]
+                {
+                    AddMarginToMaximumSize(style, 0, margin.x + margin.z),
+                    AddMarginToMaximumSize(style, 1, margin.y + margin.w)
+                },
                 flexibleWidth = style.flexibleWidth,
                 flexibleHeight = style.flexibleHeight
             };
@@ -1548,10 +1558,10 @@ namespace Html2Vrc.Editor
                 out var childAlignment)
                 ? childAlignment
                 : TextAnchor.UpperLeft;
-            group.childControlWidth = style.stretchChildrenWidth;
-            group.childControlHeight = style.stretchChildrenHeight;
-            group.childForceExpandWidth = style.stretchChildrenWidth;
-            group.childForceExpandHeight = style.stretchChildrenHeight;
+            group.childControlWidth = style.stretchChildrenWidth && !style.useResolvedChildrenWidth;
+            group.childControlHeight = style.stretchChildrenHeight && !style.useResolvedChildrenHeight;
+            group.childForceExpandWidth = group.childControlWidth;
+            group.childForceExpandHeight = group.childControlHeight;
             group.childScaleWidth = false;
             group.childScaleHeight = false;
         }
@@ -2344,6 +2354,23 @@ namespace Html2Vrc.Editor
             return values != null && values.Length >= 2
                 ? new Vector2(values[0], values[1])
                 : fallback;
+        }
+
+        private static float GetMinimumSize(UdomStyle style, int axis)
+        {
+            return style != null && style.minSize != null && style.minSize.Length >= 2
+                ? Mathf.Max(0f, style.minSize[axis])
+                : 0f;
+        }
+
+        private static float AddMarginToMaximumSize(UdomStyle style, int axis, float margin)
+        {
+            return style != null
+                   && style.maxSize != null
+                   && style.maxSize.Length >= 2
+                   && style.maxSize[axis] >= 0f
+                ? style.maxSize[axis] + margin
+                : -1f;
         }
 
         private static Vector4 GetEdges(float[] values)

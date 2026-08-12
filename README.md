@@ -104,6 +104,8 @@ Canonical `paint.visible`과 `paint.opacity`는 CanvasGroup으로 자식 전체�
 
 Canonical 2D transform은 `origin`과 배열 순서의 `translate`, `rotate`, `scale`을 지원합니다. Unity Importer는 각 operation을 안정 ID의 RectTransform wrapper로 분리해 비균일 scale이 섞인 순서도 보존하고, transform과 percentage 기준은 최종 Layout Rect에 맞춰 갱신합니다. Transform은 형제의 flex 배치 공간을 바꾸지 않습니다.
 
+Canonical layout의 `minWidth`, `minHeight`, `maxWidth`, `maxHeight`, `aspectRatio`를 지원합니다. 숫자와 percentage 제약은 부모의 design box에서 해석하고, 한 축이 `auto`인 aspect ratio는 반대 축과 min/max를 함께 만족하도록 계산합니다. 제약이 있는 flex 행·열은 max에 닿은 grow 공간을 남은 항목에 재분배하며, cross-axis stretch도 항목별 min/max를 지킨 고정 Unity Rect로 생성합니다.
+
 Canonical image의 `fit`은 `fill`, `contain`, `cover`, `none`을 지원합니다. 이미지 콘텐츠는 안정 ID를 가진 내부 자식에 배치되고 원본 비율·크기와 `position.x/y`에 따라 정렬되며, 노드 영역을 넘는 부분은 마스크로 잘립니다. 백분율 위치는 남는 공간에 대한 비율, 숫자는 왼쪽·위 기준 design-unit 오프셋, `auto`는 가운데 정렬로 해석합니다.
 
 Canonical `paint.border`의 왼쪽·위·오른쪽·아래 `solid` edge는 각 폭과 색을 유지한 단일 VRChat-safe SDF Image로 생성됩니다. Outer radius와 비대칭 폭에서 계산한 타원형 inner corner를 함께 사용하고, 서로 다른 edge 색은 폭 비율의 diagonal join으로 연결됩니다. 안정 border Material과 overlay는 레이아웃·raycast에 영향을 주지 않으며 재생성 사이에 GUID와 GameObject를 유지합니다.

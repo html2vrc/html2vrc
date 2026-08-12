@@ -62,6 +62,11 @@ namespace Html2Vrc
         public float opacity = 1f;
         public float[] position = { 0f, 0f };
         public float[] size = { 100f, 100f };
+        public float[] minSize = { 0f, 0f };
+        public float[] maxSize = { -1f, -1f };
+        public bool[] autoSize = { false, false };
+        public float aspectRatio;
+        public string aspectRatioMode = "None";
         public string layout = "None";
         public float[] padding = { 0f, 0f, 0f, 0f };
         public float[] margin = { 0f, 0f, 0f, 0f };
@@ -91,6 +96,8 @@ namespace Html2Vrc
         public string childAlignment = "UpperLeft";
         public bool stretchChildrenWidth;
         public bool stretchChildrenHeight;
+        public bool useResolvedChildrenWidth;
+        public bool useResolvedChildrenHeight;
         public float flexibleWidth;
         public float flexibleHeight;
         public float[] transformOrigin = { 50f, 50f };

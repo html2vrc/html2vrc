@@ -88,13 +88,14 @@ namespace Html2Vrc.Editor
             "textInputValue", "textInputPlaceholder", "textInputMultiline", "textInputReadOnly",
             "scrollAxisExplicit", "scrollHorizontal", "scrollVertical", "scrollInitialOffset",
             "style", "binding", "embed", "children",
-            "visible", "opacity", "position", "layout", "padding", "margin", "spacing", "backgroundColor",
+            "visible", "opacity", "position", "minSize", "maxSize", "autoSize", "aspectRatio", "aspectRatioMode",
+            "layout", "padding", "margin", "spacing", "backgroundColor",
             "backgroundType", "backgroundGradientAngle", "backgroundGradientPositions", "backgroundGradientColors",
             "backgroundGradientCenter", "backgroundGradientCenterIsPercent",
             "backgroundGradientRadius", "backgroundGradientRadiusIsPercent",
             "cornerRadius", "cornerRadiusPercent", "borderWidth", "borderColor", "textColor", "fontSize", "alignment", "fontStyle", "childAlignment",
             "shadowOffsets", "shadowBlurs", "shadowSpreads", "shadowColors", "shadowInsets",
-            "stretchChildrenWidth", "stretchChildrenHeight",
+            "stretchChildrenWidth", "stretchChildrenHeight", "useResolvedChildrenWidth", "useResolvedChildrenHeight",
             "flexibleWidth", "flexibleHeight",
             "transformOrigin", "transformOriginIsPercent", "transformOperationTypes",
             "transformOperationValues", "transformOperationValuesArePercent",
@@ -382,6 +383,9 @@ namespace Html2Vrc.Editor
 
             ValidateVector(style.position, 2, path + ".position", result, requirePositive: false);
             ValidateVector(style.size, 2, path + ".size", result, requirePositive: true);
+            ValidateVector(style.minSize, 2, path + ".minSize", result, requirePositive: false, requireNonNegative: true);
+            ValidateMaximumSize(style.maxSize, path + ".maxSize", result);
+            ValidateBooleanVector(style.autoSize, 2, path + ".autoSize", result);
             ValidateVector(style.padding, 4, path + ".padding", result, requirePositive: false, requireNonNegative: true);
             ValidateVector(style.margin, 4, path + ".margin", result, requirePositive: false, requireNonNegative: true);
             ValidateVector(
@@ -418,6 +422,20 @@ namespace Html2Vrc.Editor
                 AddError(result, path + ".spacing", "spacing은 음수가 될 수 없다.");
             }
 
+            if (style.aspectRatio < 0f
+                || float.IsNaN(style.aspectRatio)
+                || float.IsInfinity(style.aspectRatio))
+            {
+                AddError(result, path + ".aspectRatio", "aspectRatio는 0 이상의 유한한 값이어야 한다.");
+            }
+
+            if (!string.Equals(style.aspectRatioMode, "None", StringComparison.Ordinal)
+                && !string.Equals(style.aspectRatioMode, "WidthControlsHeight", StringComparison.Ordinal)
+                && !string.Equals(style.aspectRatioMode, "HeightControlsWidth", StringComparison.Ordinal))
+            {
+                AddError(result, path + ".aspectRatioMode", $"지원하지 않는 aspect ratio mode '{style.aspectRatioMode}'.");
+            }
+
             ValidateColor(style.backgroundColor, path + ".backgroundColor", result);
             ValidateBackground(style, path, result);
             ValidateColorArray(style.borderColor, path + ".borderColor", result);
@@ -445,6 +463,28 @@ namespace Html2Vrc.Editor
             }
 
             ValidateTransform(style, path, result);
+        }
+
+        private static void ValidateMaximumSize(
+            float[] value,
+            string path,
+            UdomValidationResult result)
+        {
+            if (value == null || value.Length != 2)
+            {
+                AddError(result, path, "2개 값이 필요하다.");
+                return;
+            }
+
+            for (var index = 0; index < value.Length; index++)
+            {
+                if (float.IsNaN(value[index])
+                    || float.IsInfinity(value[index])
+                    || value[index] < 0f && !Mathf.Approximately(value[index], -1f))
+                {
+                    AddError(result, $"{path}[{index}]", "max size는 -1 또는 0 이상의 유한한 값이어야 한다.");
+                }
+            }
         }
 
         private static void ValidateShadows(

@@ -1,0 +1,130 @@
+{
+  "asset": {
+    "version": "0.1",
+    "generator": "@html2vrc/udom Unity layout constraint fixture"
+  },
+  "viewport": {
+    "width": 900,
+    "height": 520
+  },
+  "root": {
+    "type": "element",
+    "id": "constraint-root",
+    "name": "view",
+    "style": {
+      "layout": {
+        "mode": "flex",
+        "width": "100%",
+        "height": "100%",
+        "padding": {
+          "top": 50,
+          "right": 50,
+          "bottom": 50,
+          "left": 50
+        },
+        "flex": {
+          "direction": "row",
+          "alignItems": "center",
+          "columnGap": 20
+        }
+      }
+    },
+    "children": [
+      {
+        "type": "element",
+        "id": "bounded-grow",
+        "name": "view",
+        "style": {
+          "layout": {
+            "width": 100,
+            "height": 80,
+            "minWidth": 200,
+            "minHeight": 120,
+            "maxWidth": "33.333333%",
+            "maxHeight": 140,
+            "flexItem": {
+              "grow": 1
+            }
+          },
+          "paint": {
+            "backgrounds": [
+              {
+                "type": "color",
+                "color": "#D95D39FF"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "type": "element",
+        "id": "remaining-grow",
+        "name": "view",
+        "style": {
+          "layout": {
+            "width": 100,
+            "height": 80,
+            "flexItem": {
+              "grow": 1
+            }
+          },
+          "paint": {
+            "backgrounds": [
+              {
+                "type": "color",
+                "color": "#2E86ABFF"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "type": "element",
+        "id": "ratio-card",
+        "name": "view",
+        "style": {
+          "layout": {
+            "mode": "flex",
+            "width": 160,
+            "minHeight": 90,
+            "maxWidth": "20%",
+            "aspectRatio": 2,
+            "flex": {
+              "direction": "column"
+            }
+          },
+          "paint": {
+            "backgrounds": [
+              {
+                "type": "color",
+                "color": "#3BB273FF"
+              }
+            ]
+          }
+        },
+        "children": [
+          {
+            "type": "element",
+            "id": "cross-bounded",
+            "name": "view",
+            "style": {
+              "layout": {
+                "width": 50,
+                "height": 40,
+                "maxWidth": 120
+              },
+              "paint": {
+                "backgrounds": [
+                  {
+                    "type": "color",
+                    "color": "#173F5FFF"
+                  }
+                ]
+              }
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

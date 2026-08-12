@@ -713,6 +713,74 @@ namespace Html2Vrc.Tests
         }
 
         [Test]
+        public void CanonicalLayoutConstraints_ClampFlexGrowthAndPreserveAspectRatio()
+        {
+            var json = LoadRepositoryFile(
+                "packages",
+                "udom",
+                "fixtures",
+                "valid",
+                "unity-layout-constraints.udom.json");
+            var validation = UdomValidator.Validate(json);
+
+            Assert.That(validation.IsValid, Is.True, validation.Format());
+            Assert.That(validation.Issues, Is.Empty, validation.Format());
+
+            var document = validation.Document;
+            var boundedStyle = document.root.children[0].style;
+            var remainingStyle = document.root.children[1].style;
+            var ratioStyle = document.root.children[2].style;
+            Assert.That(boundedStyle.minSize, Is.EqualTo(new[] { 200f, 120f }));
+            Assert.That(boundedStyle.maxSize[0], Is.EqualTo(300f).Within(0.001f));
+            Assert.That(boundedStyle.size, Is.EqualTo(new[] { 300f, 120f }));
+            Assert.That(remainingStyle.size, Is.EqualTo(new[] { 280f, 80f }).Within(0.001f));
+            Assert.That(ratioStyle.aspectRatio, Is.EqualTo(2f));
+            Assert.That(ratioStyle.aspectRatioMode, Is.EqualTo("WidthControlsHeight"));
+            Assert.That(ratioStyle.autoSize, Is.EqualTo(new[] { false, true }));
+            Assert.That(ratioStyle.size, Is.EqualTo(new[] { 180f, 90f }).Within(0.001f));
+            Assert.That(ratioStyle.useResolvedChildrenWidth, Is.True);
+            Assert.That(ratioStyle.stretchChildrenWidth, Is.True);
+            Assert.That(ratioStyle.layout, Is.EqualTo("Vertical"));
+            Assert.That(ratioStyle.useResolvedChildrenHeight, Is.False);
+            Assert.That(ratioStyle.flexibleWidth, Is.Zero);
+            Assert.That(document.root.children[2].children[0].style.size, Is.EqualTo(new[] { 120f, 40f }));
+
+            var build = UdomBuilder.GenerateOrRegenerate(document);
+            var root = build.Root;
+            var bounded = UdomBuilder.FindNode(root, "bounded-grow");
+            var remaining = UdomBuilder.FindNode(root, "remaining-grow");
+            var ratio = UdomBuilder.FindNode(root, "ratio-card");
+            var crossBounded = UdomBuilder.FindNode(root, "cross-bounded");
+            var originalBounded = bounded;
+            Assert.That(bounded.GetComponent<RectTransform>().rect.size, Is.EqualTo(new Vector2(300f, 120f)));
+            Assert.That(remaining.GetComponent<RectTransform>().rect.size, Is.EqualTo(new Vector2(280f, 80f)));
+            Assert.That(ratio.GetComponent<RectTransform>().rect.size, Is.EqualTo(new Vector2(180f, 90f)));
+            Assert.That(crossBounded.GetComponent<RectTransform>().rect.size, Is.EqualTo(new Vector2(120f, 40f)));
+            var ratioLayout = ratio.GetComponent<VerticalLayoutGroup>();
+            Assert.That(ratioLayout.childControlWidth, Is.False);
+            Assert.That(ratioLayout.childForceExpandWidth, Is.False);
+
+            var boundedLayout = bounded.GetComponent<LayoutElement>();
+            Assert.That(boundedLayout.minWidth, Is.EqualTo(200f));
+            Assert.That(boundedLayout.minHeight, Is.EqualTo(120f));
+            Assert.That(boundedLayout.preferredWidth, Is.EqualTo(300f));
+            Assert.That(boundedLayout.flexibleWidth, Is.Zero);
+
+            var regenerated = UdomBuilder.GenerateOrRegenerate(document, root);
+            Assert.That(regenerated.Created, Is.Zero);
+            Assert.That(UdomBuilder.FindNode(root, "bounded-grow"), Is.SameAs(originalBounded));
+            Assert.That(
+                UdomBuilder.FindNode(root, "ratio-card").GetComponent<RectTransform>().rect.size,
+                Is.EqualTo(new Vector2(180f, 90f)));
+
+            Object.DestroyImmediate(root.gameObject);
+
+            var invalid = UdomValidator.Validate(json.Replace("\"aspectRatio\": 2", "\"aspectRatio\": 0"));
+            Assert.That(invalid.IsValid, Is.False);
+            Assert.That(invalid.Format(), Does.Contain("aspectRatio"));
+        }
+
+        [Test]
         public void CanonicalBorder_RendersAsymmetricRoundedContourAndRegeneratesStably()
         {
             var json = LoadRepositoryFile(

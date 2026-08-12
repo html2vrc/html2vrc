@@ -101,6 +101,8 @@ namespace Html2Vrc.Editor
             var rootValue = RequireObject(RequireValue(value, "root", "$"), "$.root");
             var rootId = RequireString(rootValue, "id", "$.root.id");
             var canvasSize = new[] { width, height };
+            var root = MapNode(rootValue, "$.root", 0, canvasSize, true, styles, resources, warnings);
+            ResolveFlexLayoutTree(root);
 
             return new UdomDocument
             {
@@ -115,7 +117,7 @@ namespace Html2Vrc.Editor
                     viewportPixelRatio = pixelRatio,
                     viewportFit = fit
                 },
-                root = MapNode(rootValue, "$.root", 0, canvasSize, true, styles, resources, warnings)
+                root = root
             };
         }
 
@@ -373,11 +375,13 @@ namespace Html2Vrc.Editor
                     node.style.size[1] = Math.Max(32f, node.style.fontSize * 1.5f);
                 }
 
+                FinalizeCanonicalBoxSize(node.style);
                 return node;
             }
 
             MapElementProperties(node, elementName, value, path, mappedStyle, resources, warnings);
             ValidateEventMap(elementName, value, path, warnings);
+            FinalizeCanonicalBoxSize(node.style);
 
             if (string.Equals(node.type, "Embed", StringComparison.OrdinalIgnoreCase)
                 && IsNativeGradient(node.style.backgroundType))
@@ -1016,6 +1020,7 @@ namespace Html2Vrc.Editor
             List<UdomParseWarning> warnings)
         {
             var style = new UdomStyle();
+            style.autoSize = new[] { true, true };
             if (fillParentByDefault && parentSize != null && parentSize.Length == 2)
             {
                 style.size = new[] { parentSize[0], parentSize[1] };
@@ -1259,12 +1264,7 @@ namespace Html2Vrc.Editor
                 "flex",
                 "flexItem");
 
-            RejectPresent(value, path, "minWidth", "minimum and maximum sizes are not supported yet");
-            RejectPresent(value, path, "minHeight", "minimum and maximum sizes are not supported yet");
-            RejectPresent(value, path, "maxWidth", "minimum and maximum sizes are not supported yet");
-            RejectPresent(value, path, "maxHeight", "minimum and maximum sizes are not supported yet");
             RejectPresent(value, path, "zIndex", "z-index is not supported yet");
-            RejectPresent(value, path, "aspectRatio", "aspect ratio constraints are not supported yet");
             RequireDefaultString(value, "overflowX", "visible", path + ".overflowX");
             RequireDefaultString(value, "overflowY", "visible", path + ".overflowY");
 
@@ -1292,6 +1292,7 @@ namespace Html2Vrc.Editor
 
                 result.Style.size[0] = width;
                 result.HasWidth = true;
+                result.Style.autoSize[0] = false;
             }
 
             if (value.TryGetValue("height", out var heightValue)
@@ -1304,6 +1305,55 @@ namespace Html2Vrc.Editor
 
                 result.Style.size[1] = height;
                 result.HasHeight = true;
+                result.Style.autoSize[1] = false;
+            }
+
+            result.Style.minSize[0] = MapConstraintLength(
+                value,
+                "minWidth",
+                parentWidth,
+                path + ".minWidth",
+                0f);
+            result.Style.minSize[1] = MapConstraintLength(
+                value,
+                "minHeight",
+                parentHeight,
+                path + ".minHeight",
+                0f);
+            result.Style.maxSize[0] = MapConstraintLength(
+                value,
+                "maxWidth",
+                parentWidth,
+                path + ".maxWidth",
+                -1f);
+            result.Style.maxSize[1] = MapConstraintLength(
+                value,
+                "maxHeight",
+                parentHeight,
+                path + ".maxHeight",
+                -1f);
+
+            if (value.TryGetValue("aspectRatio", out var aspectRatioValue))
+            {
+                var aspectRatio = RequireFloat(aspectRatioValue, path + ".aspectRatio");
+                if (aspectRatio <= 0f || float.IsNaN(aspectRatio) || float.IsInfinity(aspectRatio))
+                {
+                    throw new FormatException($"{path}.aspectRatio: aspect ratio must be finite and greater than zero.");
+                }
+
+                result.Style.aspectRatio = aspectRatio;
+                if (result.HasWidth && result.HasHeight)
+                {
+                    result.Style.aspectRatioMode = "None";
+                }
+                else if (result.HasHeight)
+                {
+                    result.Style.aspectRatioMode = "HeightControlsWidth";
+                }
+                else
+                {
+                    result.Style.aspectRatioMode = "WidthControlsHeight";
+                }
             }
 
             if (value.TryGetValue("padding", out var paddingValue))
@@ -1362,6 +1412,383 @@ namespace Html2Vrc.Editor
                     result.Style.flexibleHeight = grow;
                 }
             }
+        }
+
+        private static float MapConstraintLength(
+            Dictionary<string, object> value,
+            string key,
+            float reference,
+            string path,
+            float defaultValue)
+        {
+            if (!value.TryGetValue(key, out var raw)
+                || !TryResolveLength(raw, reference, path, out var resolved))
+            {
+                return defaultValue;
+            }
+
+            if (resolved < 0f || float.IsNaN(resolved) || float.IsInfinity(resolved))
+            {
+                throw new FormatException($"{path}: size constraint must be finite and non-negative.");
+            }
+
+            return resolved;
+        }
+
+        private static void FinalizeCanonicalBoxSize(UdomStyle style)
+        {
+            if (style == null || style.size == null || style.size.Length < 2)
+            {
+                return;
+            }
+
+            var widthControlsHeight = string.Equals(
+                style.aspectRatioMode,
+                "WidthControlsHeight",
+                StringComparison.Ordinal);
+            var heightControlsWidth = string.Equals(
+                style.aspectRatioMode,
+                "HeightControlsWidth",
+                StringComparison.Ordinal);
+            var resolved = widthControlsHeight || heightControlsWidth
+                ? ResolveAspectSize(
+                    style,
+                    style.size[0],
+                    style.size[1],
+                    widthControlsHeight)
+                : new[]
+                {
+                    ClampSizeAxis(style, 0, style.size[0]),
+                    ClampSizeAxis(style, 1, style.size[1])
+                };
+            style.size = resolved;
+        }
+
+        private static float[] ResolveAspectSize(
+            UdomStyle style,
+            float width,
+            float height,
+            bool widthControlsHeight)
+        {
+            var ratio = style.aspectRatio;
+            if (ratio <= 0f || float.IsNaN(ratio) || float.IsInfinity(ratio))
+            {
+                return new[]
+                {
+                    ClampSizeAxis(style, 0, width),
+                    ClampSizeAxis(style, 1, height)
+                };
+            }
+
+            var minimumWidth = Math.Max(GetMinimumSize(style, 0), GetMinimumSize(style, 1) * ratio);
+            var maximumWidth = Math.Min(
+                GetMaximumSize(style, 0),
+                MultiplyFinite(GetMaximumSize(style, 1), ratio));
+            if (maximumWidth < minimumWidth)
+            {
+                maximumWidth = minimumWidth;
+            }
+
+            var candidateWidth = widthControlsHeight ? width : height * ratio;
+            var resolvedWidth = Clamp(candidateWidth, minimumWidth, maximumWidth);
+            return new[] { resolvedWidth, resolvedWidth / ratio };
+        }
+
+        private static void ResolveFlexLayoutTree(UdomNode node)
+        {
+            if (node == null)
+            {
+                return;
+            }
+
+            ResolveFlexChildren(node);
+            var children = node.children ?? Array.Empty<UdomNode>();
+            for (var index = 0; index < children.Length; index++)
+            {
+                ResolveFlexLayoutTree(children[index]);
+            }
+        }
+
+        private static void ResolveFlexChildren(UdomNode node)
+        {
+            var style = node.style ?? new UdomStyle();
+            var isVertical = string.Equals(style.layout, "Vertical", StringComparison.OrdinalIgnoreCase);
+            var isHorizontal = string.Equals(style.layout, "Horizontal", StringComparison.OrdinalIgnoreCase);
+            var children = node.children ?? Array.Empty<UdomNode>();
+            if ((!isVertical && !isHorizontal) || children.Length == 0)
+            {
+                return;
+            }
+
+            var requiresConstraintResolution = false;
+            for (var index = 0; index < children.Length; index++)
+            {
+                if (HasLayoutConstraint(children[index].style))
+                {
+                    requiresConstraintResolution = true;
+                    break;
+                }
+            }
+
+            if (!requiresConstraintResolution)
+            {
+                return;
+            }
+
+            var mainAxis = isVertical ? 1 : 0;
+            var crossAxis = 1 - mainAxis;
+            var padding = style.padding != null && style.padding.Length >= 4
+                ? style.padding
+                : new[] { 0f, 0f, 0f, 0f };
+            var contentWidth = Math.Max(0f, style.size[0] - padding[0] - padding[2]);
+            var contentHeight = Math.Max(0f, style.size[1] - padding[1] - padding[3]);
+            var mainAvailable = mainAxis == 0 ? contentWidth : contentHeight;
+            var crossAvailable = crossAxis == 0 ? contentWidth : contentHeight;
+            var stretchCross = crossAxis == 0
+                ? style.stretchChildrenWidth
+                : style.stretchChildrenHeight;
+            var allocatedOuterSizes = new float[children.Length];
+            var flexibleWeights = new float[children.Length];
+            var maximumOuterSizes = new float[children.Length];
+            var totalOuterSize = Math.Max(0, children.Length - 1) * style.spacing;
+
+            for (var index = 0; index < children.Length; index++)
+            {
+                var childStyle = children[index].style ?? new UdomStyle();
+                var margins = GetAxisMargins(childStyle, mainAxis);
+                var preserveAspect = HasAspectRatio(childStyle)
+                                     && IsAutoSize(childStyle, crossAxis)
+                                     && !stretchCross;
+                var minimum = GetEffectiveMinimumSize(childStyle, mainAxis, preserveAspect);
+                var maximum = GetEffectiveMaximumSize(childStyle, mainAxis, preserveAspect);
+                var baseSize = childStyle.size != null && childStyle.size.Length >= 2
+                    ? childStyle.size[mainAxis]
+                    : 100f;
+                var contentSize = Clamp(baseSize, minimum, Math.Max(minimum, maximum));
+                allocatedOuterSizes[index] = contentSize + margins;
+                maximumOuterSizes[index] = float.IsPositiveInfinity(maximum)
+                    ? float.PositiveInfinity
+                    : maximum + margins;
+                flexibleWeights[index] = mainAxis == 0
+                    ? Math.Max(0f, childStyle.flexibleWidth)
+                    : Math.Max(0f, childStyle.flexibleHeight);
+                totalOuterSize += allocatedOuterSizes[index];
+            }
+
+            var remaining = mainAvailable - totalOuterSize;
+            while (remaining > 0.0001f)
+            {
+                var totalWeight = 0f;
+                for (var index = 0; index < children.Length; index++)
+                {
+                    if (flexibleWeights[index] > 0f
+                        && allocatedOuterSizes[index] + 0.0001f < maximumOuterSizes[index])
+                    {
+                        totalWeight += flexibleWeights[index];
+                    }
+                }
+
+                if (totalWeight <= 0f)
+                {
+                    break;
+                }
+
+                var distributed = 0f;
+                for (var index = 0; index < children.Length; index++)
+                {
+                    if (flexibleWeights[index] <= 0f
+                        || allocatedOuterSizes[index] + 0.0001f >= maximumOuterSizes[index])
+                    {
+                        continue;
+                    }
+
+                    var share = remaining * flexibleWeights[index] / totalWeight;
+                    var room = maximumOuterSizes[index] - allocatedOuterSizes[index];
+                    var addition = Math.Min(share, room);
+                    allocatedOuterSizes[index] += addition;
+                    distributed += addition;
+                }
+
+                if (distributed <= 0.0001f)
+                {
+                    break;
+                }
+
+                remaining -= distributed;
+            }
+
+            for (var index = 0; index < children.Length; index++)
+            {
+                var childStyle = children[index].style ?? new UdomStyle();
+                var size = childStyle.size != null && childStyle.size.Length >= 2
+                    ? new[] { childStyle.size[0], childStyle.size[1] }
+                    : new[] { 100f, 100f };
+                size[mainAxis] = Math.Max(
+                    0f,
+                    allocatedOuterSizes[index] - GetAxisMargins(childStyle, mainAxis));
+
+                if (stretchCross)
+                {
+                    size[crossAxis] = ClampSizeAxis(
+                        childStyle,
+                        crossAxis,
+                        Math.Max(0f, crossAvailable - GetAxisMargins(childStyle, crossAxis)));
+                }
+                else if (HasAspectRatio(childStyle) && IsAutoSize(childStyle, crossAxis))
+                {
+                    size = ResolveAspectSize(
+                        childStyle,
+                        size[0],
+                        size[1],
+                        mainAxis == 0);
+                }
+                else
+                {
+                    size[0] = ClampSizeAxis(childStyle, 0, size[0]);
+                    size[1] = ClampSizeAxis(childStyle, 1, size[1]);
+                }
+
+                childStyle.size = size;
+                if (mainAxis == 0)
+                {
+                    childStyle.flexibleWidth = 0f;
+                }
+                else
+                {
+                    childStyle.flexibleHeight = 0f;
+                }
+            }
+
+            if (stretchCross)
+            {
+                if (crossAxis == 0)
+                {
+                    style.useResolvedChildrenWidth = true;
+                }
+                else
+                {
+                    style.useResolvedChildrenHeight = true;
+                }
+            }
+        }
+
+        private static float GetAxisMargins(UdomStyle style, int axis)
+        {
+            if (style.margin == null || style.margin.Length < 4)
+            {
+                return 0f;
+            }
+
+            return axis == 0
+                ? style.margin[0] + style.margin[2]
+                : style.margin[1] + style.margin[3];
+        }
+
+        private static bool HasAspectRatio(UdomStyle style)
+        {
+            return style.aspectRatio > 0f
+                   && !string.Equals(style.aspectRatioMode, "None", StringComparison.Ordinal);
+        }
+
+        private static bool HasLayoutConstraint(UdomStyle style)
+        {
+            if (style == null)
+            {
+                return false;
+            }
+
+            if (HasAspectRatio(style))
+            {
+                return true;
+            }
+
+            for (var axis = 0; axis < 2; axis++)
+            {
+                if (GetMinimumSize(style, axis) > 0f
+                    || style.maxSize != null
+                    && style.maxSize.Length >= 2
+                    && style.maxSize[axis] >= 0f)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool IsAutoSize(UdomStyle style, int axis)
+        {
+            return style.autoSize != null
+                   && style.autoSize.Length >= 2
+                   && style.autoSize[axis];
+        }
+
+        private static float GetEffectiveMinimumSize(UdomStyle style, int axis, bool preserveAspect)
+        {
+            var minimum = GetMinimumSize(style, axis);
+            if (!preserveAspect)
+            {
+                return minimum;
+            }
+
+            var crossMinimum = GetMinimumSize(style, 1 - axis);
+            return axis == 0
+                ? Math.Max(minimum, crossMinimum * style.aspectRatio)
+                : Math.Max(minimum, crossMinimum / style.aspectRatio);
+        }
+
+        private static float GetEffectiveMaximumSize(UdomStyle style, int axis, bool preserveAspect)
+        {
+            var maximum = GetMaximumSize(style, axis);
+            if (!preserveAspect)
+            {
+                return Math.Max(GetMinimumSize(style, axis), maximum);
+            }
+
+            var crossMaximum = GetMaximumSize(style, 1 - axis);
+            var transferredMaximum = axis == 0
+                ? MultiplyFinite(crossMaximum, style.aspectRatio)
+                : DivideFinite(crossMaximum, style.aspectRatio);
+            return Math.Max(GetEffectiveMinimumSize(style, axis, true), Math.Min(maximum, transferredMaximum));
+        }
+
+        private static float ClampSizeAxis(UdomStyle style, int axis, float value)
+        {
+            var minimum = GetMinimumSize(style, axis);
+            var maximum = Math.Max(minimum, GetMaximumSize(style, axis));
+            return Clamp(value, minimum, maximum);
+        }
+
+        private static float GetMinimumSize(UdomStyle style, int axis)
+        {
+            return style.minSize != null && style.minSize.Length >= 2
+                ? Math.Max(0f, style.minSize[axis])
+                : 0f;
+        }
+
+        private static float GetMaximumSize(UdomStyle style, int axis)
+        {
+            if (style.maxSize == null || style.maxSize.Length < 2 || style.maxSize[axis] < 0f)
+            {
+                return float.PositiveInfinity;
+            }
+
+            return style.maxSize[axis];
+        }
+
+        private static float MultiplyFinite(float value, float multiplier)
+        {
+            return float.IsPositiveInfinity(value) ? value : value * multiplier;
+        }
+
+        private static float DivideFinite(float value, float divisor)
+        {
+            return float.IsPositiveInfinity(value) ? value : value / divisor;
+        }
+
+        private static float Clamp(float value, float minimum, float maximum)
+        {
+            return Math.Max(minimum, Math.Min(value, maximum));
         }
 
         private static void MapFlex(Dictionary<string, object> layout, string path, StyleMapping result)
