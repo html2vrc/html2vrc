@@ -37,6 +37,8 @@
 - `max-width`, `max-height`: 숫자, `px` 또는 `none`
 - `aspect-ratio`: 양수 또는 `width / height`
 - `left`, `top`: 숫자 또는 `px`
+- `transform-origin`: 1~2개의 숫자, `px`, percentage 또는 `left | center | right | top | bottom`
+- `transform`: `translate`, `translateX/Y`, `rotate`, `scale`, `scaleX/Y` 함수 또는 `none`
 - `display: flex | block | none`
 - `position: static | absolute`: absolute는 `left`, `top`을 부모 왼쪽 위 기준으로 적용
 - `overflow: visible | hidden`: 한 값 또는 x·y 순서의 두 값
@@ -61,7 +63,9 @@
 
 HTML에서 만든 flex 트리도 canonical UDOM importer와 같은 크기·정렬 해석기를 사용한다. 따라서 grow/shrink/basis의 비율 재분배, min/max 고정과 남는 공간 재분배, 한 축 auto aspect ratio, reverse 순서, justify의 남는 공간 분배, wrap line 분할, align-content, 축별 gap, align-self와 wrap/nowrap 전환 시 안정 GameObject 수명주기가 두 입력 경로에서 동일하다. 지원 값이 아닌 `baseline`, 임의 keyword, `calc(...)`, 소수 order와 음수 grow/shrink는 추측하지 않고 오류로 반환한다.
 
-CSS 전체 호환은 목표가 아니다. `flex-basis` 이외의 percentage 길이, 양축이 모두 auto이거나 반대 고정 축·aspect-ratio가 없는 크기 auto, `aspect-ratio: auto`, `calc`, flex shorthand, `align-content: space-evenly`, `overflow: auto | scroll`, visible/hidden이 섞인 축별 overflow, Grid, 선택자, 외부 스타일시트, 애니메이션과 지원 목록 밖의 속성은 오류로 표시한다.
+CSS transform 함수는 웹 규칙대로 선언의 오른쪽부터 좌표에 적용된다. Converter는 함수 목록을 역전해 array-order인 canonical transform wrapper에 저장한다. Translate는 숫자·`px`·percentage, rotate는 숫자·`deg`·`rad`·`grad`·`turn`, scale은 유한한 숫자를 지원한다. Transform을 `none`으로 바꾸면 원래 노드를 유지한 채 생성 wrapper만 제거한다.
+
+CSS 전체 호환은 목표가 아니다. `flex-basis`와 transform 이외의 percentage 길이, 양축이 모두 auto이거나 반대 고정 축·aspect-ratio가 없는 크기 auto, `aspect-ratio: auto`, `calc`, flex shorthand, transform의 matrix·skew·perspective와 3~4값 origin, `align-content: space-evenly`, `overflow: auto | scroll`, visible/hidden이 섞인 축별 overflow, Grid, 선택자, 외부 스타일시트, 애니메이션과 지원 목록 밖의 속성은 오류로 표시한다.
 
 ## 안전한 버튼 동작
 

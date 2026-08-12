@@ -3201,6 +3201,107 @@ namespace Html2Vrc.Tests
         }
 
         [Test]
+        public void HtmlConverter_CssTransformsPreserveWebOrderOriginAndStableWrappers()
+        {
+            const string html = @"
+              <main id=""css-transform-root"" data-canvas-size=""520 400""
+                style=""width: 520px; height: 400px; display: flex; flex-direction: column; align-items: flex-start; padding: 40px; gap: 20px"">
+                <section id=""css-transform-panel""
+                  style=""width: 200px; height: 100px; transform-origin: 25% 20px; transform: translate(10%, 12px) rotate(30deg) scale(1.5, 0.75)""></section>
+                <section id=""css-transform-axes""
+                  style=""width: 160px; height: 80px; transform-origin: top right; transform: translateX(-10px) translateY(25%) scaleX(-1) scaleY(0.5) rotate(0.5turn)""></section>
+              </main>";
+
+            var conversion = HtmlToUdomConverter.Convert(html);
+
+            Assert.That(conversion.IsValid, Is.True, conversion.Format());
+            var panelStyle = conversion.Document.root.children[0].style;
+            var axesStyle = conversion.Document.root.children[1].style;
+            Assert.That(panelStyle.transformOrigin, Is.EqualTo(new[] { 25f, 20f }));
+            Assert.That(panelStyle.transformOriginIsPercent, Is.EqualTo(new[] { true, false }));
+            Assert.That(
+                panelStyle.transformOperationTypes,
+                Is.EqualTo(new[] { "scale", "rotate", "translate" }));
+            Assert.That(
+                panelStyle.transformOperationValues,
+                Is.EqualTo(new[] { 1.5f, 0.75f, 30f, 0f, 10f, 12f }));
+            Assert.That(
+                panelStyle.transformOperationValuesArePercent,
+                Is.EqualTo(new[] { false, false, false, false, true, false }));
+            Assert.That(axesStyle.transformOrigin, Is.EqualTo(new[] { 100f, 0f }));
+            Assert.That(axesStyle.transformOriginIsPercent, Is.EqualTo(new[] { true, true }));
+            Assert.That(
+                axesStyle.transformOperationTypes,
+                Is.EqualTo(new[] { "rotate", "scale", "scale", "translate", "translate" }));
+            Assert.That(
+                axesStyle.transformOperationValues,
+                Is.EqualTo(new[] { 180f, 0f, 1f, 0.5f, -1f, 1f, 0f, 25f, -10f, 0f })
+                    .Within(0.001f));
+            Assert.That(axesStyle.transformOperationValuesArePercent[7], Is.True);
+
+            var normalized = UdomValidator.Validate(conversion.Json);
+            Assert.That(normalized.IsValid, Is.True, normalized.Format());
+            Assert.That(
+                normalized.Document.root.children[0].style.transformOperationTypes,
+                Is.EqualTo(new[] { "scale", "rotate", "translate" }));
+
+            var build = UdomBuilder.GenerateOrRegenerate(conversion.Document);
+            var root = build.Root;
+            var layout = UdomBuilder.FindNode(root, "css-transform-panel::__transform-layout");
+            var origin = UdomBuilder.FindNode(root, "css-transform-panel::__transform-origin");
+            var scale = UdomBuilder.FindNode(root, "css-transform-panel::__transform-operation-0");
+            var rotate = UdomBuilder.FindNode(root, "css-transform-panel::__transform-operation-1");
+            var translate = UdomBuilder.FindNode(root, "css-transform-panel::__transform-operation-2");
+            var panel = UdomBuilder.FindNode(root, "css-transform-panel");
+            Assert.That(layout, Is.Not.Null);
+            Assert.That(origin, Is.Not.Null);
+            Assert.That(translate.transform.parent, Is.SameAs(origin.transform));
+            Assert.That(rotate.transform.parent, Is.SameAs(translate.transform));
+            Assert.That(scale.transform.parent, Is.SameAs(rotate.transform));
+            Assert.That(panel.transform.parent, Is.SameAs(scale.transform));
+            Assert.That(origin.GetComponent<RectTransform>().anchoredPosition, Is.EqualTo(new Vector2(-50f, 30f)));
+            Assert.That(translate.GetComponent<RectTransform>().anchoredPosition, Is.EqualTo(new Vector2(20f, -12f)));
+            Assert.That(rotate.GetComponent<RectTransform>().localEulerAngles.z, Is.EqualTo(330f).Within(0.001f));
+            Assert.That(scale.GetComponent<RectTransform>().localScale, Is.EqualTo(new Vector3(1.5f, 0.75f, 1f)));
+
+            var expectedCenter = new Vector3(50f, -30f, 0f);
+            expectedCenter = Vector3.Scale(expectedCenter, new Vector3(1.5f, 0.75f, 1f));
+            expectedCenter = Quaternion.Euler(0f, 0f, -30f) * expectedCenter;
+            expectedCenter += new Vector3(20f, -12f, 0f);
+            expectedCenter += new Vector3(-50f, 30f, 0f);
+            var actualCenter = layout.GetComponent<RectTransform>().InverseTransformPoint(
+                panel.GetComponent<RectTransform>().TransformPoint(Vector3.zero));
+            Assert.That(actualCenter.x, Is.EqualTo(expectedCenter.x).Within(0.001f));
+            Assert.That(actualCenter.y, Is.EqualTo(expectedCenter.y).Within(0.001f));
+
+            var withoutTransform = HtmlToUdomConverter.Convert(html.Replace(
+                "translate(10%, 12px) rotate(30deg) scale(1.5, 0.75)",
+                "none"));
+            Assert.That(withoutTransform.IsValid, Is.True, withoutTransform.Format());
+            UdomBuilder.GenerateOrRegenerate(withoutTransform.Document, root);
+            Assert.That(UdomBuilder.FindNode(root, "css-transform-panel"), Is.SameAs(panel));
+            Assert.That(UdomBuilder.FindNode(root, "css-transform-panel::__transform-layout"), Is.Null);
+            Assert.That(UdomBuilder.FindNode(root, "css-transform-axes::__transform-layout"), Is.Not.Null);
+            Object.DestroyImmediate(root.gameObject);
+
+            var unsupported = HtmlToUdomConverter.Convert(html.Replace(
+                "translate(10%, 12px) rotate(30deg) scale(1.5, 0.75)",
+                "matrix(1, 0, 0, 1, 0, 0)"));
+            Assert.That(unsupported.IsValid, Is.False);
+            Assert.That(unsupported.Format(), Does.Contain("matrix"));
+
+            var invalidOrigin = HtmlToUdomConverter.Convert(html.Replace(
+                "transform-origin: 25% 20px",
+                "transform-origin: left top bottom"));
+            Assert.That(invalidOrigin.IsValid, Is.False);
+            Assert.That(invalidOrigin.Format(), Does.Contain("transform-origin"));
+
+            var invalidScale = HtmlToUdomConverter.Convert(html.Replace("scale(1.5, 0.75)", "scale(2px)"));
+            Assert.That(invalidScale.IsValid, Is.False);
+            Assert.That(invalidScale.Format(), Does.Contain("scale"));
+        }
+
+        [Test]
         public void HtmlConverter_FlexWrapCssUsesCanonicalMultiLineLayout()
         {
             const string html = @"

@@ -104,6 +104,8 @@ Canonical `paint.visible`과 `paint.opacity`는 CanvasGroup으로 자식 전체�
 
 Canonical 2D transform은 `origin`과 배열 순서의 `translate`, `rotate`, `scale`을 지원합니다. Unity Importer는 각 operation을 안정 ID의 RectTransform wrapper로 분리해 비균일 scale이 섞인 순서도 보존하고, transform과 percentage 기준은 최종 Layout Rect에 맞춰 갱신합니다. Transform은 형제의 flex 배치 공간을 바꾸지 않습니다.
 
+제한형 HTML의 `transform-origin`과 `translate`·`translateX/Y`·`rotate`·`scale`·`scaleX/Y`도 같은 wrapper 경로를 사용합니다. CSS 함수의 오른쪽부터 적용되는 순서를 canonical 배열에 맞게 변환하고, `transform: none` 전환에서는 기존 노드를 유지하면서 wrapper만 정리합니다.
+
 Canonical layout의 `minWidth`, `minHeight`, `maxWidth`, `maxHeight`, `aspectRatio`를 지원합니다. 숫자와 percentage 제약은 부모의 design box에서 해석하고, 한 축이 `auto`인 aspect ratio는 반대 축과 min/max를 함께 만족하도록 계산합니다. 제약이 있는 flex 행·열은 max에 닿은 grow 공간을 남은 항목에 재분배하며, cross-axis stretch도 항목별 min/max를 지킨 고정 Unity Rect로 생성합니다.
 
 제한형 HTML도 px `min/max-width/height`, `max-*: none`, `aspect-ratio`의 숫자·`width / height` 형식과 한 축 `auto`를 같은 constraint resolver로 처리합니다. Min/max에 닿은 HTML flex item을 고정한 뒤 남은 grow 공간도 다른 항목에 재분배합니다.

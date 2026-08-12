@@ -41,6 +41,10 @@ namespace Html2Vrc.Editor
             @"\son[a-z][a-z0-9_-]*\s*=",
             RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
+        private static readonly Regex TransformFunctionPattern = new Regex(
+            @"([A-Za-z][A-Za-z0-9-]*)\s*\(([^()]*)\)",
+            RegexOptions.CultureInvariant);
+
         private static readonly HashSet<string> ContainerTags = new HashSet<string>(
             new[] { "main", "section", "div", "header", "footer", "nav", "article" },
             StringComparer.OrdinalIgnoreCase);
@@ -686,6 +690,12 @@ namespace Html2Vrc.Editor
                     case "text-align":
                         style.alignment = TextAlignment(declaration.Value, path, result);
                         break;
+                    case "transform-origin":
+                        SetTransformOrigin(declaration.Value, path, result, style);
+                        break;
+                    case "transform":
+                        SetTransform(declaration.Value, path, result, style);
+                        break;
                     case "flex-grow":
                         if (!TryParseNumber(declaration.Value, out var grow) || grow < 0f)
                         {
@@ -1080,6 +1090,378 @@ namespace Html2Vrc.Editor
             }
 
             return declarations;
+        }
+
+        private sealed class CssTransformOperation
+        {
+            public string Type;
+            public float X;
+            public float Y;
+            public bool XIsPercent;
+            public bool YIsPercent;
+        }
+
+        private static void SetTransformOrigin(
+            string source,
+            string path,
+            HtmlToUdomResult result,
+            UdomStyle style)
+        {
+            var parts = source.Split(
+                new[] { ' ', '\t', '\r', '\n' },
+                StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length < 1 || parts.Length > 2)
+            {
+                AddError(result, path + "/@style", "transform-origin은 1~2개의 위치 값만 지원한다.");
+                return;
+            }
+
+            string xSource;
+            string ySource;
+            if (parts.Length == 1)
+            {
+                if (IsVerticalOriginKeyword(parts[0]))
+                {
+                    xSource = "center";
+                    ySource = parts[0];
+                }
+                else
+                {
+                    xSource = parts[0];
+                    ySource = "center";
+                }
+            }
+            else if (IsVerticalOriginKeyword(parts[0])
+                     || IsHorizontalOriginKeyword(parts[1]))
+            {
+                xSource = parts[1];
+                ySource = parts[0];
+            }
+            else
+            {
+                xSource = parts[0];
+                ySource = parts[1];
+            }
+
+            if (!TryParseOriginCoordinate(xSource, 0, out var x, out var xIsPercent)
+                || !TryParseOriginCoordinate(ySource, 1, out var y, out var yIsPercent))
+            {
+                AddError(
+                    result,
+                    path + "/@style",
+                    $"transform-origin 값 '{source}'은 지원하지 않는다. px, 숫자, percentage와 방향 keyword만 사용할 수 있다.");
+                return;
+            }
+
+            style.transformOrigin = new[] { x, y };
+            style.transformOriginIsPercent = new[] { xIsPercent, yIsPercent };
+        }
+
+        private static bool IsHorizontalOriginKeyword(string source)
+        {
+            var value = source.Trim().ToLowerInvariant();
+            return value == "left" || value == "right";
+        }
+
+        private static bool IsVerticalOriginKeyword(string source)
+        {
+            var value = source.Trim().ToLowerInvariant();
+            return value == "top" || value == "bottom";
+        }
+
+        private static bool TryParseOriginCoordinate(
+            string source,
+            int axis,
+            out float value,
+            out bool isPercent)
+        {
+            var normalized = source.Trim().ToLowerInvariant();
+            if (normalized == "center")
+            {
+                value = 50f;
+                isPercent = true;
+                return true;
+            }
+
+            if ((axis == 0 && normalized == "left")
+                || (axis == 1 && normalized == "top"))
+            {
+                value = 0f;
+                isPercent = true;
+                return true;
+            }
+
+            if ((axis == 0 && normalized == "right")
+                || (axis == 1 && normalized == "bottom"))
+            {
+                value = 100f;
+                isPercent = true;
+                return true;
+            }
+
+            return TryParseTransformLength(source, out value, out isPercent);
+        }
+
+        private static void SetTransform(
+            string source,
+            string path,
+            HtmlToUdomResult result,
+            UdomStyle style)
+        {
+            var normalized = source.Trim();
+            if (string.Equals(normalized, "none", StringComparison.OrdinalIgnoreCase))
+            {
+                style.transformOperationTypes = Array.Empty<string>();
+                style.transformOperationValues = Array.Empty<float>();
+                style.transformOperationValuesArePercent = Array.Empty<bool>();
+                return;
+            }
+
+            var matches = TransformFunctionPattern.Matches(normalized);
+            if (matches.Count == 0)
+            {
+                AddError(result, path + "/@style", $"transform 값 '{source}'에서 함수를 찾을 수 없다.");
+                return;
+            }
+
+            var operations = new List<CssTransformOperation>();
+            var cursor = 0;
+            for (var index = 0; index < matches.Count; index++)
+            {
+                var match = matches[index];
+                if (!string.IsNullOrWhiteSpace(normalized.Substring(cursor, match.Index - cursor)))
+                {
+                    AddError(result, path + "/@style", $"transform 값 '{source}'의 함수 사이 문법이 잘못됐다.");
+                    return;
+                }
+
+                if (!TryParseTransformOperation(
+                        match.Groups[1].Value,
+                        match.Groups[2].Value,
+                        path,
+                        result,
+                        out var operation))
+                {
+                    return;
+                }
+
+                operations.Add(operation);
+                cursor = match.Index + match.Length;
+            }
+
+            if (!string.IsNullOrWhiteSpace(normalized.Substring(cursor)))
+            {
+                AddError(result, path + "/@style", $"transform 값 '{source}'의 끝 문법이 잘못됐다.");
+                return;
+            }
+
+            // CSS composite transforms affect points from right to left. Canonical arrays are applied in array order.
+            operations.Reverse();
+            style.transformOperationTypes = new string[operations.Count];
+            style.transformOperationValues = new float[operations.Count * 2];
+            style.transformOperationValuesArePercent = new bool[operations.Count * 2];
+            for (var index = 0; index < operations.Count; index++)
+            {
+                var operation = operations[index];
+                var valueIndex = index * 2;
+                style.transformOperationTypes[index] = operation.Type;
+                style.transformOperationValues[valueIndex] = operation.X;
+                style.transformOperationValues[valueIndex + 1] = operation.Y;
+                style.transformOperationValuesArePercent[valueIndex] = operation.XIsPercent;
+                style.transformOperationValuesArePercent[valueIndex + 1] = operation.YIsPercent;
+            }
+        }
+
+        private static bool TryParseTransformOperation(
+            string function,
+            string argumentSource,
+            string path,
+            HtmlToUdomResult result,
+            out CssTransformOperation operation)
+        {
+            operation = null;
+            if (!TrySplitTransformArguments(argumentSource, out var arguments))
+            {
+                AddError(result, path + "/@style", $"transform 함수 {function}(...)의 인수 문법이 잘못됐다.");
+                return false;
+            }
+
+            var name = function.Trim().ToLowerInvariant();
+            if (name == "translate" || name == "translatex" || name == "translatey")
+            {
+                var expectedMaximum = name == "translate" ? 2 : 1;
+                if (arguments.Length < 1 || arguments.Length > expectedMaximum)
+                {
+                    AddError(result, path + "/@style", $"{function} 함수의 인수 개수가 잘못됐다.");
+                    return false;
+                }
+
+                var x = 0f;
+                var y = 0f;
+                var xIsPercent = false;
+                var yIsPercent = false;
+                if (name == "translatey")
+                {
+                    if (!TryParseTransformLength(arguments[0], out y, out yIsPercent))
+                    {
+                        AddError(result, path + "/@style", $"{function} 값 '{arguments[0]}'은 지원하지 않는다.");
+                        return false;
+                    }
+                }
+                else
+                {
+                    if (!TryParseTransformLength(arguments[0], out x, out xIsPercent))
+                    {
+                        AddError(result, path + "/@style", $"{function} 값 '{arguments[0]}'은 지원하지 않는다.");
+                        return false;
+                    }
+
+                    if (name == "translate" && arguments.Length == 2
+                        && !TryParseTransformLength(arguments[1], out y, out yIsPercent))
+                    {
+                        AddError(result, path + "/@style", $"{function} 값 '{arguments[1]}'은 지원하지 않는다.");
+                        return false;
+                    }
+                }
+
+                operation = new CssTransformOperation
+                {
+                    Type = "translate",
+                    X = x,
+                    Y = y,
+                    XIsPercent = xIsPercent,
+                    YIsPercent = yIsPercent
+                };
+                return true;
+            }
+
+            if (name == "rotate")
+            {
+                if (arguments.Length != 1 || !TryParseTransformAngle(arguments[0], out var degrees))
+                {
+                    AddError(result, path + "/@style", $"{function}은 하나의 숫자 또는 deg/rad/grad/turn 각도를 요구한다.");
+                    return false;
+                }
+
+                operation = new CssTransformOperation { Type = "rotate", X = degrees };
+                return true;
+            }
+
+            if (name == "scale" || name == "scalex" || name == "scaley")
+            {
+                var maximum = name == "scale" ? 2 : 1;
+                if (arguments.Length < 1 || arguments.Length > maximum
+                    || !TryParseNumber(arguments[0], out var first))
+                {
+                    AddError(result, path + "/@style", $"{function}은 1~{maximum}개의 숫자 인수를 요구한다.");
+                    return false;
+                }
+
+                var x = name == "scaley" ? 1f : first;
+                var y = name == "scalex" ? 1f : first;
+                if (name == "scale" && arguments.Length == 2
+                    && !TryParseNumber(arguments[1], out y))
+                {
+                    AddError(result, path + "/@style", $"{function} 값 '{arguments[1]}'은 숫자여야 한다.");
+                    return false;
+                }
+
+                operation = new CssTransformOperation { Type = "scale", X = x, Y = y };
+                return true;
+            }
+
+            AddError(result, path + "/@style", $"transform 함수 '{function}'은 지원하지 않는다.");
+            return false;
+        }
+
+        private static bool TrySplitTransformArguments(string source, out string[] arguments)
+        {
+            if (source.IndexOf(',') >= 0)
+            {
+                var commaParts = source.Split(',');
+                var result = new string[commaParts.Length];
+                for (var index = 0; index < commaParts.Length; index++)
+                {
+                    var trimmed = commaParts[index].Trim();
+                    if (trimmed.Length == 0
+                        || trimmed.Split(
+                            new[] { ' ', '\t', '\r', '\n' },
+                            StringSplitOptions.RemoveEmptyEntries).Length != 1)
+                    {
+                        arguments = Array.Empty<string>();
+                        return false;
+                    }
+
+                    result[index] = trimmed;
+                }
+
+                arguments = result;
+                return true;
+            }
+
+            arguments = source.Split(
+                new[] { ' ', '\t', '\r', '\n' },
+                StringSplitOptions.RemoveEmptyEntries);
+            return arguments.Length > 0;
+        }
+
+        private static bool TryParseTransformLength(
+            string source,
+            out float value,
+            out bool isPercent)
+        {
+            var normalized = source.Trim();
+            isPercent = normalized.EndsWith("%", StringComparison.Ordinal);
+            if (isPercent)
+            {
+                normalized = normalized.Substring(0, normalized.Length - 1).Trim();
+            }
+            else if (normalized.EndsWith("px", StringComparison.OrdinalIgnoreCase))
+            {
+                normalized = normalized.Substring(0, normalized.Length - 2).Trim();
+            }
+
+            return TryParseNumber(normalized, out value);
+        }
+
+        private static bool TryParseTransformAngle(string source, out float degrees)
+        {
+            var normalized = source.Trim().ToLowerInvariant();
+            var multiplier = 1f;
+            var suffixLength = 0;
+            if (normalized.EndsWith("grad", StringComparison.Ordinal))
+            {
+                multiplier = 0.9f;
+                suffixLength = 4;
+            }
+            else if (normalized.EndsWith("turn", StringComparison.Ordinal))
+            {
+                multiplier = 360f;
+                suffixLength = 4;
+            }
+            else if (normalized.EndsWith("rad", StringComparison.Ordinal))
+            {
+                multiplier = 180f / Mathf.PI;
+                suffixLength = 3;
+            }
+            else if (normalized.EndsWith("deg", StringComparison.Ordinal))
+            {
+                suffixLength = 3;
+            }
+
+            if (suffixLength > 0)
+            {
+                normalized = normalized.Substring(0, normalized.Length - suffixLength).Trim();
+            }
+
+            if (!TryParseNumber(normalized, out var value))
+            {
+                degrees = 0f;
+                return false;
+            }
+
+            degrees = value * multiplier;
+            return !float.IsNaN(degrees) && !float.IsInfinity(degrees);
         }
 
         private static void SetDimension(
