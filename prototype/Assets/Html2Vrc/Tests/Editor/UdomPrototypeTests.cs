@@ -3420,13 +3420,167 @@ namespace Html2Vrc.Tests
             Assert.That(oneStop.IsValid, Is.False);
             Assert.That(oneStop.Format(), Does.Contain("두 개 이상"));
 
-            var conic = HtmlToUdomConverter.Convert(
-                html.Replace("linear-gradient(0.25turn", "conic-gradient(from 0deg"));
-            Assert.That(conic.IsValid, Is.False);
-            Assert.That(conic.Format(), Does.Contain("background-image"));
+            var repeating = HtmlToUdomConverter.Convert(
+                html.Replace("linear-gradient(0.25turn", "repeating-linear-gradient(0.25turn"));
+            Assert.That(repeating.IsValid, Is.False);
+            Assert.That(repeating.Format(), Does.Contain("background-image"));
 
             var nestedColor = HtmlToUdomConverter.Convert(
                 html.Replace("#FF0000FF 0%", "rgb(255, 0, 0) 0%"));
+            Assert.That(nestedColor.IsValid, Is.False);
+            Assert.That(nestedColor.Format(), Does.Contain("rgb()"));
+        }
+
+        [Test]
+        public void HtmlConverter_ConicGradientMapsAnglesAndRegeneratesStably()
+        {
+            const string html = @"
+              <main id=""html-conic-root"" data-canvas-size=""1100 220""
+                style=""width: 1100px; height: 220px; display: flex; align-items: flex-start; padding: 40px; gap: 20px"">
+                <section id=""html-conic-panel""
+                  style=""width: 300px; height: 140px; border-radius: 24px;
+                    background-image: conic-gradient(from -0.25turn at 60% 45px, #FF0000FF 0deg, currentColor 100grad, transparent 1turn);
+                    color: #0000FFFF""></section>
+                <section id=""html-conic-defaults""
+                  style=""width: 300px; height: 140px;
+                    background: conic-gradient(#112233FF, #445566FF 50%, #778899FF)""></section>
+                <section id=""html-conic-keywords""
+                  style=""width: 300px; height: 140px;
+                    background-image: conic-gradient(at bottom right, #00FF00FF 25%, #FFFFFFFF 75%)""></section>
+              </main>";
+
+            var conversion = HtmlToUdomConverter.Convert(html);
+
+            Assert.That(conversion.IsValid, Is.True, conversion.Format());
+            var panelNode = conversion.Document.root.children[0];
+            var defaultsNode = conversion.Document.root.children[1];
+            var keywordsNode = conversion.Document.root.children[2];
+            Assert.That(panelNode.style.backgroundType, Is.EqualTo("conic-gradient"));
+            Assert.That(panelNode.style.backgroundGradientAngle, Is.EqualTo(270f).Within(0.001f));
+            Assert.That(panelNode.style.backgroundGradientCenter, Is.EqualTo(new[] { 60f, 45f }));
+            Assert.That(panelNode.style.backgroundGradientCenterIsPercent, Is.EqualTo(new[] { true, false }));
+            Assert.That(panelNode.style.backgroundGradientPositions, Is.EqualTo(new[] { 0f, 0.25f, 1f }).Within(0.001f));
+            Assert.That(
+                panelNode.style.backgroundGradientColors,
+                Is.EqualTo(new[] { "#FF0000FF", "#0000FFFF", "#00000000" }));
+            Assert.That(defaultsNode.style.backgroundGradientAngle, Is.Zero);
+            Assert.That(defaultsNode.style.backgroundGradientCenter, Is.EqualTo(new[] { 50f, 50f }));
+            Assert.That(defaultsNode.style.backgroundGradientCenterIsPercent, Is.EqualTo(new[] { true, true }));
+            Assert.That(defaultsNode.style.backgroundGradientPositions, Is.EqualTo(new[] { 0f, 0.5f, 1f }));
+            Assert.That(keywordsNode.style.backgroundGradientAngle, Is.Zero);
+            Assert.That(keywordsNode.style.backgroundGradientCenter, Is.EqualTo(new[] { 100f, 100f }));
+            Assert.That(keywordsNode.style.backgroundGradientCenterIsPercent, Is.EqualTo(new[] { true, true }));
+
+            var normalized = UdomValidator.Validate(conversion.Json);
+            Assert.That(normalized.IsValid, Is.True, normalized.Format());
+            Assert.That(normalized.Document.root.children[0].style.backgroundGradientAngle, Is.EqualTo(270f));
+            Assert.That(
+                normalized.Document.root.children[0].style.backgroundGradientCenterIsPercent,
+                Is.EqualTo(panelNode.style.backgroundGradientCenterIsPercent));
+
+            var build = UdomBuilder.GenerateOrRegenerate(conversion.Document);
+            var root = build.Root;
+            var panel = UdomBuilder.FindNode(root, "html-conic-panel");
+            var defaults = UdomBuilder.FindNode(root, "html-conic-defaults");
+            var keywords = UdomBuilder.FindNode(root, "html-conic-keywords");
+            var image = panel.GetComponent<Image>();
+            var defaultsImage = defaults.GetComponent<Image>();
+            var keywordsImage = keywords.GetComponent<Image>();
+            var material = image.material;
+            var texture = material.GetTexture("_GradientTex") as Texture2D;
+            Assert.That(material.shader.name, Is.EqualTo(UdomGradientAssetUtility.ConicShaderName));
+            Assert.That(defaultsImage.material.shader.name, Is.EqualTo(UdomGradientAssetUtility.ConicShaderName));
+            Assert.That(keywordsImage.material.shader.name, Is.EqualTo(UdomGradientAssetUtility.ConicShaderName));
+            Assert.That(texture, Is.Not.Null);
+            Assert.That(texture.GetPixel(0, 0), Is.EqualTo(Color.red).Using(ColorComparer.Instance));
+            Assert.That(texture.GetPixel(texture.width / 4, 0), Is.EqualTo(Color.blue).Using(ColorComparer.Instance));
+            Assert.That(texture.GetPixel(texture.width - 1, 0), Is.EqualTo(Color.clear).Using(ColorComparer.Instance));
+            Assert.That(
+                material.GetVector("_GradientCenter"),
+                Is.EqualTo(new Vector4(30f, 25f, 0f, 0f))
+                    .Using(Vector4ComparerWithEqualsOperator.Instance));
+            Assert.That(material.GetFloat("_GradientStart"), Is.EqualTo(0.75f).Within(0.0001f));
+            Assert.That(
+                keywordsImage.material.GetVector("_GradientCenter"),
+                Is.EqualTo(new Vector4(150f, -70f, 0f, 0f))
+                    .Using(Vector4ComparerWithEqualsOperator.Instance));
+            Assert.That(keywordsImage.material.GetFloat("_GradientStart"), Is.Zero.Within(0.0001f));
+            Assert.That(panel.GetComponent<Mask>(), Is.Not.Null);
+
+            var originalPanel = panel.gameObject;
+            var changedGeometry = HtmlToUdomConverter.Convert(
+                html.Replace(
+                    "from -0.25turn at 60% 45px",
+                    "from 90deg at left bottom"));
+            Assert.That(changedGeometry.IsValid, Is.True, changedGeometry.Format());
+            UdomBuilder.GenerateOrRegenerate(changedGeometry.Document, root);
+            panel = UdomBuilder.FindNode(root, "html-conic-panel");
+            image = panel.GetComponent<Image>();
+            Assert.That(panel.gameObject, Is.SameAs(originalPanel));
+            Assert.That(image.material, Is.SameAs(material));
+            Assert.That(image.material.GetTexture("_GradientTex"), Is.SameAs(texture));
+            Assert.That(
+                image.material.GetVector("_GradientCenter"),
+                Is.EqualTo(new Vector4(-150f, -70f, 0f, 0f))
+                    .Using(Vector4ComparerWithEqualsOperator.Instance));
+            Assert.That(image.material.GetFloat("_GradientStart"), Is.EqualTo(0.25f).Within(0.0001f));
+
+            var fixedStops = HtmlToUdomConverter.Convert(
+                html.Replace(
+                    "#FF0000FF 0deg, currentColor 100grad, transparent 1turn",
+                    "#FF0000FF 240deg, #00FF00FF 90deg"));
+            Assert.That(fixedStops.IsValid, Is.True, fixedStops.Format());
+            Assert.That(
+                fixedStops.Document.root.children[0].style.backgroundGradientPositions,
+                Is.EqualTo(new[] { 2f / 3f, 2f / 3f }).Within(0.001f));
+
+            var withoutGradient = HtmlToUdomConverter.Convert(
+                html.Replace(
+                    "background-image: conic-gradient(from -0.25turn at 60% 45px, #FF0000FF 0deg, currentColor 100grad, transparent 1turn)",
+                    "background-image: none; background-color: #123456FF"));
+            Assert.That(withoutGradient.IsValid, Is.True, withoutGradient.Format());
+            UdomBuilder.GenerateOrRegenerate(withoutGradient.Document, root);
+            panel = UdomBuilder.FindNode(root, "html-conic-panel");
+            image = panel.GetComponent<Image>();
+            Assert.That(panel.gameObject, Is.SameAs(originalPanel));
+            Assert.That(image.material.shader.name, Is.EqualTo(UdomRoundedCornerAssetUtility.ShaderName));
+            Assert.That(
+                image.color,
+                Is.EqualTo((Color)new Color32(0x12, 0x34, 0x56, 0xFF)).Using(ColorComparer.Instance));
+            Object.DestroyImmediate(root.gameObject);
+
+            var invalidAngle = HtmlToUdomConverter.Convert(
+                html.Replace("from -0.25turn", "from north"));
+            Assert.That(invalidAngle.IsValid, Is.False);
+            Assert.That(invalidAngle.Format(), Does.Contain("시작 각도"));
+
+            var invalidCenter = HtmlToUdomConverter.Convert(
+                html.Replace("at 60% 45px", "at left right"));
+            Assert.That(invalidCenter.IsValid, Is.False);
+            Assert.That(invalidCenter.Format(), Does.Contain("중심"));
+
+            var reversedPrelude = HtmlToUdomConverter.Convert(
+                html.Replace("from -0.25turn at 60% 45px", "at center from 90deg"));
+            Assert.That(reversedPrelude.IsValid, Is.False);
+            Assert.That(reversedPrelude.Format(), Does.Contain("중심"));
+
+            var excessiveAngleStop = HtmlToUdomConverter.Convert(
+                html.Replace("currentColor 100grad", "currentColor 400deg"));
+            Assert.That(excessiveAngleStop.IsValid, Is.False);
+            Assert.That(excessiveAngleStop.Format(), Does.Contain("400deg"));
+
+            var pixelStop = HtmlToUdomConverter.Convert(
+                html.Replace("currentColor 100grad", "currentColor 40px"));
+            Assert.That(pixelStop.IsValid, Is.False);
+            Assert.That(pixelStop.Format(), Does.Contain("40px"));
+
+            var oneStop = HtmlToUdomConverter.Convert(
+                html.Replace("#FF0000FF 0deg, currentColor 100grad, transparent 1turn", "#FF0000FF"));
+            Assert.That(oneStop.IsValid, Is.False);
+            Assert.That(oneStop.Format(), Does.Contain("두 개 이상"));
+
+            var nestedColor = HtmlToUdomConverter.Convert(
+                html.Replace("#FF0000FF 0deg", "rgb(255, 0, 0) 0deg"));
             Assert.That(nestedColor.IsValid, Is.False);
             Assert.That(nestedColor.Format(), Does.Contain("rgb()"));
         }

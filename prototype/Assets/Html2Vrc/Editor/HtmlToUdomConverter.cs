@@ -1796,7 +1796,7 @@ namespace Html2Vrc.Editor
             AddError(
                 result,
                 path + "/@style",
-                $"background 값 '{source}'은 지원하지 않는다. 단일 hex color, transparent, linear-gradient, radial-gradient 또는 none만 사용할 수 있다.");
+                $"background 값 '{source}'은 지원하지 않는다. 단일 hex color, transparent, linear-gradient, radial-gradient, conic-gradient 또는 none만 사용할 수 있다.");
             gradient = null;
             return false;
         }
@@ -1825,7 +1825,7 @@ namespace Html2Vrc.Editor
             AddError(
                 result,
                 path + "/@style",
-                $"background-image 값 '{source}'은 지원하지 않는다. 단일 linear-gradient, radial-gradient 또는 none만 사용할 수 있다.");
+                $"background-image 값 '{source}'은 지원하지 않는다. 단일 linear-gradient, radial-gradient, conic-gradient 또는 none만 사용할 수 있다.");
             gradient = null;
             return false;
         }
@@ -1833,7 +1833,8 @@ namespace Html2Vrc.Editor
         private static bool IsSupportedCssGradientFunction(string source)
         {
             return source.StartsWith("linear-gradient", StringComparison.OrdinalIgnoreCase)
-                   || source.StartsWith("radial-gradient", StringComparison.OrdinalIgnoreCase);
+                   || source.StartsWith("radial-gradient", StringComparison.OrdinalIgnoreCase)
+                   || source.StartsWith("conic-gradient", StringComparison.OrdinalIgnoreCase);
         }
 
         private static CssBackgroundGradient ParseCssBackgroundGradient(
@@ -1846,7 +1847,12 @@ namespace Html2Vrc.Editor
                 return ParseCssLinearGradient(source, path, result);
             }
 
-            return ParseCssRadialGradient(source, path, result);
+            if (source.StartsWith("radial-gradient", StringComparison.OrdinalIgnoreCase))
+            {
+                return ParseCssRadialGradient(source, path, result);
+            }
+
+            return ParseCssConicGradient(source, path, result);
         }
 
         private static CssBackgroundGradient ParseCssLinearGradient(
@@ -1910,6 +1916,7 @@ namespace Html2Vrc.Editor
                     functionName,
                     path,
                     result,
+                    false,
                     out var colors,
                     out var positions))
             {
@@ -1974,6 +1981,7 @@ namespace Html2Vrc.Editor
                     functionName,
                     path,
                     result,
+                    false,
                     out var colors,
                     out var positions))
             {
@@ -1983,6 +1991,135 @@ namespace Html2Vrc.Editor
             gradient.Colors = colors;
             gradient.Positions = positions;
             return gradient;
+        }
+
+        private static CssBackgroundGradient ParseCssConicGradient(
+            string source,
+            string path,
+            HtmlToUdomResult result)
+        {
+            const string functionName = "conic-gradient";
+            var value = source.Trim();
+            if (!value.StartsWith(functionName + "(", StringComparison.OrdinalIgnoreCase)
+                || !value.EndsWith(")", StringComparison.Ordinal))
+            {
+                AddError(result, path + "/@style", $"conic-gradient 형식 '{source}'이 잘못됐다.");
+                return null;
+            }
+
+            var body = value.Substring(functionName.Length + 1, value.Length - functionName.Length - 2);
+            if (body.IndexOf('(') >= 0 || body.IndexOf(')') >= 0)
+            {
+                AddError(
+                    result,
+                    path + "/@style",
+                    "conic-gradient 안의 rgb(), hsl(), calc() 또는 다중 background 함수는 지원하지 않는다.");
+                return null;
+            }
+
+            var parts = body.Split(',');
+            if (parts.Any(part => string.IsNullOrWhiteSpace(part)))
+            {
+                AddError(result, path + "/@style", "conic-gradient에 빈 항목이 있다.");
+                return null;
+            }
+
+            var gradient = new CssBackgroundGradient
+            {
+                Type = "conic-gradient",
+                Angle = 0f
+            };
+            var firstStop = 0;
+            if (parts.Length > 0 && !LooksLikeSupportedGradientStop(parts[0]))
+            {
+                if (!TryParseCssConicPrelude(parts[0], path, result, gradient))
+                {
+                    return null;
+                }
+
+                firstStop = 1;
+            }
+
+            if (!TryParseCssGradientStops(
+                    parts,
+                    firstStop,
+                    functionName,
+                    path,
+                    result,
+                    true,
+                    out var colors,
+                    out var positions))
+            {
+                return null;
+            }
+
+            gradient.Colors = colors;
+            gradient.Positions = positions;
+            return gradient;
+        }
+
+        private static bool TryParseCssConicPrelude(
+            string source,
+            string path,
+            HtmlToUdomResult result,
+            CssBackgroundGradient gradient)
+        {
+            var tokens = source.Split(
+                new[] { ' ', '\t', '\r', '\n' },
+                StringSplitOptions.RemoveEmptyEntries);
+            var index = 0;
+            if (index < tokens.Length
+                && string.Equals(tokens[index], "from", StringComparison.OrdinalIgnoreCase))
+            {
+                if (index + 1 >= tokens.Length
+                    || !TryParseTransformAngle(tokens[index + 1], out var angle)
+                    || float.IsNaN(angle)
+                    || float.IsInfinity(angle))
+                {
+                    AddError(
+                        result,
+                        path + "/@style",
+                        $"conic-gradient 시작 각도 '{source}'은 숫자 또는 deg, rad, grad, turn angle이어야 한다.");
+                    return false;
+                }
+
+                gradient.Angle = Mathf.Repeat(angle, 360f);
+                index += 2;
+            }
+
+            if (index >= tokens.Length
+                || !string.Equals(tokens[index], "at", StringComparison.OrdinalIgnoreCase))
+            {
+                if (index == tokens.Length && index > 0)
+                {
+                    return true;
+                }
+
+                AddError(
+                    result,
+                    path + "/@style",
+                    $"conic-gradient prelude '{source}'은 선택적 from <angle> 다음 선택적 at <position> 순서여야 한다.");
+                return false;
+            }
+
+            index++;
+            var positionCount = tokens.Length - index;
+            if (positionCount < 1 || positionCount > 2
+                || !TryParseCssGradientPosition(
+                    tokens.Skip(index).ToArray(),
+                    out var center,
+                    out var centerIsPercent))
+            {
+                AddError(
+                    result,
+                    path + "/@style",
+                    $"conic-gradient 중심 '{source}'은 1~2개의 px, percentage 또는 방향 keyword여야 한다.");
+                return false;
+            }
+
+            gradient.Center = center;
+            gradient.CenterIsPercent = centerIsPercent;
+            return true;
         }
 
         private static bool LooksLikeSupportedGradientStop(string source)
@@ -2177,6 +2314,7 @@ namespace Html2Vrc.Editor
             string functionName,
             string path,
             HtmlToUdomResult result,
+            bool allowAnglePositions,
             out string[] colors,
             out float[] resolvedPositions)
         {
@@ -2203,7 +2341,9 @@ namespace Html2Vrc.Editor
                     AddError(
                         result,
                         path + "/@style",
-                        $"{functionName} stop {index + 1} '{stopSource}'은 hex color와 선택적 percentage 하나만 지원한다.");
+                        allowAnglePositions
+                            ? $"{functionName} stop {index + 1} '{stopSource}'은 hex color와 선택적 percentage 또는 angle 하나만 지원한다."
+                            : $"{functionName} stop {index + 1} '{stopSource}'은 hex color와 선택적 percentage 하나만 지원한다.");
                     colors = null;
                     resolvedPositions = null;
                     return false;
@@ -2214,12 +2354,18 @@ namespace Html2Vrc.Editor
                     continue;
                 }
 
-                if (!TryParseGradientStopPosition(stopParts[1], out var position))
+                float position;
+                var positionIsValid = allowAnglePositions
+                    ? TryParseConicGradientStopPosition(stopParts[1], out position)
+                    : TryParseGradientStopPosition(stopParts[1], out position);
+                if (!positionIsValid)
                 {
                     AddError(
                         result,
                         path + "/@style",
-                        $"{functionName} stop {index + 1} 위치 '{stopParts[1]}'은 0%~100% percentage여야 한다.");
+                        allowAnglePositions
+                            ? $"{functionName} stop {index + 1} 위치 '{stopParts[1]}'은 0%~100% percentage 또는 0~360도 angle이어야 한다."
+                            : $"{functionName} stop {index + 1} 위치 '{stopParts[1]}'은 0%~100% percentage여야 한다.");
                     colors = null;
                     resolvedPositions = null;
                     return false;
@@ -2230,6 +2376,27 @@ namespace Html2Vrc.Editor
 
             resolvedPositions = ResolveCssGradientStopPositions(positions);
             return true;
+        }
+
+        private static bool TryParseConicGradientStopPosition(string source, out float position)
+        {
+            if (TryParseGradientStopPosition(source, out position))
+            {
+                return true;
+            }
+
+            if (TryParseTransformAngle(source, out var degrees)
+                && !float.IsNaN(degrees)
+                && !float.IsInfinity(degrees)
+                && degrees >= 0f
+                && degrees <= 360f)
+            {
+                position = degrees / 360f;
+                return true;
+            }
+
+            position = 0f;
+            return false;
         }
 
         private static bool TryParseCssGradientDirection(

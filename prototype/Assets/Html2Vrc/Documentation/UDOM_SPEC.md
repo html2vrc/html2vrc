@@ -62,6 +62,8 @@ Canonical `radial-gradient`는 같은 LUT와 별도 VRChat-safe UI Shader로 렌
 
 Canonical `conic-gradient`는 같은 LUT와 전용 UI Shader로 렌더링한다. 생략된 시작 `angle`은 `0`이며 중심에서 위쪽으로 향하는 선을 기준으로 stop을 시계 방향으로 순회한다. `center.x/y`의 design-unit·percentage 보존과 최종 Layout Rect 계산, 안정 Material/LUT 경로 및 radius SDF 합성은 radial gradient와 동일하다.
 
+제한형 HTML의 단일 `conic-gradient`는 선택적 `from` 숫자·deg·rad·grad·turn 각도와 그 뒤의 선택적 `at` mixed-unit 중심을 canonical start angle·center로 정규화한다. Percentage 또는 0~360도 angle stop은 0~1 LUT 위치가 되고, 생략 stop 보간·감소 위치 fix-up·currentColor·none/단색 재생성 수명주기는 linear/radial gradient와 공유한다. 기본값은 위쪽 0°와 `50% 50%` 중심이며 pixel stop과 repeating·multiple background는 거부한다.
+
 Canonical `paint.radius`는 `[topLeft, topRight, bottomRight, bottomLeft]` design-unit 배열로 보존한다. percentage는 박스의 짧은 변을 기준으로 해석하고, 같은 변에 닿는 두 radius의 합이 변보다 크면 네 값을 같은 비율로 줄인다. 단색 배경은 rounded-corner SDF Material, linear/radial/conic gradient는 같은 SDF 계산을 합성한 gradient Material을 사용한다. 자식이 있는 노드는 Unity `Mask`로 같은 곡선을 stencil에 기록하며, 투명한 image 부모는 Graphic을 표시하지 않은 채 자식만 자른다. source TextAsset 기반 Material은 `Assets/Html2VrcGenerated/RoundedCorners` 아래 source GUID와 node ID 기반 안정 경로로 갱신된다.
 
 Canonical `paint.border`는 `[left, top, right, bottom]` 폭·색 배열을 단일 `<node-id>::__border` Image와 VRChat-safe SDF Material로 렌더링한다. Outer contour는 정규화된 circular corner radius를 사용하고, inner contour는 각 edge 폭만큼 inset한 box와 corner별 X/Y radius로 계산하므로 비대칭 폭에서도 타원형 안쪽 곡선을 유지한다. 서로 다른 edge 색의 join은 outer corner와 inner corner를 잇는 폭 비율 경계로 선택한다. overlay는 `ignoreLayout`, raycast off이며 source TextAsset 기반 Material은 `Assets/Html2VrcGenerated/Borders` 아래 안정 경로로 재사용한다.

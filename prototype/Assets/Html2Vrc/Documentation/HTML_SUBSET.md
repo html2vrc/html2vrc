@@ -56,9 +56,10 @@
 - `row-gap`, `column-gap`: 숫자 또는 `px`
 - `padding`, `margin`: CSS의 1~4개 값
 - `background-color`, `color`: `#RRGGBB` 또는 `#RRGGBBAA`
-- `background`, `background-image`: 단일 `linear-gradient(...)`, `radial-gradient(...)`, `none`; `background`은 단일 hex color와 `transparent`도 지원
+- `background`, `background-image`: 단일 `linear-gradient(...)`, `radial-gradient(...)`, `conic-gradient(...)`, `none`; `background`은 단일 hex color와 `transparent`도 지원
 - `linear-gradient`: 기본 아래 방향, cardinal `to top | right | bottom | left` 또는 숫자·deg·rad·grad·turn angle, 두 개 이상의 hex·transparent·currentColor stop과 선택적 0%~100% 위치
 - `radial-gradient`: 생략하거나 `ellipse <rx> <ry>`로 쓰는 타원, `circle <r>` 또는 shape을 생략한 단일 px 원형 반지름, 선택적 `at <position>`, 두 개 이상의 linear-gradient와 같은 color stop
+- `conic-gradient`: 선택적 `from <angle>` 다음 선택적 `at <position>`, 두 개 이상의 hex·transparent·currentColor stop과 선택적 0%~100% 또는 0~360도 angle 위치
 - `border`: 0 이상 숫자·`px` width, `solid | none`, hex color·`transparent | currentColor`의 shorthand
 - `border-width`, `border-style`, `border-color`: CSS 순서의 1~4개 값
 - `border-top|right|bottom|left` 및 각 edge의 `-width`, `-style`, `-color` longhand
@@ -89,9 +90,11 @@ Border shorthand와 longhand는 inline 선언의 source-order대로 합성한다
 
 `radial-gradient`는 명시한 X/Y 반지름과 중심의 숫자·`px`·percentage 혼합 단위를 canonical radial paint에 그대로 보존한다. `left | center | right | top | bottom` 중심 keyword와 세로·가로 순서 전환도 지원한다. Geometry 전체를 생략하거나 `at`만 쓰면 canonical 기본 중심과 X/Y 반지름 `50% 50%`를 사용한다. `circle`은 최종 Rect에서도 같은 절대 반지름을 유지하도록 percentage가 아닌 단일 px 값이 필요하다. 브라우저 크기에 따라 계산해야 하는 `closest-side | farthest-side | closest-corner | farthest-corner`와 shape만 쓴 암시적 원형 크기는 지원하지 않는다. Color stop 보간·fix-up·currentColor, LUT, rounded mask와 `none` 재생성 수명주기는 linear-gradient와 같다.
 
+`conic-gradient`의 생략한 시작 각도는 위쪽 기준 0°이고 양의 방향은 시계 방향이다. `from`은 숫자를 degree로 보거나 `deg | rad | grad | turn`을 받아 0~360°로 정규화하며, 생략한 중심은 `50% 50%`다. `at`은 radial과 같은 mixed-unit 위치 및 keyword 축 전환을 사용한다. Stop 위치는 percentage 또는 0~360도 angle을 canonical 0~1로 바꾸고, 생략 stop 보간과 감소 위치 fix-up은 다른 gradient와 공유한다. Pixel stop, color hint, double-position stop은 지원하지 않는다.
+
 Opacity는 CanvasGroup alpha로 자식 전체에 곱해진다. Visibility hidden도 GameObject를 비활성화하지 않아 flex 공간과 안정 ID를 유지하지만 CanvasGroup의 interactable·raycast를 끈다. Z-index가 형제마다 다르면 flex 좌표를 먼저 고정한 뒤 낮은 정수부터 높은 정수 순으로 가장 바깥 margin·transform·shadow wrapper를 배치한다. 모두 auto/0으로 돌아오면 native Layout Group을 복원한다.
 
-CSS 전체 호환은 목표가 아니다. `flex-basis`, transform, object-position과 radial geometry 이외의 percentage 길이, 양축이 모두 auto이거나 반대 고정 축·aspect-ratio가 없는 크기 auto, `aspect-ratio: auto`, `calc`, flex shorthand, transform의 matrix·skew·perspective와 3~4값 origin, dashed/dotted/double border, percentage border width, percentage 및 `/` 타원형 radius, named/rgb/hsl color, percentage shadow length, linear-gradient의 corner 방향·px stop·color hint·double-position stop, radial-gradient의 size keyword·암시적 circle 크기, conic/repeating gradient와 다중 background, `visibility: collapse`와 hidden 부모 안에서 자식 visible로 다시 표시하는 override, 중첩 stacking context·isolation, `object-fit: scale-down`, object-position의 3~4값 edge offset, `align-content: space-evenly`, `overflow: auto | scroll`, visible/hidden이 섞인 축별 overflow, Grid, 선택자, 외부 스타일시트, 애니메이션과 지원 목록 밖의 속성은 오류로 표시하거나 계약 밖으로 둔다.
+CSS 전체 호환은 목표가 아니다. `flex-basis`, transform, object-position과 radial/conic geometry 이외의 percentage 길이, 양축이 모두 auto이거나 반대 고정 축·aspect-ratio가 없는 크기 auto, `aspect-ratio: auto`, `calc`, flex shorthand, transform의 matrix·skew·perspective와 3~4값 origin, dashed/dotted/double border, percentage border width, percentage 및 `/` 타원형 radius, named/rgb/hsl color, percentage shadow length, linear-gradient의 corner 방향·px stop·color hint·double-position stop, radial-gradient의 size keyword·암시적 circle 크기, conic-gradient의 px stop·color hint·double-position stop, repeating gradient와 다중 background, `visibility: collapse`와 hidden 부모 안에서 자식 visible로 다시 표시하는 override, 중첩 stacking context·isolation, `object-fit: scale-down`, object-position의 3~4값 edge offset, `align-content: space-evenly`, `overflow: auto | scroll`, visible/hidden이 섞인 축별 overflow, Grid, 선택자, 외부 스타일시트, 애니메이션과 지원 목록 밖의 속성은 오류로 표시하거나 계약 밖으로 둔다.
 
 ## 안전한 버튼 동작
 
