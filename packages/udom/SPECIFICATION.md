@@ -569,6 +569,11 @@ UDOM 핵심 Color 형식은 sRGB `#RRGGBBAA` 문자열이다.
 - `angle`: 시작 각도
 - `stops`: GradientStop[]
 
+- `center`의 기본값은 `{ "x": "50%", "y": "50%" }`다.
+- `angle`의 기본값은 `0`이다.
+- `0`도는 중심에서 위쪽으로 향하는 선에서 시작한다.
+- 양의 각도와 stop 진행 방향은 화면을 바라볼 때 시계 방향이다.
+
 #### image background
 
 주요 속성:

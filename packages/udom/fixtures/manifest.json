@@ -48,6 +48,10 @@
     "valid": true
   },
   {
+    "file": "valid/unity-conic-gradient.udom.json",
+    "valid": true
+  },
+  {
     "file": "valid/unity-radius.udom.json",
     "valid": true
   },

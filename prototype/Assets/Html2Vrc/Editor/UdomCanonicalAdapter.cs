@@ -1364,23 +1364,14 @@ namespace Html2Vrc.Editor
                     out var gradientCenterIsPercent,
                     out var gradientRadius,
                     out var gradientRadiusIsPercent);
-                if (IsNativeGradient(type))
-                {
-                    result.Style.backgroundType = type;
-                    result.Style.backgroundGradientAngle = gradientAngle;
-                    result.Style.backgroundGradientPositions = gradientPositions;
-                    result.Style.backgroundGradientColors = gradientColors;
-                    result.Style.backgroundGradientCenter = gradientCenter;
-                    result.Style.backgroundGradientCenterIsPercent = gradientCenterIsPercent;
-                    result.Style.backgroundGradientRadius = gradientRadius;
-                    result.Style.backgroundGradientRadiusIsPercent = gradientRadiusIsPercent;
-                }
-                else
-                {
-                    warnings.Add(new UdomParseWarning(
-                        path + ".backgrounds[0]",
-                        $"Canonical {type} is approximated with its first stop color until a matching Unity backend is available."));
-                }
+                result.Style.backgroundType = type;
+                result.Style.backgroundGradientAngle = gradientAngle;
+                result.Style.backgroundGradientPositions = gradientPositions;
+                result.Style.backgroundGradientColors = gradientColors;
+                result.Style.backgroundGradientCenter = gradientCenter;
+                result.Style.backgroundGradientCenterIsPercent = gradientCenterIsPercent;
+                result.Style.backgroundGradientRadius = gradientRadius;
+                result.Style.backgroundGradientRadiusIsPercent = gradientRadiusIsPercent;
             }
             else
             {
@@ -1521,7 +1512,7 @@ namespace Html2Vrc.Editor
             out float[] radius,
             out bool[] radiusIsPercent)
         {
-            angle = 180f;
+            angle = string.Equals(type, "conic-gradient", StringComparison.Ordinal) ? 0f : 180f;
             center = new[] { 50f, 50f };
             centerIsPercent = new[] { true, true };
             radius = new[] { 50f, 50f };
@@ -1559,10 +1550,20 @@ namespace Html2Vrc.Editor
             else
             {
                 EnsureOnlyKeys(value, path, "type", "center", "angle", "stops");
-                ValidateOptionalXyLength(value, "center", path + ".center");
+                MapGradientXyLength(
+                    value,
+                    "center",
+                    path + ".center",
+                    requireNonNegative: false,
+                    out center,
+                    out centerIsPercent);
                 if (value.TryGetValue("angle", out var angleValue))
                 {
-                    RequireFloat(angleValue, path + ".angle");
+                    angle = RequireFloat(angleValue, path + ".angle");
+                    if (float.IsNaN(angle) || float.IsInfinity(angle))
+                    {
+                        throw new FormatException($"{path}.angle: gradient angle must be finite.");
+                    }
                 }
             }
 
@@ -1603,7 +1604,8 @@ namespace Html2Vrc.Editor
         private static bool IsNativeGradient(string type)
         {
             return string.Equals(type, "linear-gradient", StringComparison.Ordinal)
-                   || string.Equals(type, "radial-gradient", StringComparison.Ordinal);
+                   || string.Equals(type, "radial-gradient", StringComparison.Ordinal)
+                   || string.Equals(type, "conic-gradient", StringComparison.Ordinal);
         }
 
         private static void MapGradientXyLength(
@@ -1674,27 +1676,6 @@ namespace Html2Vrc.Editor
                 values[index] = absolute;
                 isPercent[index] = false;
             }
-        }
-
-        private static void ValidateOptionalXyLength(
-            Dictionary<string, object> value,
-            string key,
-            string path)
-        {
-            if (!value.TryGetValue(key, out var raw))
-            {
-                return;
-            }
-
-            var xy = RequireObject(raw, path);
-            EnsureOnlyKeys(xy, path, "x", "y");
-            if (!xy.TryGetValue("x", out var xValue) || !xy.TryGetValue("y", out var yValue))
-            {
-                throw new FormatException($"{path}: both x and y are required.");
-            }
-
-            TryResolveLength(xValue, 100f, path + ".x", out _);
-            TryResolveLength(yValue, 100f, path + ".y", out _);
         }
 
         private static void MapTextStyle(

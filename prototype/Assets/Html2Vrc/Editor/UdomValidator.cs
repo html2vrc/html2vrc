@@ -651,20 +651,24 @@ namespace Html2Vrc.Editor
                 style.backgroundType,
                 "radial-gradient",
                 StringComparison.OrdinalIgnoreCase);
-            if (!isLinear && !isRadial)
+            var isConic = string.Equals(
+                style.backgroundType,
+                "conic-gradient",
+                StringComparison.OrdinalIgnoreCase);
+            if (!isLinear && !isRadial && !isConic)
             {
                 AddError(result, path + ".backgroundType", $"unsupported background type '{style.backgroundType}'.");
                 return;
             }
 
-            if (isLinear
+            if ((isLinear || isConic)
                 && (float.IsNaN(style.backgroundGradientAngle)
                     || float.IsInfinity(style.backgroundGradientAngle)))
             {
                 AddError(result, path + ".backgroundGradientAngle", "gradient angle must be finite.");
             }
 
-            if (isRadial)
+            if (isRadial || isConic)
             {
                 ValidateVector(
                     style.backgroundGradientCenter,
@@ -677,18 +681,21 @@ namespace Html2Vrc.Editor
                     2,
                     path + ".backgroundGradientCenterIsPercent",
                     result);
-                ValidateVector(
-                    style.backgroundGradientRadius,
-                    2,
-                    path + ".backgroundGradientRadius",
-                    result,
-                    requirePositive: false,
-                    requireNonNegative: true);
-                ValidateBooleanVector(
-                    style.backgroundGradientRadiusIsPercent,
-                    2,
-                    path + ".backgroundGradientRadiusIsPercent",
-                    result);
+                if (isRadial)
+                {
+                    ValidateVector(
+                        style.backgroundGradientRadius,
+                        2,
+                        path + ".backgroundGradientRadius",
+                        result,
+                        requirePositive: false,
+                        requireNonNegative: true);
+                    ValidateBooleanVector(
+                        style.backgroundGradientRadiusIsPercent,
+                        2,
+                        path + ".backgroundGradientRadiusIsPercent",
+                        result);
+                }
             }
 
             var positions = style.backgroundGradientPositions;

@@ -28,12 +28,13 @@
 - canonical per-edge solid border의 비대칭 폭·색 정규화, 레이아웃 비간섭 overlay 생성, anchor/offset, draw order, 안정 재생성과 edge·overlay 정리를 확인했다.
 - canonical linear-gradient의 임의 각도와 다중 stop을 1025×1 LUT Texture와 UI Material로 생성하고, 에셋 경로·재사용·단색 전환 정리와 VRChat 허용 컴포넌트 검사 뒤 Image/Shader 보존을 확인했다.
 - canonical radial-gradient의 center/radius mixed unit 보존, 최종 Layout Rect 기반 타원 계산, 다중 stop LUT, radius SDF 합성, linear 전환 시 Material/Texture GUID 재사용과 VRChat 허용 컴포넌트 검사를 확인했다.
+- canonical conic-gradient의 위쪽 0°·시계 방향 순회, start angle과 mixed unit center 보존, 다중 stop LUT, radius SDF 합성, radial 전환 시 GUID 재사용과 VRChat 허용 컴포넌트 검사를 확인했다.
 - canonical per-corner radius의 절대값·percentage 해석, SDF Material, 최종 Layout Rect 기반 갱신, 과도한 반지름 비율 정규화, gradient 합성, 투명 image 자식 stencil clipping, Material 안정 재사용·정리와 VRChat 허용 컴포넌트 검사를 확인했다.
 
 자동 검증 결과:
 
-- `npm run check`: UDOM conformance 25/25, React 5/5, TypeScript typecheck와 build 통과
-- Unity EditMode `Html2Vrc.Tests.UdomPrototypeTests`: **26/26 통과, 실패 0**
+- `npm run check`: UDOM conformance 26/26, React 5/5, TypeScript typecheck와 build 통과
+- Unity EditMode `Html2Vrc.Tests.UdomPrototypeTests`: **27/27 통과, 실패 0**
 - Unity 종료 코드 0, C# 컴파일 오류 0
 - Windows CRLF에서 기존 HTML 재생성 테스트가 문자열을 교체하지 못하던 문제도 함께 수정했다.
 
@@ -63,7 +64,7 @@
 
 ## 자동 회귀 검증
 
-HTML2VRC 전용 Unity Test Framework 테스트 26개를 실행한다. 검증 범위는 다음과 같다.
+HTML2VRC 전용 Unity Test Framework 테스트 27개를 실행한다. 검증 범위는 다음과 같다.
 
 1. 샘플 UDOM Validation 성공과 잘못된 속성/중복 ID 거부
 2. Canvas, TextMeshProUGUI, Image, Button, ScrollRect, LayoutGroup과 VRChat용 `VRCUiShape` 생성
@@ -91,11 +92,12 @@ HTML2VRC 전용 Unity Test Framework 테스트 26개를 실행한다. 검증 범
 24. canonical linear-gradient의 다중 stop LUT·각도 축, 영속 Material/Texture 안정 재사용, 단색 전환과 VRChat 허용 컴포넌트 검사
 25. canonical per-corner radius의 SDF Material, 인접 반지름 정규화, gradient 합성, stencil Mask 자식 clipping과 VRChat 허용 컴포넌트 검사
 26. canonical radial-gradient의 mixed unit center/radius 타원, 최종 Rect 계산, rounded Mask 합성, linear 전환 재사용과 VRChat 허용 컴포넌트 검사
+27. canonical conic-gradient의 위쪽 0°·시계 방향 진행, mixed unit center/start angle, rounded Mask 합성, radial 전환 재사용과 VRChat 허용 컴포넌트 검사
 
 최종 자동 테스트 결과:
 
-- 전체 26개
-- 통과 26개
+- 전체 27개
+- 통과 27개
 - 실패 0개
 - 건너뜀 0개
 - Unity 종료 코드 0

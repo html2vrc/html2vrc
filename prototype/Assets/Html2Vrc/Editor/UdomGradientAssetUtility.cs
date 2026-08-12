@@ -10,6 +10,7 @@ namespace Html2Vrc.Editor
     {
         public const string ShaderName = "HTML2VRC/UI Linear Gradient";
         public const string RadialShaderName = "HTML2VRC/UI Radial Gradient";
+        public const string ConicShaderName = "HTML2VRC/UI Conic Gradient";
         public const int LutWidth = 1025;
 
         private const string GeneratedRoot = "Assets/Html2VrcGenerated";
@@ -111,6 +112,21 @@ namespace Html2Vrc.Editor
                     "_GradientRadius",
                     new Vector4(Mathf.Max(0f, radius.x), Mathf.Max(0f, radius.y), 0f, 0f));
             }
+            else if (string.Equals(
+                         style.backgroundType,
+                         "conic-gradient",
+                         StringComparison.OrdinalIgnoreCase))
+            {
+                var center = ResolveVector(
+                    style.backgroundGradientCenter,
+                    style.backgroundGradientCenterIsPercent,
+                    size,
+                    new Vector2(50f, 50f));
+                material.SetVector(
+                    "_GradientCenter",
+                    new Vector4(-size.x * 0.5f + center.x, size.y * 0.5f - center.y, 0f, 0f));
+                material.SetFloat("_GradientStart", style.backgroundGradientAngle / 360f);
+            }
             else
             {
                 var radians = style.backgroundGradientAngle * Mathf.Deg2Rad;
@@ -124,13 +140,15 @@ namespace Html2Vrc.Editor
         public static bool IsGradientType(string backgroundType)
         {
             return string.Equals(backgroundType, "linear-gradient", StringComparison.OrdinalIgnoreCase)
-                   || string.Equals(backgroundType, "radial-gradient", StringComparison.OrdinalIgnoreCase);
+                   || string.Equals(backgroundType, "radial-gradient", StringComparison.OrdinalIgnoreCase)
+                   || string.Equals(backgroundType, "conic-gradient", StringComparison.OrdinalIgnoreCase);
         }
 
         public static bool IsShader(string shaderName)
         {
             return string.Equals(shaderName, ShaderName, StringComparison.Ordinal)
-                   || string.Equals(shaderName, RadialShaderName, StringComparison.Ordinal);
+                   || string.Equals(shaderName, RadialShaderName, StringComparison.Ordinal)
+                   || string.Equals(shaderName, ConicShaderName, StringComparison.Ordinal);
         }
 
         public static void DeleteGeneratedAssets(TextAsset sourceAsset, string stableId)
@@ -210,6 +228,16 @@ namespace Html2Vrc.Editor
             return UdomBuilderUtility.ParseColor(colors[colors.Length - 1], Color.clear);
         }
 
+        public static float EvaluateConicPosition(
+            Vector2 localPosition,
+            Vector2 localCenter,
+            float startAngle)
+        {
+            var delta = localPosition - localCenter;
+            var turns = Mathf.Atan2(delta.x, delta.y) / (Mathf.PI * 2f);
+            return Mathf.Repeat(turns - startAngle / 360f, 1f);
+        }
+
         private static Material GetTransientMaterial(Image image, Shader shader)
         {
             var current = image.material;
@@ -235,11 +263,19 @@ namespace Html2Vrc.Editor
 
         private static string GetShaderName(string backgroundType)
         {
+            if (string.Equals(
+                    backgroundType,
+                    "radial-gradient",
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                return RadialShaderName;
+            }
+
             return string.Equals(
                 backgroundType,
-                "radial-gradient",
+                "conic-gradient",
                 StringComparison.OrdinalIgnoreCase)
-                ? RadialShaderName
+                ? ConicShaderName
                 : ShaderName;
         }
 

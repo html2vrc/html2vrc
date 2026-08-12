@@ -51,8 +51,10 @@ namespace Html2Vrc.Tests
             {
                 UdomGradientAssetUtility.DeleteGeneratedAssets(sample, "gradient-panel");
                 UdomGradientAssetUtility.DeleteGeneratedAssets(sample, "radial-panel");
+                UdomGradientAssetUtility.DeleteGeneratedAssets(sample, "conic-panel");
                 UdomGradientAssetUtility.DeleteGeneratedAssets(sample, "radius-panel");
                 UdomRoundedCornerAssetUtility.DeleteGeneratedAssets(sample, "radial-panel");
+                UdomRoundedCornerAssetUtility.DeleteGeneratedAssets(sample, "conic-panel");
                 UdomRoundedCornerAssetUtility.DeleteGeneratedAssets(sample, "radius-panel");
             }
         }
@@ -1023,6 +1025,156 @@ namespace Html2Vrc.Tests
             Assert.That(
                 image.material.GetVector("_GradientAxis"),
                 Is.EqualTo(new Vector4(0f, 160f, 0f, 0f))
+                    .Using(Vector4ComparerWithEqualsOperator.Instance));
+
+            panelNode.style.backgroundType = "color";
+            panelNode.style.backgroundColor = "#123456FF";
+            panelNode.style.cornerRadius = new[] { 0f, 0f, 0f, 0f };
+            panelNode.style.cornerRadiusPercent = new[] { -1f, -1f, -1f, -1f };
+            UdomBuilder.GenerateOrRegenerate(validation.Document, root, sample);
+            Assert.That(UdomGradientAssetUtility.IsShader(image.material.shader.name), Is.False);
+            Assert.That(panel.GetComponent<Mask>(), Is.Null);
+            Assert.That(panel.GetComponent<RectMask2D>(), Is.Null);
+        }
+
+        [Test]
+        public void CanonicalConicGradient_GeneratesClockwiseLutMaterialAndRegeneratesStably()
+        {
+            var json = LoadRepositoryFile(
+                "packages",
+                "udom",
+                "fixtures",
+                "valid",
+                "unity-conic-gradient.udom.json");
+            var validation = UdomValidator.Validate(json);
+
+            Assert.That(validation.IsValid, Is.True, validation.Format());
+            Assert.That(validation.Issues, Is.Empty, validation.Format());
+            var panelNode = validation.Document.root.children.Single(node => node.id == "conic-panel");
+            Assert.That(panelNode.style.backgroundType, Is.EqualTo("conic-gradient"));
+            Assert.That(panelNode.style.backgroundGradientAngle, Is.EqualTo(45f));
+            Assert.That(panelNode.style.backgroundGradientCenter, Is.EqualTo(new[] { 60f, 45f }));
+            Assert.That(panelNode.style.backgroundGradientCenterIsPercent, Is.EqualTo(new[] { true, false }));
+            Assert.That(panelNode.style.backgroundGradientPositions, Is.EqualTo(new[] { 0f, 0.25f, 0.5f, 1f }));
+            Assert.That(
+                panelNode.style.backgroundGradientColors,
+                Is.EqualTo(new[] { "#FF0000FF", "#FFFF00FF", "#00FF00FF", "#0000FFFF" }));
+
+            const string defaultGeometryJson = @"{
+              ""asset"": { ""version"": ""0.1"" },
+              ""viewport"": { ""width"": 200, ""height"": 100 },
+              ""root"": {
+                ""type"": ""element"", ""id"": ""conic-defaults"", ""name"": ""view"",
+                ""style"": { ""paint"": { ""backgrounds"": [{
+                  ""type"": ""conic-gradient"",
+                  ""stops"": [
+                    { ""position"": 0, ""color"": ""#FFFFFFFF"" },
+                    { ""position"": 1, ""color"": ""#000000FF"" }
+                  ]
+                }] } }
+              }
+            }";
+            var defaultGeometry = UdomValidator.Validate(defaultGeometryJson);
+            Assert.That(defaultGeometry.IsValid, Is.True, defaultGeometry.Format());
+            Assert.That(defaultGeometry.Document.root.style.backgroundGradientAngle, Is.EqualTo(0f));
+            Assert.That(defaultGeometry.Document.root.style.backgroundGradientCenter, Is.EqualTo(new[] { 50f, 50f }));
+            Assert.That(defaultGeometry.Document.root.style.backgroundGradientCenterIsPercent, Is.EqualTo(new[] { true, true }));
+
+            Assert.That(
+                UdomGradientAssetUtility.EvaluateConicPosition(Vector2.up, Vector2.zero, 0f),
+                Is.EqualTo(0f).Within(0.0001f));
+            Assert.That(
+                UdomGradientAssetUtility.EvaluateConicPosition(Vector2.right, Vector2.zero, 0f),
+                Is.EqualTo(0.25f).Within(0.0001f));
+            Assert.That(
+                UdomGradientAssetUtility.EvaluateConicPosition(Vector2.down, Vector2.zero, 0f),
+                Is.EqualTo(0.5f).Within(0.0001f));
+            Assert.That(
+                UdomGradientAssetUtility.EvaluateConicPosition(Vector2.left, Vector2.zero, 0f),
+                Is.EqualTo(0.75f).Within(0.0001f));
+            Assert.That(
+                UdomGradientAssetUtility.EvaluateConicPosition(Vector2.right, Vector2.zero, 90f),
+                Is.EqualTo(0f).Within(0.0001f));
+
+            var build = UdomBuilder.GenerateOrRegenerate(validation.Document, null, sample);
+            var root = build.Root;
+            var panel = UdomBuilder.FindNode(root, "conic-panel");
+            var image = panel.GetComponent<Image>();
+            var material = image.material;
+            var texture = material.GetTexture("_GradientTex") as Texture2D;
+            var materialPath = AssetDatabase.GetAssetPath(material);
+            var texturePath = AssetDatabase.GetAssetPath(texture);
+            var materialGuid = AssetDatabase.AssetPathToGUID(materialPath);
+            var textureGuid = AssetDatabase.AssetPathToGUID(texturePath);
+            Assert.That(image.color, Is.EqualTo(Color.white).Using(ColorComparer.Instance));
+            Assert.That(material.shader.name, Is.EqualTo(UdomGradientAssetUtility.ConicShaderName));
+            Assert.That(materialPath, Does.StartWith("Assets/Html2VrcGenerated/Gradients/"));
+            Assert.That(texturePath, Does.StartWith("Assets/Html2VrcGenerated/Gradients/"));
+            Assert.That(texture, Is.Not.Null);
+            Assert.That(texture.width, Is.EqualTo(UdomGradientAssetUtility.LutWidth));
+            Assert.That(texture.GetPixel(0, 0), Is.EqualTo(Color.red).Using(ColorComparer.Instance));
+            Assert.That(
+                texture.GetPixel(texture.width / 4, 0),
+                Is.EqualTo(new Color(1f, 1f, 0f, 1f)).Using(ColorComparer.Instance));
+            Assert.That(texture.GetPixel(texture.width / 2, 0), Is.EqualTo(Color.green).Using(ColorComparer.Instance));
+            Assert.That(texture.GetPixel(texture.width - 1, 0), Is.EqualTo(Color.blue).Using(ColorComparer.Instance));
+            Assert.That(
+                material.GetVector("_GradientCenter"),
+                Is.EqualTo(new Vector4(36f, 35f, 0f, 0f))
+                    .Using(Vector4ComparerWithEqualsOperator.Instance));
+            Assert.That(material.GetFloat("_GradientStart"), Is.EqualTo(0.125f).Within(0.0001f));
+            Assert.That(
+                material.GetVector("_CornerRadii"),
+                Is.EqualTo(new Vector4(32f, 32f, 32f, 32f))
+                    .Using(Vector4ComparerWithEqualsOperator.Instance));
+            Assert.That(panel.GetComponent<Mask>(), Is.Not.Null);
+            Assert.That(panel.GetComponent<RectMask2D>(), Is.Null);
+
+#if UDONSHARP
+            var validationClone = Object.Instantiate(panel.gameObject);
+            try
+            {
+                WorldValidation.RemoveIllegalComponents(
+                    new List<GameObject> { validationClone },
+                    WorldValidation.WhiteListConfiguration.VRCSDK3);
+                Assert.That(validationClone.GetComponent<Image>(), Is.Not.Null);
+                Assert.That(validationClone.GetComponent<Mask>(), Is.Not.Null);
+                Assert.That(
+                    validationClone.GetComponent<Image>().material.shader.name,
+                    Is.EqualTo(UdomGradientAssetUtility.ConicShaderName));
+            }
+            finally
+            {
+                Object.DestroyImmediate(validationClone);
+            }
+#endif
+
+            panelNode.style.backgroundGradientAngle = 90f;
+            panelNode.style.backgroundGradientCenter = new[] { 10f, 20f };
+            panelNode.style.backgroundGradientCenterIsPercent = new[] { false, false };
+            UdomBuilder.GenerateOrRegenerate(validation.Document, root, sample);
+            var regeneratedMaterial = image.material;
+            var regeneratedTexture = regeneratedMaterial.GetTexture("_GradientTex") as Texture2D;
+            Assert.That(AssetDatabase.GetAssetPath(regeneratedMaterial), Is.EqualTo(materialPath));
+            Assert.That(AssetDatabase.GetAssetPath(regeneratedTexture), Is.EqualTo(texturePath));
+            Assert.That(AssetDatabase.AssetPathToGUID(materialPath), Is.EqualTo(materialGuid));
+            Assert.That(AssetDatabase.AssetPathToGUID(texturePath), Is.EqualTo(textureGuid));
+            Assert.That(
+                regeneratedMaterial.GetVector("_GradientCenter"),
+                Is.EqualTo(new Vector4(-170f, 60f, 0f, 0f))
+                    .Using(Vector4ComparerWithEqualsOperator.Instance));
+            Assert.That(regeneratedMaterial.GetFloat("_GradientStart"), Is.EqualTo(0.25f).Within(0.0001f));
+
+            panelNode.style.backgroundType = "radial-gradient";
+            panelNode.style.backgroundGradientRadius = new[] { 50f, 50f };
+            panelNode.style.backgroundGradientRadiusIsPercent = new[] { true, true };
+            UdomBuilder.GenerateOrRegenerate(validation.Document, root, sample);
+            Assert.That(image.material.shader.name, Is.EqualTo(UdomGradientAssetUtility.RadialShaderName));
+            Assert.That(AssetDatabase.GetAssetPath(image.material), Is.EqualTo(materialPath));
+            Assert.That(AssetDatabase.AssetPathToGUID(materialPath), Is.EqualTo(materialGuid));
+            Assert.That(
+                image.material.GetVector("_GradientRadius"),
+                Is.EqualTo(new Vector4(180f, 80f, 0f, 0f))
                     .Using(Vector4ComparerWithEqualsOperator.Instance));
 
             panelNode.style.backgroundType = "color";
