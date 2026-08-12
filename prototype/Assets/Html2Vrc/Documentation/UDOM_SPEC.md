@@ -58,6 +58,8 @@ Canonical `linear-gradient`는 임의 각도와 두 개 이상의 color stop을 
 
 Canonical `radial-gradient`는 같은 LUT와 별도 VRChat-safe UI Shader로 렌더링한다. `center.x/y`와 타원형 `radius.x/y`는 design-unit과 percentage 여부를 내부 모델에 함께 보존하고, percentage는 Layout이 끝난 최종 Rect의 width/height 축을 기준으로 해석한다. 생략되거나 `auto`인 축은 canonical 기본값 `50%`를 사용한다. Material과 LUT는 linear gradient와 같은 안정 경로를 사용하며 두 gradient 종류 사이를 전환해도 에셋 GUID를 유지한다.
 
+제한형 HTML의 단일 `radial-gradient`는 `ellipse`의 두 px·percentage 반지름, `circle` 또는 shape 생략형의 단일 px 반지름, 선택적 `at` 중심을 위 canonical mixed-unit geometry로 정규화한다. Geometry 생략과 `at` 단독 prelude는 중심·반지름 모두 `50%`인 canonical 기본값을 사용한다. Stop 해석과 currentColor, LUT 및 none/단색 재생성 수명주기는 linear-gradient와 공유하며, Layout Rect가 있어야 정해지는 CSS size keyword와 암시적 circle 크기는 명시적 오류로 거부한다.
+
 Canonical `conic-gradient`는 같은 LUT와 전용 UI Shader로 렌더링한다. 생략된 시작 `angle`은 `0`이며 중심에서 위쪽으로 향하는 선을 기준으로 stop을 시계 방향으로 순회한다. `center.x/y`의 design-unit·percentage 보존과 최종 Layout Rect 계산, 안정 Material/LUT 경로 및 radius SDF 합성은 radial gradient와 동일하다.
 
 Canonical `paint.radius`는 `[topLeft, topRight, bottomRight, bottomLeft]` design-unit 배열로 보존한다. percentage는 박스의 짧은 변을 기준으로 해석하고, 같은 변에 닿는 두 radius의 합이 변보다 크면 네 값을 같은 비율로 줄인다. 단색 배경은 rounded-corner SDF Material, linear/radial/conic gradient는 같은 SDF 계산을 합성한 gradient Material을 사용한다. 자식이 있는 노드는 Unity `Mask`로 같은 곡선을 stencil에 기록하며, 투명한 image 부모는 Graphic을 표시하지 않은 채 자식만 자른다. source TextAsset 기반 Material은 `Assets/Html2VrcGenerated/RoundedCorners` 아래 source GUID와 node ID 기반 안정 경로로 갱신된다.

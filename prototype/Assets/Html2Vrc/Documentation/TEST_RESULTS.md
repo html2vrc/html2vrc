@@ -48,7 +48,8 @@
 - 제한형 HTML `<img>`의 Texture2D/Sprite 자동 구분과 CSS object-fit fill/contain/cover/none, object-position의 px·percentage·방향 키워드를 canonical 이미지 콘텐츠 경로로 연결했다. 실제 원본 크기 기반 배치·clipping, normalized JSON, 재생성 시 안정 내부 콘텐츠와 지원하지 않는 문법 진단을 확인했다.
 - 제한형 HTML CSS의 border shorthand와 width/style/color·edge longhand를 source-order로 합성했다. CurrentColor, 비대칭 width/color, px corner radius, canonical SDF border·rounded mask, normalized JSON, 스타일 제거 시 원본 GameObject 재사용과 overlay·mask 정리, dashed·percentage·타원형 radius 오류를 확인했다.
 - 제한형 HTML CSS의 다중 box-shadow를 canonical paint 순서에 맞게 역전했다. Outer·inset, 음수 offset·spread, blur, currentColor, radius-aware SDF geometry, normalized JSON, layer 순서, none 전환 시 원본 노드 재사용과 wrapper 정리, 잘못된 blur·offset·percentage·none·inset 진단을 확인했다.
-- 제한형 HTML CSS의 background/background-image 단일 linear-gradient를 canonical LUT paint로 변환했다. CSS angle·cardinal 방향, percentage·생략 stop 보간, 감소 위치 fix-up, transparent·currentColor, normalized JSON, LUT 픽셀·axis·rounded mask, angle 변경 시 material/texture 재사용과 none→단색 복원, corner·px·단일 stop·radial·rgb 오류를 확인했다.
+- 제한형 HTML CSS의 background/background-image 단일 linear-gradient를 canonical LUT paint로 변환했다. CSS angle·cardinal 방향, percentage·생략 stop 보간, 감소 위치 fix-up, transparent·currentColor, normalized JSON, LUT 픽셀·axis·rounded mask, angle 변경 시 material/texture 재사용과 none→단색 복원, corner·px·단일 stop·conic·rgb 오류를 확인했다.
+- 제한형 HTML CSS의 background/background-image 단일 radial-gradient를 canonical mixed-unit radial paint로 변환했다. Ellipse의 px·percentage X/Y 반지름, circle의 절대 반지름, 중심 keyword·축 순서, 기본 geometry, 공통 stop 보간·currentColor, normalized JSON, LUT 픽셀·material geometry·rounded mask, geometry 변경 재사용과 none→단색 복원, percentage circle·누락/음수 반지름·size keyword·잘못된 중심·단일 stop·rgb 오류를 확인했다.
 - 제한형 HTML CSS의 숫자·percentage opacity, visible/hidden visibility, auto·정수 z-index를 canonical paint state와 stacking에 연결했다. 중첩 alpha, hidden layout·입력 차단, opacity 0 입력 유지, flex 위치와 paint 순서 분리, margin·transform wrapper, normalized JSON, 기본값 복원 시 CanvasGroup·paint state 제거와 native Layout Group·GameObject 재사용, 범위·collapse·소수 오류를 확인했다.
 - canonical flex의 wrap·wrap-reverse, alignContent 여섯 모드, 물리 row/column gap을 결정론적인 multi-line 배치로 해석했다. Line별 grow/max 재분배, reverse 주·교차축, alignSelf와 stretch, top-left Rect bake, nowrap 전환과 normalized JSON round-trip을 확인했다.
 - canonical font resource의 문서 상대 경로를 기존 TMP Font Asset 또는 TTF/OTF Unity Font로 해석했다. Source font는 GUID 기반 안정 경로의 dynamic TMP asset으로 생성하며 Text·TextInput·placeholder 적용, normalized JSON round-trip, 반복 재생성의 asset GUID·GameObject 재사용, 누락 경로의 기본 TMP font 폴백을 확인했다.
@@ -58,7 +59,7 @@
 자동 검증 결과:
 
 - `npm run check`: UDOM conformance 39/39, React 5/5, TypeScript typecheck와 build 통과
-- Unity EditMode `Html2Vrc.Tests.UdomPrototypeTests`: **52/52 통과, 실패 0**
+- Unity EditMode `Html2Vrc.Tests.UdomPrototypeTests`: **53/53 통과, 실패 0**
 - Unity 종료 코드 0, C# 컴파일 오류 0
 - Windows CRLF에서 기존 HTML 재생성 테스트가 문자열을 교체하지 못하던 문제도 함께 수정했다.
 
@@ -142,11 +143,12 @@ HTML2VRC 전용 Unity Test Framework 테스트 52개를 실행한다. 검증 범
 50. 제한형 HTML 다중 box-shadow의 CSS/canonical paint 순서 변환, outer·inset geometry, offset·blur·spread·currentColor, SDF layer·none 수명주기와 오류 진단 검증
 51. 제한형 HTML linear-gradient의 angle·cardinal 방향, percentage·생략 stop 보간과 fix-up, currentColor, LUT·axis·rounded mask, paint 전환 재사용·정리와 미지원 문법 진단 검증
 52. 제한형 HTML opacity·visibility·z-index의 CanvasGroup 합성, hidden/transparent 입력 차이, flex 좌표·paint-order 분리, wrapper·normalized 상태와 기본 복원 수명주기 검증
+53. 제한형 HTML radial-gradient의 mixed-unit ellipse·absolute circle·중심 위치·기본 geometry, 공통 stop 보간, LUT·rounded mask, geometry 변경 재사용·none 정리와 미지원 문법 진단 검증
 
 최종 자동 테스트 결과:
 
-- 전체 52개
-- 통과 52개
+- 전체 53개
+- 통과 53개
 - 실패 0개
 - 건너뜀 0개
 - Unity 종료 코드 0

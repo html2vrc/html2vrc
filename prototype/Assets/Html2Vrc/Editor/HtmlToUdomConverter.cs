@@ -487,7 +487,7 @@ namespace Html2Vrc.Editor
             var hasBorderDeclaration = false;
             List<CssBoxShadow> boxShadows = null;
             var hasBoxShadowDeclaration = false;
-            CssLinearGradient backgroundGradient = null;
+            CssBackgroundGradient backgroundGradient = null;
             foreach (var declaration in declarations)
             {
                 switch (declaration.Key)
@@ -957,7 +957,7 @@ namespace Html2Vrc.Editor
             }
             if (backgroundGradient != null)
             {
-                ApplyCssLinearGradient(style, backgroundGradient);
+                ApplyCssBackgroundGradient(style, backgroundGradient);
             }
 
             ConfigureOverflow(style, overflowX, overflowY, path, result);
@@ -1762,7 +1762,7 @@ namespace Html2Vrc.Editor
             string path,
             HtmlToUdomResult result,
             UdomStyle style,
-            out CssLinearGradient gradient)
+            out CssBackgroundGradient gradient)
         {
             var value = source.Trim();
             if (string.Equals(value, "none", StringComparison.OrdinalIgnoreCase))
@@ -1773,9 +1773,9 @@ namespace Html2Vrc.Editor
                 return true;
             }
 
-            if (value.StartsWith("linear-gradient", StringComparison.OrdinalIgnoreCase))
+            if (IsSupportedCssGradientFunction(value))
             {
-                gradient = ParseCssLinearGradient(value, path, result);
+                gradient = ParseCssBackgroundGradient(value, path, result);
                 if (gradient != null)
                 {
                     style.backgroundColor = "#00000000";
@@ -1796,7 +1796,7 @@ namespace Html2Vrc.Editor
             AddError(
                 result,
                 path + "/@style",
-                $"background 값 '{source}'은 지원하지 않는다. 단일 hex color, transparent, linear-gradient 또는 none만 사용할 수 있다.");
+                $"background 값 '{source}'은 지원하지 않는다. 단일 hex color, transparent, linear-gradient, radial-gradient 또는 none만 사용할 수 있다.");
             gradient = null;
             return false;
         }
@@ -1806,7 +1806,7 @@ namespace Html2Vrc.Editor
             string path,
             HtmlToUdomResult result,
             UdomStyle style,
-            out CssLinearGradient gradient)
+            out CssBackgroundGradient gradient)
         {
             var value = source.Trim();
             if (string.Equals(value, "none", StringComparison.OrdinalIgnoreCase))
@@ -1816,21 +1816,40 @@ namespace Html2Vrc.Editor
                 return true;
             }
 
-            if (value.StartsWith("linear-gradient", StringComparison.OrdinalIgnoreCase))
+            if (IsSupportedCssGradientFunction(value))
             {
-                gradient = ParseCssLinearGradient(value, path, result);
+                gradient = ParseCssBackgroundGradient(value, path, result);
                 return gradient != null;
             }
 
             AddError(
                 result,
                 path + "/@style",
-                $"background-image 값 '{source}'은 지원하지 않는다. 단일 linear-gradient 또는 none만 사용할 수 있다.");
+                $"background-image 값 '{source}'은 지원하지 않는다. 단일 linear-gradient, radial-gradient 또는 none만 사용할 수 있다.");
             gradient = null;
             return false;
         }
 
-        private static CssLinearGradient ParseCssLinearGradient(
+        private static bool IsSupportedCssGradientFunction(string source)
+        {
+            return source.StartsWith("linear-gradient", StringComparison.OrdinalIgnoreCase)
+                   || source.StartsWith("radial-gradient", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static CssBackgroundGradient ParseCssBackgroundGradient(
+            string source,
+            string path,
+            HtmlToUdomResult result)
+        {
+            if (source.StartsWith("linear-gradient", StringComparison.OrdinalIgnoreCase))
+            {
+                return ParseCssLinearGradient(source, path, result);
+            }
+
+            return ParseCssRadialGradient(source, path, result);
+        }
+
+        private static CssBackgroundGradient ParseCssLinearGradient(
             string source,
             string path,
             HtmlToUdomResult result)
@@ -1885,14 +1904,292 @@ namespace Html2Vrc.Editor
                 }
             }
 
-            var stopCount = parts.Length - firstStop;
-            if (stopCount < 2)
+            if (!TryParseCssGradientStops(
+                    parts,
+                    firstStop,
+                    functionName,
+                    path,
+                    result,
+                    out var colors,
+                    out var positions))
             {
-                AddError(result, path + "/@style", "linear-gradient에는 color stop이 두 개 이상 필요하다.");
                 return null;
             }
 
-            var colors = new string[stopCount];
+            return new CssBackgroundGradient
+            {
+                Type = "linear-gradient",
+                Angle = angle,
+                Colors = colors,
+                Positions = positions
+            };
+        }
+
+        private static CssBackgroundGradient ParseCssRadialGradient(
+            string source,
+            string path,
+            HtmlToUdomResult result)
+        {
+            const string functionName = "radial-gradient";
+            var value = source.Trim();
+            if (!value.StartsWith(functionName + "(", StringComparison.OrdinalIgnoreCase)
+                || !value.EndsWith(")", StringComparison.Ordinal))
+            {
+                AddError(result, path + "/@style", $"radial-gradient 형식 '{source}'이 잘못됐다.");
+                return null;
+            }
+
+            var body = value.Substring(functionName.Length + 1, value.Length - functionName.Length - 2);
+            if (body.IndexOf('(') >= 0 || body.IndexOf(')') >= 0)
+            {
+                AddError(
+                    result,
+                    path + "/@style",
+                    "radial-gradient 안의 rgb(), hsl(), calc() 또는 다중 background 함수는 지원하지 않는다.");
+                return null;
+            }
+
+            var parts = body.Split(',');
+            if (parts.Any(part => string.IsNullOrWhiteSpace(part)))
+            {
+                AddError(result, path + "/@style", "radial-gradient에 빈 항목이 있다.");
+                return null;
+            }
+
+            var gradient = new CssBackgroundGradient { Type = "radial-gradient" };
+            var firstStop = 0;
+            if (parts.Length > 0 && !LooksLikeSupportedGradientStop(parts[0]))
+            {
+                if (!TryParseCssRadialPrelude(parts[0], path, result, gradient))
+                {
+                    return null;
+                }
+
+                firstStop = 1;
+            }
+
+            if (!TryParseCssGradientStops(
+                    parts,
+                    firstStop,
+                    functionName,
+                    path,
+                    result,
+                    out var colors,
+                    out var positions))
+            {
+                return null;
+            }
+
+            gradient.Colors = colors;
+            gradient.Positions = positions;
+            return gradient;
+        }
+
+        private static bool LooksLikeSupportedGradientStop(string source)
+        {
+            var tokens = source.Split(
+                new[] { ' ', '\t', '\r', '\n' },
+                StringSplitOptions.RemoveEmptyEntries);
+            return tokens.Length > 0 && TryNormalizeBorderColor(tokens[0], out _);
+        }
+
+        private static bool TryParseCssRadialPrelude(
+            string source,
+            string path,
+            HtmlToUdomResult result,
+            CssBackgroundGradient gradient)
+        {
+            var tokens = source.Split(
+                new[] { ' ', '\t', '\r', '\n' },
+                StringSplitOptions.RemoveEmptyEntries);
+            var atIndex = -1;
+            for (var index = 0; index < tokens.Length; index++)
+            {
+                if (!string.Equals(tokens[index], "at", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                if (atIndex >= 0)
+                {
+                    AddError(result, path + "/@style", $"radial-gradient geometry '{source}'에 at이 두 번 있다.");
+                    return false;
+                }
+
+                atIndex = index;
+            }
+
+            var geometryCount = atIndex >= 0 ? atIndex : tokens.Length;
+            var geometryStart = 0;
+            string shape = null;
+            if (geometryCount > 0
+                && (string.Equals(tokens[0], "circle", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(tokens[0], "ellipse", StringComparison.OrdinalIgnoreCase)))
+            {
+                shape = tokens[0].ToLowerInvariant();
+                geometryStart = 1;
+            }
+
+            var radiusCount = geometryCount - geometryStart;
+            if (shape == "circle" || (shape == null && radiusCount == 1))
+            {
+                if (radiusCount != 1
+                    || !TryParseCssGradientLength(tokens[geometryStart], false, out var radius, out _))
+                {
+                    AddError(
+                        result,
+                        path + "/@style",
+                        "radial-gradient circle은 0 이상의 단일 px 반지름이 필요하며 percentage는 지원하지 않는다.");
+                    return false;
+                }
+
+                gradient.Radius = new[] { radius, radius };
+                gradient.RadiusIsPercent = new[] { false, false };
+            }
+            else if (shape == "ellipse" || radiusCount != 0)
+            {
+                if (radiusCount != 2
+                    || !TryParseCssGradientLength(
+                        tokens[geometryStart],
+                        true,
+                        out var radiusX,
+                        out var radiusXIsPercent)
+                    || !TryParseCssGradientLength(
+                        tokens[geometryStart + 1],
+                        true,
+                        out var radiusY,
+                        out var radiusYIsPercent))
+                {
+                    AddError(
+                        result,
+                        path + "/@style",
+                        "radial-gradient ellipse는 0 이상의 px 또는 percentage 반지름 두 개가 필요하다.");
+                    return false;
+                }
+
+                gradient.Radius = new[] { radiusX, radiusY };
+                gradient.RadiusIsPercent = new[] { radiusXIsPercent, radiusYIsPercent };
+            }
+
+            if (atIndex < 0)
+            {
+                return true;
+            }
+
+            var positionCount = tokens.Length - atIndex - 1;
+            if (positionCount < 1 || positionCount > 2
+                || !TryParseCssGradientPosition(
+                    tokens.Skip(atIndex + 1).ToArray(),
+                    out var center,
+                    out var centerIsPercent))
+            {
+                AddError(
+                    result,
+                    path + "/@style",
+                    $"radial-gradient 중심 '{source}'은 1~2개의 px, percentage 또는 방향 keyword여야 한다.");
+                return false;
+            }
+
+            gradient.Center = center;
+            gradient.CenterIsPercent = centerIsPercent;
+            return true;
+        }
+
+        private static bool TryParseCssGradientLength(
+            string source,
+            bool allowPercentage,
+            out float value,
+            out bool isPercent)
+        {
+            if (!TryParseTransformLength(source, out value, out isPercent)
+                || float.IsNaN(value)
+                || float.IsInfinity(value)
+                || value < 0f
+                || (isPercent && !allowPercentage))
+            {
+                value = 0f;
+                isPercent = false;
+                return false;
+            }
+
+            return true;
+        }
+
+        private static bool TryParseCssGradientPosition(
+            string[] tokens,
+            out float[] center,
+            out bool[] centerIsPercent)
+        {
+            string xSource;
+            string ySource;
+            if (tokens.Length == 1)
+            {
+                if (IsVerticalOriginKeyword(tokens[0]))
+                {
+                    xSource = "center";
+                    ySource = tokens[0];
+                }
+                else
+                {
+                    xSource = tokens[0];
+                    ySource = "center";
+                }
+            }
+            else if (tokens.Length == 2
+                     && (IsVerticalOriginKeyword(tokens[0])
+                         || IsHorizontalOriginKeyword(tokens[1])))
+            {
+                xSource = tokens[1];
+                ySource = tokens[0];
+            }
+            else if (tokens.Length == 2)
+            {
+                xSource = tokens[0];
+                ySource = tokens[1];
+            }
+            else
+            {
+                center = null;
+                centerIsPercent = null;
+                return false;
+            }
+
+            if (!TryParseOriginCoordinate(xSource, 0, out var x, out var xIsPercent)
+                || !TryParseOriginCoordinate(ySource, 1, out var y, out var yIsPercent)
+                || float.IsNaN(x)
+                || float.IsInfinity(x)
+                || float.IsNaN(y)
+                || float.IsInfinity(y))
+            {
+                center = null;
+                centerIsPercent = null;
+                return false;
+            }
+
+            center = new[] { x, y };
+            centerIsPercent = new[] { xIsPercent, yIsPercent };
+            return true;
+        }
+
+        private static bool TryParseCssGradientStops(
+            string[] parts,
+            int firstStop,
+            string functionName,
+            string path,
+            HtmlToUdomResult result,
+            out string[] colors,
+            out float[] resolvedPositions)
+        {
+            var stopCount = parts.Length - firstStop;
+            if (stopCount < 2)
+            {
+                AddError(result, path + "/@style", $"{functionName}에는 color stop이 두 개 이상 필요하다.");
+                colors = null;
+                resolvedPositions = null;
+                return false;
+            }
+
+            colors = new string[stopCount];
             var positions = new float?[stopCount];
             for (var index = 0; index < stopCount; index++)
             {
@@ -1906,31 +2203,33 @@ namespace Html2Vrc.Editor
                     AddError(
                         result,
                         path + "/@style",
-                        $"linear-gradient stop {index + 1} '{stopSource}'은 hex color와 선택적 percentage 하나만 지원한다.");
-                    return null;
+                        $"{functionName} stop {index + 1} '{stopSource}'은 hex color와 선택적 percentage 하나만 지원한다.");
+                    colors = null;
+                    resolvedPositions = null;
+                    return false;
                 }
 
-                if (stopParts.Length == 2)
+                if (stopParts.Length != 2)
                 {
-                    if (!TryParseGradientStopPosition(stopParts[1], out var position))
-                    {
-                        AddError(
-                            result,
-                            path + "/@style",
-                            $"linear-gradient stop {index + 1} 위치 '{stopParts[1]}'은 0%~100% percentage여야 한다.");
-                        return null;
-                    }
-
-                    positions[index] = position;
+                    continue;
                 }
+
+                if (!TryParseGradientStopPosition(stopParts[1], out var position))
+                {
+                    AddError(
+                        result,
+                        path + "/@style",
+                        $"{functionName} stop {index + 1} 위치 '{stopParts[1]}'은 0%~100% percentage여야 한다.");
+                    colors = null;
+                    resolvedPositions = null;
+                    return false;
+                }
+
+                positions[index] = position;
             }
 
-            return new CssLinearGradient
-            {
-                Angle = angle,
-                Colors = colors,
-                Positions = ResolveCssGradientStopPositions(positions)
-            };
+            resolvedPositions = ResolveCssGradientStopPositions(positions);
+            return true;
         }
 
         private static bool TryParseCssGradientDirection(
@@ -2049,7 +2348,7 @@ namespace Html2Vrc.Editor
             return result.Select(item => item.Value).ToArray();
         }
 
-        private static void ApplyCssLinearGradient(UdomStyle style, CssLinearGradient gradient)
+        private static void ApplyCssBackgroundGradient(UdomStyle style, CssBackgroundGradient gradient)
         {
             var colors = new string[gradient.Colors.Length];
             for (var index = 0; index < colors.Length; index++)
@@ -2059,10 +2358,15 @@ namespace Html2Vrc.Editor
                     : gradient.Colors[index];
             }
 
-            style.backgroundType = "linear-gradient";
+            ClearBackgroundGradient(style);
+            style.backgroundType = gradient.Type;
             style.backgroundGradientAngle = gradient.Angle;
             style.backgroundGradientPositions = gradient.Positions;
             style.backgroundGradientColors = colors;
+            style.backgroundGradientCenter = gradient.Center;
+            style.backgroundGradientCenterIsPercent = gradient.CenterIsPercent;
+            style.backgroundGradientRadius = gradient.Radius;
+            style.backgroundGradientRadiusIsPercent = gradient.RadiusIsPercent;
             style.backgroundColor = colors[0];
         }
 
@@ -2098,11 +2402,16 @@ namespace Html2Vrc.Editor
             return false;
         }
 
-        private sealed class CssLinearGradient
+        private sealed class CssBackgroundGradient
         {
-            public float Angle;
+            public string Type;
+            public float Angle = 180f;
             public float[] Positions;
             public string[] Colors;
+            public float[] Center = { 50f, 50f };
+            public bool[] CenterIsPercent = { true, true };
+            public float[] Radius = { 50f, 50f };
+            public bool[] RadiusIsPercent = { true, true };
         }
 
         private static void SetObjectFit(

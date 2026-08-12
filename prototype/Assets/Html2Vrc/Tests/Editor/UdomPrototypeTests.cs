@@ -3420,13 +3420,176 @@ namespace Html2Vrc.Tests
             Assert.That(oneStop.IsValid, Is.False);
             Assert.That(oneStop.Format(), Does.Contain("두 개 이상"));
 
-            var radial = HtmlToUdomConverter.Convert(
-                html.Replace("linear-gradient(0.25turn", "radial-gradient(circle"));
-            Assert.That(radial.IsValid, Is.False);
-            Assert.That(radial.Format(), Does.Contain("background-image"));
+            var conic = HtmlToUdomConverter.Convert(
+                html.Replace("linear-gradient(0.25turn", "conic-gradient(from 0deg"));
+            Assert.That(conic.IsValid, Is.False);
+            Assert.That(conic.Format(), Does.Contain("background-image"));
 
             var nestedColor = HtmlToUdomConverter.Convert(
                 html.Replace("#FF0000FF 0%", "rgb(255, 0, 0) 0%"));
+            Assert.That(nestedColor.IsValid, Is.False);
+            Assert.That(nestedColor.Format(), Does.Contain("rgb()"));
+        }
+
+        [Test]
+        public void HtmlConverter_RadialGradientMapsMixedGeometryAndRegeneratesStably()
+        {
+            const string html = @"
+              <main id=""html-radial-root"" data-canvas-size=""1100 220""
+                style=""width: 1100px; height: 220px; display: flex; align-items: flex-start; padding: 40px; gap: 20px"">
+                <section id=""html-radial-panel""
+                  style=""width: 300px; height: 140px; border-radius: 24px;
+                    background-image: radial-gradient(ellipse 45% 60px at 25% bottom, #FF0000FF 10%, currentColor, transparent 90%);
+                    color: #0000FFFF""></section>
+                <section id=""html-radial-circle""
+                  style=""width: 300px; height: 140px;
+                    background: radial-gradient(circle 48px at top 30px, #00FF00FF 20%, #FFFFFFFF 80%)""></section>
+                <section id=""html-radial-defaults""
+                  style=""width: 300px; height: 140px;
+                    background-image: radial-gradient(#112233FF, #445566FF)""></section>
+              </main>";
+
+            var conversion = HtmlToUdomConverter.Convert(html);
+
+            Assert.That(conversion.IsValid, Is.True, conversion.Format());
+            var panelNode = conversion.Document.root.children[0];
+            var circleNode = conversion.Document.root.children[1];
+            var defaultsNode = conversion.Document.root.children[2];
+            Assert.That(panelNode.style.backgroundType, Is.EqualTo("radial-gradient"));
+            Assert.That(panelNode.style.backgroundGradientCenter, Is.EqualTo(new[] { 25f, 100f }));
+            Assert.That(panelNode.style.backgroundGradientCenterIsPercent, Is.EqualTo(new[] { true, true }));
+            Assert.That(panelNode.style.backgroundGradientRadius, Is.EqualTo(new[] { 45f, 60f }));
+            Assert.That(panelNode.style.backgroundGradientRadiusIsPercent, Is.EqualTo(new[] { true, false }));
+            Assert.That(panelNode.style.backgroundGradientPositions, Is.EqualTo(new[] { 0.1f, 0.5f, 0.9f }).Within(0.001f));
+            Assert.That(
+                panelNode.style.backgroundGradientColors,
+                Is.EqualTo(new[] { "#FF0000FF", "#0000FFFF", "#00000000" }));
+            Assert.That(circleNode.style.backgroundGradientCenter, Is.EqualTo(new[] { 30f, 0f }));
+            Assert.That(circleNode.style.backgroundGradientCenterIsPercent, Is.EqualTo(new[] { false, true }));
+            Assert.That(circleNode.style.backgroundGradientRadius, Is.EqualTo(new[] { 48f, 48f }));
+            Assert.That(circleNode.style.backgroundGradientRadiusIsPercent, Is.EqualTo(new[] { false, false }));
+            Assert.That(defaultsNode.style.backgroundGradientCenter, Is.EqualTo(new[] { 50f, 50f }));
+            Assert.That(defaultsNode.style.backgroundGradientCenterIsPercent, Is.EqualTo(new[] { true, true }));
+            Assert.That(defaultsNode.style.backgroundGradientRadius, Is.EqualTo(new[] { 50f, 50f }));
+            Assert.That(defaultsNode.style.backgroundGradientRadiusIsPercent, Is.EqualTo(new[] { true, true }));
+
+            var normalized = UdomValidator.Validate(conversion.Json);
+            Assert.That(normalized.IsValid, Is.True, normalized.Format());
+            Assert.That(
+                normalized.Document.root.children[0].style.backgroundGradientRadius,
+                Is.EqualTo(panelNode.style.backgroundGradientRadius));
+            Assert.That(
+                normalized.Document.root.children[1].style.backgroundGradientCenterIsPercent,
+                Is.EqualTo(circleNode.style.backgroundGradientCenterIsPercent));
+
+            var build = UdomBuilder.GenerateOrRegenerate(conversion.Document);
+            var root = build.Root;
+            var panel = UdomBuilder.FindNode(root, "html-radial-panel");
+            var circle = UdomBuilder.FindNode(root, "html-radial-circle");
+            var defaults = UdomBuilder.FindNode(root, "html-radial-defaults");
+            var image = panel.GetComponent<Image>();
+            var circleImage = circle.GetComponent<Image>();
+            var defaultsImage = defaults.GetComponent<Image>();
+            var material = image.material;
+            var texture = material.GetTexture("_GradientTex") as Texture2D;
+            Assert.That(material.shader.name, Is.EqualTo(UdomGradientAssetUtility.RadialShaderName));
+            Assert.That(circleImage.material.shader.name, Is.EqualTo(UdomGradientAssetUtility.RadialShaderName));
+            Assert.That(defaultsImage.material.shader.name, Is.EqualTo(UdomGradientAssetUtility.RadialShaderName));
+            Assert.That(texture, Is.Not.Null);
+            Assert.That(texture.GetPixel(0, 0), Is.EqualTo(Color.red).Using(ColorComparer.Instance));
+            Assert.That(texture.GetPixel(texture.width / 2, 0), Is.EqualTo(Color.blue).Using(ColorComparer.Instance));
+            Assert.That(texture.GetPixel(texture.width - 1, 0), Is.EqualTo(Color.clear).Using(ColorComparer.Instance));
+            Assert.That(
+                material.GetVector("_GradientCenter"),
+                Is.EqualTo(new Vector4(-75f, -70f, 0f, 0f))
+                    .Using(Vector4ComparerWithEqualsOperator.Instance));
+            Assert.That(
+                material.GetVector("_GradientRadius"),
+                Is.EqualTo(new Vector4(135f, 60f, 0f, 0f))
+                    .Using(Vector4ComparerWithEqualsOperator.Instance));
+            Assert.That(
+                circleImage.material.GetVector("_GradientCenter"),
+                Is.EqualTo(new Vector4(-120f, 70f, 0f, 0f))
+                    .Using(Vector4ComparerWithEqualsOperator.Instance));
+            Assert.That(
+                circleImage.material.GetVector("_GradientRadius"),
+                Is.EqualTo(new Vector4(48f, 48f, 0f, 0f))
+                    .Using(Vector4ComparerWithEqualsOperator.Instance));
+            Assert.That(panel.GetComponent<Mask>(), Is.Not.Null);
+
+            var originalPanel = panel.gameObject;
+            var changedGeometry = HtmlToUdomConverter.Convert(
+                html.Replace(
+                    "ellipse 45% 60px at 25% bottom",
+                    "ellipse 80px 40% at right 20px"));
+            Assert.That(changedGeometry.IsValid, Is.True, changedGeometry.Format());
+            UdomBuilder.GenerateOrRegenerate(changedGeometry.Document, root);
+            panel = UdomBuilder.FindNode(root, "html-radial-panel");
+            image = panel.GetComponent<Image>();
+            Assert.That(panel.gameObject, Is.SameAs(originalPanel));
+            Assert.That(image.material, Is.SameAs(material));
+            Assert.That(image.material.GetTexture("_GradientTex"), Is.SameAs(texture));
+            Assert.That(
+                image.material.GetVector("_GradientCenter"),
+                Is.EqualTo(new Vector4(150f, 50f, 0f, 0f))
+                    .Using(Vector4ComparerWithEqualsOperator.Instance));
+            Assert.That(
+                image.material.GetVector("_GradientRadius"),
+                Is.EqualTo(new Vector4(80f, 56f, 0f, 0f))
+                    .Using(Vector4ComparerWithEqualsOperator.Instance));
+
+            var inferredCircle = HtmlToUdomConverter.Convert(html.Replace("circle 48px", "48px"));
+            Assert.That(inferredCircle.IsValid, Is.True, inferredCircle.Format());
+            Assert.That(
+                inferredCircle.Document.root.children[1].style.backgroundGradientRadius,
+                Is.EqualTo(new[] { 48f, 48f }));
+
+            var withoutGradient = HtmlToUdomConverter.Convert(
+                html.Replace(
+                    "background-image: radial-gradient(ellipse 45% 60px at 25% bottom, #FF0000FF 10%, currentColor, transparent 90%)",
+                    "background-image: none; background-color: #123456FF"));
+            Assert.That(withoutGradient.IsValid, Is.True, withoutGradient.Format());
+            UdomBuilder.GenerateOrRegenerate(withoutGradient.Document, root);
+            panel = UdomBuilder.FindNode(root, "html-radial-panel");
+            image = panel.GetComponent<Image>();
+            Assert.That(panel.gameObject, Is.SameAs(originalPanel));
+            Assert.That(image.material.shader.name, Is.EqualTo(UdomRoundedCornerAssetUtility.ShaderName));
+            Assert.That(
+                image.color,
+                Is.EqualTo((Color)new Color32(0x12, 0x34, 0x56, 0xFF)).Using(ColorComparer.Instance));
+            Object.DestroyImmediate(root.gameObject);
+
+            var percentageCircle = HtmlToUdomConverter.Convert(html.Replace("circle 48px", "circle 40%"));
+            Assert.That(percentageCircle.IsValid, Is.False);
+            Assert.That(percentageCircle.Format(), Does.Contain("circle"));
+
+            var missingEllipseRadius = HtmlToUdomConverter.Convert(
+                html.Replace("ellipse 45% 60px", "ellipse 45%"));
+            Assert.That(missingEllipseRadius.IsValid, Is.False);
+            Assert.That(missingEllipseRadius.Format(), Does.Contain("ellipse"));
+
+            var negativeRadius = HtmlToUdomConverter.Convert(
+                html.Replace("ellipse 45% 60px", "ellipse -1px 60px"));
+            Assert.That(negativeRadius.IsValid, Is.False);
+            Assert.That(negativeRadius.Format(), Does.Contain("반지름"));
+
+            var sizeKeyword = HtmlToUdomConverter.Convert(
+                html.Replace("ellipse 45% 60px", "ellipse closest-side farthest-side"));
+            Assert.That(sizeKeyword.IsValid, Is.False);
+            Assert.That(sizeKeyword.Format(), Does.Contain("ellipse"));
+
+            var invalidCenter = HtmlToUdomConverter.Convert(
+                html.Replace("at 25% bottom", "at left right"));
+            Assert.That(invalidCenter.IsValid, Is.False);
+            Assert.That(invalidCenter.Format(), Does.Contain("중심"));
+
+            var oneStop = HtmlToUdomConverter.Convert(
+                html.Replace("#FF0000FF 10%, currentColor, transparent 90%", "#FF0000FF"));
+            Assert.That(oneStop.IsValid, Is.False);
+            Assert.That(oneStop.Format(), Does.Contain("두 개 이상"));
+
+            var nestedColor = HtmlToUdomConverter.Convert(
+                html.Replace("#FF0000FF 10%", "rgb(255, 0, 0) 10%"));
             Assert.That(nestedColor.IsValid, Is.False);
             Assert.That(nestedColor.Format(), Does.Contain("rgb()"));
         }

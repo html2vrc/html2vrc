@@ -146,6 +146,8 @@ Canonical image의 `fit`은 `fill`, `contain`, `cover`, `none`을 지원합니�
 
 제한형 HTML의 단일 `linear-gradient`는 cardinal 방향과 CSS angle 단위, percentage·생략 color stop, transparent와 `currentColor`를 canonical 1025×1 LUT Material로 변환합니다. Stop 보간·CSS 위치 fix-up, rounded mask와 gradient/none/단색 간 안정 재생성을 지원합니다.
 
+제한형 HTML의 단일 `radial-gradient`는 명시적 원형 px 반지름 또는 타원형 px·percentage X/Y 반지름과 선택적 중심 위치를 canonical mixed-unit radial paint로 변환합니다. 생략한 geometry는 50% 중심·반지름을 사용하며 linear-gradient와 같은 stop 보간, rounded mask와 안정 재생성 경로를 공유합니다.
+
 제한형 HTML의 `opacity`, `visibility`, `z-index`도 canonical paint state로 연결됩니다. Hidden은 레이아웃을 유지하면서 입력을 차단하고 opacity 0은 입력을 유지합니다. Z-index는 같은 부모의 flex/absolute 위치를 바꾸지 않고 margin·transform·shadow를 포함한 paint 순서만 결정합니다.
 
 Canonical `paint.border`의 왼쪽·위·오른쪽·아래 `solid` edge는 각 폭과 색을 유지한 단일 VRChat-safe SDF Image로 생성됩니다. Outer radius와 비대칭 폭에서 계산한 타원형 inner corner를 함께 사용하고, 서로 다른 edge 색은 폭 비율의 diagonal join으로 연결됩니다. 안정 border Material과 overlay는 레이아웃·raycast에 영향을 주지 않으며 재생성 사이에 GUID와 GameObject를 유지합니다.
@@ -306,7 +308,7 @@ VRChat 패키지는 VPM manifest에 고정되어 있습니다. UDOM 파서와 Un
 4. `Generate / Regenerate`를 누릅니다.
 5. 생성 루트의 `External References`에서 `world-light` 슬롯을 연결합니다.
 
-지원 범위는 `div`, 제목과 문단, `img`, `button`, 목록, ScrollView, Embed와 일부 인라인 CSS입니다. 제한형 CSS flex는 reverse 방향, wrap, justify/align, 축별 gap, 항목별 order·align-self·grow/shrink/basis를 canonical UDOM과 같은 계산기로 처리하며, `display: none`, visibility/opacity/z-index, top-left absolute 배치, 양축 hidden overflow, 이미지 object-fit/object-position, solid border/radius, 다중 box-shadow와 linear-gradient도 지원합니다. `script`, `onclick`, 외부 CSS와 임의 JavaScript는 실행하지 않고 오류로 표시합니다. 자세한 계약은 `Assets/Html2Vrc/Documentation/HTML_SUBSET.md`에 있습니다.
+지원 범위는 `div`, 제목과 문단, `img`, `button`, 목록, ScrollView, Embed와 일부 인라인 CSS입니다. 제한형 CSS flex는 reverse 방향, wrap, justify/align, 축별 gap, 항목별 order·align-self·grow/shrink/basis를 canonical UDOM과 같은 계산기로 처리하며, `display: none`, visibility/opacity/z-index, top-left absolute 배치, 양축 hidden overflow, 이미지 object-fit/object-position, solid border/radius, 다중 box-shadow와 linear/radial-gradient도 지원합니다. `script`, `onclick`, 외부 CSS와 임의 JavaScript는 실행하지 않고 오류로 표시합니다. 자세한 계약은 `Assets/Html2Vrc/Documentation/HTML_SUBSET.md`에 있습니다.
 
 HTML 입력부터 독립된 샘플 Scene까지 한 번에 확인하려면 `Tools > HTML2VRC > Build HTML World Settings Scene`을 실행합니다. 결과는 `Assets/Html2Vrc/Samples/WorldSettingsHtmlSample.unity`에 저장됩니다. VRChat에서 바로 확인하려면 `Tools > HTML2VRC > VRChat > Build & Test HTML Sample World`를 실행합니다.
 
