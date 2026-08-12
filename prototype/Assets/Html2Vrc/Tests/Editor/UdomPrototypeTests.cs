@@ -1188,6 +1188,148 @@ namespace Html2Vrc.Tests
         }
 
         [Test]
+        public void CanonicalTransform_AppliesOrderedOperationsAndRegeneratesStably()
+        {
+            var json = LoadRepositoryFile(
+                "packages",
+                "udom",
+                "fixtures",
+                "valid",
+                "unity-transform.udom.json");
+            var validation = UdomValidator.Validate(json);
+
+            Assert.That(validation.IsValid, Is.True, validation.Format());
+            Assert.That(validation.Issues, Is.Empty, validation.Format());
+            var panelNode = validation.Document.root.children.Single(node => node.id == "transform-panel");
+            Assert.That(panelNode.style.transformOrigin, Is.EqualTo(new[] { 25f, 20f }));
+            Assert.That(panelNode.style.transformOriginIsPercent, Is.EqualTo(new[] { true, false }));
+            Assert.That(
+                panelNode.style.transformOperationTypes,
+                Is.EqualTo(new[] { "translate", "rotate", "scale" }));
+            Assert.That(
+                panelNode.style.transformOperationValues,
+                Is.EqualTo(new[] { 10f, 12f, 30f, 0f, 1.5f, 0.75f }));
+            Assert.That(
+                panelNode.style.transformOperationValuesArePercent,
+                Is.EqualTo(new[] { true, false, false, false, false, false }));
+
+            const string defaultTransformJson = @"{
+              ""asset"": { ""version"": ""0.1"" },
+              ""viewport"": { ""width"": 200, ""height"": 100 },
+              ""root"": {
+                ""type"": ""element"", ""id"": ""transform-defaults"", ""name"": ""view"",
+                ""style"": { ""transform"": { ""operations"": [
+                  { ""type"": ""translate"", ""x"": ""auto"" },
+                  { ""type"": ""scale"" }
+                ] } }
+              }
+            }";
+            var defaults = UdomValidator.Validate(defaultTransformJson);
+            Assert.That(defaults.IsValid, Is.True, defaults.Format());
+            Assert.That(defaults.Document.root.style.transformOrigin, Is.EqualTo(new[] { 50f, 50f }));
+            Assert.That(defaults.Document.root.style.transformOriginIsPercent, Is.EqualTo(new[] { true, true }));
+            Assert.That(defaults.Document.root.style.transformOperationValues, Is.EqualTo(new[] { 0f, 0f, 1f, 1f }));
+
+            var build = UdomBuilder.GenerateOrRegenerate(validation.Document);
+            var root = build.Root;
+            var layout = UdomBuilder.FindNode(root, "transform-panel::__transform-layout");
+            var origin = UdomBuilder.FindNode(root, "transform-panel::__transform-origin");
+            var translate = UdomBuilder.FindNode(root, "transform-panel::__transform-operation-0");
+            var rotate = UdomBuilder.FindNode(root, "transform-panel::__transform-operation-1");
+            var scale = UdomBuilder.FindNode(root, "transform-panel::__transform-operation-2");
+            var panel = UdomBuilder.FindNode(root, "transform-panel");
+            var reference = UdomBuilder.FindNode(root, "layout-reference");
+            var documentRoot = UdomBuilder.FindNode(root, "transform-root");
+
+            Assert.That(layout, Is.Not.Null);
+            Assert.That(origin, Is.Not.Null);
+            Assert.That(translate, Is.Not.Null);
+            Assert.That(rotate, Is.Not.Null);
+            Assert.That(scale, Is.Not.Null);
+            Assert.That(panel, Is.Not.Null);
+            Assert.That(layout.transform.parent, Is.SameAs(documentRoot.transform));
+            Assert.That(reference.transform.parent, Is.SameAs(documentRoot.transform));
+            Assert.That(scale.transform.parent, Is.SameAs(origin.transform));
+            Assert.That(rotate.transform.parent, Is.SameAs(scale.transform));
+            Assert.That(translate.transform.parent, Is.SameAs(rotate.transform));
+            Assert.That(panel.transform.parent, Is.SameAs(translate.transform));
+
+            var layoutRect = layout.GetComponent<RectTransform>();
+            var originRect = origin.GetComponent<RectTransform>();
+            var translateRect = translate.GetComponent<RectTransform>();
+            var rotateRect = rotate.GetComponent<RectTransform>();
+            var scaleRect = scale.GetComponent<RectTransform>();
+            var panelRect = panel.GetComponent<RectTransform>();
+            Assert.That(layoutRect.rect.width, Is.EqualTo(440f).Within(0.001f));
+            Assert.That(layoutRect.rect.height, Is.EqualTo(100f).Within(0.001f));
+            Assert.That(originRect.anchoredPosition, Is.EqualTo(new Vector2(-110f, 30f)));
+            Assert.That(translateRect.anchoredPosition, Is.EqualTo(new Vector2(44f, -12f)));
+            Assert.That(rotateRect.localEulerAngles.z, Is.EqualTo(330f).Within(0.001f));
+            Assert.That(scaleRect.localScale, Is.EqualTo(new Vector3(1.5f, 0.75f, 1f)));
+            Assert.That(panelRect.anchoredPosition, Is.EqualTo(new Vector2(110f, -30f)));
+            Assert.That(panelRect.rect.size, Is.EqualTo(new Vector2(440f, 100f)));
+            Assert.That(panel.GetComponent<LayoutElement>(), Is.Null);
+            Assert.That(layout.GetComponent<LayoutElement>(), Is.Not.Null);
+            Assert.That(translate.GetComponents<MonoBehaviour>().Select(component => component.GetType()),
+                Is.EqualTo(new[] { typeof(UdomGeneratedNode) }));
+
+            var expectedCenter = new Vector3(110f, -30f, 0f);
+            expectedCenter += new Vector3(44f, -12f, 0f);
+            expectedCenter = Quaternion.Euler(0f, 0f, -30f) * expectedCenter;
+            expectedCenter = Vector3.Scale(expectedCenter, new Vector3(1.5f, 0.75f, 1f));
+            expectedCenter += new Vector3(-110f, 30f, 0f);
+            var actualCenter = layoutRect.InverseTransformPoint(panelRect.TransformPoint(Vector3.zero));
+            Assert.That(actualCenter.x, Is.EqualTo(expectedCenter.x).Within(0.001f));
+            Assert.That(actualCenter.y, Is.EqualTo(expectedCenter.y).Within(0.001f));
+
+#if UDONSHARP
+            var validationClone = Object.Instantiate(layout.gameObject);
+            try
+            {
+                WorldValidation.RemoveIllegalComponents(
+                    new List<GameObject> { validationClone },
+                    WorldValidation.WhiteListConfiguration.VRCSDK3);
+                Assert.That(validationClone.GetComponentInChildren<Image>(true), Is.Not.Null);
+            }
+            finally
+            {
+                Object.DestroyImmediate(validationClone);
+            }
+#endif
+
+            panelNode.style.margin = new[] { 10f, 5f, 20f, 15f };
+            UdomBuilder.GenerateOrRegenerate(validation.Document, root);
+            var margin = UdomBuilder.FindNode(root, "transform-panel::__margin");
+            Assert.That(margin, Is.Not.Null);
+            Assert.That(layout, Is.SameAs(UdomBuilder.FindNode(root, "transform-panel::__transform-layout")));
+            Assert.That(origin, Is.SameAs(UdomBuilder.FindNode(root, "transform-panel::__transform-origin")));
+            Assert.That(translate, Is.SameAs(UdomBuilder.FindNode(root, "transform-panel::__transform-operation-0")));
+            Assert.That(rotate, Is.SameAs(UdomBuilder.FindNode(root, "transform-panel::__transform-operation-1")));
+            Assert.That(scale, Is.SameAs(UdomBuilder.FindNode(root, "transform-panel::__transform-operation-2")));
+            Assert.That(panel, Is.SameAs(UdomBuilder.FindNode(root, "transform-panel")));
+            Assert.That(layout.transform.parent, Is.SameAs(margin.transform));
+            Assert.That(layoutRect.rect.size, Is.EqualTo(new Vector2(410f, 100f)));
+            Assert.That(originRect.anchoredPosition, Is.EqualTo(new Vector2(-102.5f, 30f)));
+            Assert.That(translateRect.anchoredPosition, Is.EqualTo(new Vector2(41f, -12f)));
+            Assert.That(panelRect.anchoredPosition, Is.EqualTo(new Vector2(102.5f, -30f)));
+
+            panelNode.style.transformOperationTypes = System.Array.Empty<string>();
+            panelNode.style.transformOperationValues = System.Array.Empty<float>();
+            panelNode.style.transformOperationValuesArePercent = System.Array.Empty<bool>();
+            UdomBuilder.GenerateOrRegenerate(validation.Document, root);
+            Assert.That(panel, Is.SameAs(UdomBuilder.FindNode(root, "transform-panel")));
+            Assert.That(panel.transform.parent, Is.SameAs(margin.transform));
+            Assert.That(UdomBuilder.FindNode(root, "transform-panel::__transform-layout"), Is.Null);
+            Assert.That(UdomBuilder.FindNode(root, "transform-panel::__transform-origin"), Is.Null);
+            Assert.That(UdomBuilder.FindNode(root, "transform-panel::__transform-operation-0"), Is.Null);
+            Assert.That(UdomBuilder.FindNode(root, "transform-panel::__transform-operation-1"), Is.Null);
+            Assert.That(UdomBuilder.FindNode(root, "transform-panel::__transform-operation-2"), Is.Null);
+            Assert.That(panelRect.rect.size, Is.EqualTo(new Vector2(410f, 100f)));
+            Assert.That(panelRect.localScale, Is.EqualTo(Vector3.one));
+            Assert.That(panelRect.localRotation, Is.EqualTo(Quaternion.identity));
+        }
+
+        [Test]
         public void CanonicalCornerRadius_GeneratesMaskedMaterialAndRegeneratesStably()
         {
             var json = LoadRepositoryFile(

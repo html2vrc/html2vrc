@@ -88,6 +88,11 @@ namespace Html2Vrc
         public bool stretchChildrenHeight;
         public float flexibleWidth;
         public float flexibleHeight;
+        public float[] transformOrigin = { 50f, 50f };
+        public bool[] transformOriginIsPercent = { true, true };
+        public string[] transformOperationTypes = Array.Empty<string>();
+        public float[] transformOperationValues = Array.Empty<float>();
+        public bool[] transformOperationValuesArePercent = Array.Empty<bool>();
     }
 
     [Serializable]

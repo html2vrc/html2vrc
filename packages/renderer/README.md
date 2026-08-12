@@ -330,6 +330,7 @@ ReactUnity에서는 CSS 값 정규화, 속성 매핑, uGUI와 UI Toolkit 백엔�
 | conic gradient | Conic Gradient LUT Material (Unity 프로토타입 구현) | 부분 이미지 | 단색 또는 비활성화 |
 | border radius | SDF Rounded Corners Material (Unity 프로토타입 구현) | 9-slice | Material 또는 9-slice |
 | 단순 border | Material 또는 추가 Image | 9-slice | 동일 |
+| 2D transform | operation별 RectTransform wrapper (Unity 프로토타입 구현) | Matrix bake | 동일 |
 | 단순 shadow | UIEffect 또는 복제 Image | 부분 이미지 | 축소하거나 비활성화 |
 | blur shadow | UIEffect | 부분 이미지 | 기본 비활성화 |
 | 사진·일러스트 | Sprite 또는 Texture | Atlas | 압축 Texture |

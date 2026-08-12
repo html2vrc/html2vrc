@@ -1052,8 +1052,183 @@ namespace Html2Vrc.Editor
                     warnings);
             }
 
-            RejectNonEmptyObject(value, "transform", path + ".transform", "canonical transforms are not supported yet");
+            if (value.TryGetValue("transform", out var transformValue))
+            {
+                MapTransform(
+                    RequireObject(transformValue, path + ".transform"),
+                    path + ".transform",
+                    style);
+            }
+
             return result;
+        }
+
+        private static void MapTransform(
+            Dictionary<string, object> value,
+            string path,
+            UdomStyle style)
+        {
+            EnsureOnlyKeys(value, path, "origin", "operations");
+            if (value.TryGetValue("origin", out var originValue))
+            {
+                var origin = RequireObject(originValue, path + ".origin");
+                EnsureOnlyKeys(origin, path + ".origin", "x", "y");
+                if (!origin.ContainsKey("x") || !origin.ContainsKey("y"))
+                {
+                    throw new FormatException($"{path}.origin: both x and y are required.");
+                }
+
+                style.transformOrigin = new float[2];
+                style.transformOriginIsPercent = new bool[2];
+                MapTransformLength(
+                    origin,
+                    "x",
+                    path + ".origin.x",
+                    50f,
+                    defaultIsPercent: true,
+                    out style.transformOrigin[0],
+                    out style.transformOriginIsPercent[0]);
+                MapTransformLength(
+                    origin,
+                    "y",
+                    path + ".origin.y",
+                    50f,
+                    defaultIsPercent: true,
+                    out style.transformOrigin[1],
+                    out style.transformOriginIsPercent[1]);
+            }
+
+            if (!value.TryGetValue("operations", out var operationsValue))
+            {
+                return;
+            }
+
+            var operations = RequireArray(operationsValue, path + ".operations");
+            var types = new string[operations.Count];
+            var values = new float[operations.Count * 2];
+            var percentages = new bool[operations.Count * 2];
+            for (var index = 0; index < operations.Count; index++)
+            {
+                var operationPath = $"{path}.operations[{index}]";
+                var operation = RequireObject(operations[index], operationPath);
+                var type = RequireString(operation, "type", operationPath + ".type");
+                types[index] = type;
+                var valueIndex = index * 2;
+                switch (type)
+                {
+                    case "translate":
+                        EnsureOnlyKeys(operation, operationPath, "type", "x", "y");
+                        MapTransformLength(
+                            operation,
+                            "x",
+                            operationPath + ".x",
+                            0f,
+                            defaultIsPercent: false,
+                            out values[valueIndex],
+                            out percentages[valueIndex]);
+                        MapTransformLength(
+                            operation,
+                            "y",
+                            operationPath + ".y",
+                            0f,
+                            defaultIsPercent: false,
+                            out values[valueIndex + 1],
+                            out percentages[valueIndex + 1]);
+                        break;
+                    case "rotate":
+                        EnsureOnlyKeys(operation, operationPath, "type", "degrees");
+                        values[valueIndex] = RequireFloat(
+                            RequireValue(operation, "degrees", operationPath),
+                            operationPath + ".degrees");
+                        ValidateFiniteTransformValue(values[valueIndex], operationPath + ".degrees");
+                        break;
+                    case "scale":
+                        EnsureOnlyKeys(operation, operationPath, "type", "x", "y");
+                        values[valueIndex] = GetOptionalFiniteTransformValue(
+                            operation,
+                            "x",
+                            1f,
+                            operationPath + ".x");
+                        values[valueIndex + 1] = GetOptionalFiniteTransformValue(
+                            operation,
+                            "y",
+                            1f,
+                            operationPath + ".y");
+                        break;
+                    default:
+                        throw new FormatException(
+                            $"{operationPath}.type: unsupported canonical transform operation '{type}'.");
+                }
+            }
+
+            style.transformOperationTypes = types;
+            style.transformOperationValues = values;
+            style.transformOperationValuesArePercent = percentages;
+        }
+
+        private static void MapTransformLength(
+            Dictionary<string, object> value,
+            string key,
+            string path,
+            float defaultValue,
+            bool defaultIsPercent,
+            out float result,
+            out bool isPercent)
+        {
+            result = defaultValue;
+            isPercent = defaultIsPercent;
+            if (!value.TryGetValue(key, out var raw)
+                || raw is string autoText
+                && string.Equals(autoText, "auto", StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            if (raw is string percentageText
+                && percentageText.EndsWith("%", StringComparison.Ordinal))
+            {
+                if (!TryResolveLength(raw, 100f, path, out result))
+                {
+                    return;
+                }
+
+                isPercent = true;
+            }
+            else
+            {
+                if (!TryResolveLength(raw, 100f, path, out result))
+                {
+                    return;
+                }
+
+                isPercent = false;
+            }
+
+            ValidateFiniteTransformValue(result, path);
+        }
+
+        private static float GetOptionalFiniteTransformValue(
+            Dictionary<string, object> value,
+            string key,
+            float defaultValue,
+            string path)
+        {
+            if (!value.TryGetValue(key, out var raw))
+            {
+                return defaultValue;
+            }
+
+            var result = RequireFloat(raw, path);
+            ValidateFiniteTransformValue(result, path);
+            return result;
+        }
+
+        private static void ValidateFiniteTransformValue(float value, string path)
+        {
+            if (float.IsNaN(value) || float.IsInfinity(value))
+            {
+                throw new FormatException($"{path}: transform value must be finite.");
+            }
         }
 
         private static void MapLayout(

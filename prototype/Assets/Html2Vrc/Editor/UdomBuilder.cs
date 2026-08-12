@@ -96,6 +96,9 @@ namespace Html2Vrc.Editor
     public static class UdomBuilder
     {
         private const string MarginSuffix = "::__margin";
+        private const string TransformLayoutSuffix = "::__transform-layout";
+        private const string TransformOriginSuffix = "::__transform-origin";
+        private const string TransformOperationSuffix = "::__transform-operation-";
         private const string ViewportSuffix = "::__viewport";
         private const string ContentSuffix = "::__content";
         private const string ToggleCheckmarkSuffix = "::__toggle-checkmark";
@@ -253,6 +256,8 @@ namespace Html2Vrc.Editor
 
             EditorUtility.SetDirty(root);
             PrefabUtility.RecordPrefabInstancePropertyModifications(root);
+            Canvas.ForceUpdateCanvases();
+            RefreshTransformLayout(document.root, context);
             Canvas.ForceUpdateCanvases();
             RefreshPaintLayout(document.root, context);
             return result;
@@ -453,6 +458,7 @@ namespace Html2Vrc.Editor
             var style = node.style ?? new UdomStyle();
             var actualParent = parent;
             var hasMargin = HasNonZero(style.margin);
+            var hasTransform = HasTransform(style);
 
             if (hasMargin)
             {
@@ -464,11 +470,55 @@ namespace Html2Vrc.Editor
                 actualParent = wrapper.transform;
             }
 
-            var nodeObject = UpsertGeneratedObject(node.id, node.type, false, actualParent, context);
+            GameObject transformLayout = null;
+            var nodeParent = actualParent;
+            if (hasTransform)
+            {
+                var transformLayoutId = node.id + TransformLayoutSuffix;
+                transformLayout = UpsertGeneratedObject(
+                    transformLayoutId,
+                    "TransformLayout",
+                    true,
+                    actualParent,
+                    context);
+                context.DesiredIds.Add(transformLayoutId);
+                transformLayout.name = $"Transform Layout [{node.id}]";
+                if (hasMargin)
+                {
+                    transformLayout.transform.SetSiblingIndex(0);
+                    ConfigureInsideMargin(
+                        transformLayout.GetComponent<RectTransform>(),
+                        style.margin);
+                }
+                else
+                {
+                    transformLayout.transform.SetSiblingIndex(Mathf.Min(siblingIndex, parent.childCount - 1));
+                    ConfigureRect(transformLayout, style, parent);
+                }
+
+                nodeParent = ConfigureTransformHierarchy(
+                    transformLayout,
+                    node,
+                    style,
+                    context);
+            }
+
+            var nodeObject = UpsertGeneratedObject(node.id, node.type, false, nodeParent, context);
             context.DesiredIds.Add(node.id);
             nodeObject.name = string.IsNullOrWhiteSpace(node.name) ? $"{node.type} [{node.id}]" : node.name;
 
-            if (hasMargin)
+            if (hasTransform)
+            {
+                nodeObject.transform.SetSiblingIndex(0);
+                var transformSize = transformLayout.GetComponent<RectTransform>().rect.size;
+                if (transformSize.x <= 0f || transformSize.y <= 0f)
+                {
+                    transformSize = GetVector2(style.size, new Vector2(100f, 100f));
+                }
+
+                ConfigureTransformedNodeRect(nodeObject, style, transformSize);
+            }
+            else if (hasMargin)
             {
                 nodeObject.transform.SetSiblingIndex(0);
                 ConfigureInsideMargin(nodeObject.GetComponent<RectTransform>(), style.margin);
@@ -622,6 +672,211 @@ namespace Html2Vrc.Editor
             layoutElement.flexibleWidth = style.flexibleWidth;
             layoutElement.flexibleHeight = style.flexibleHeight;
             layoutElement.ignoreLayout = parent.GetComponent<LayoutGroup>() == null;
+        }
+
+        private static Transform ConfigureTransformHierarchy(
+            GameObject transformLayout,
+            UdomNode node,
+            UdomStyle style,
+            BuildContext context)
+        {
+            var size = transformLayout.GetComponent<RectTransform>().rect.size;
+            if (size.x <= 0f || size.y <= 0f)
+            {
+                size = GetVector2(style.size, new Vector2(100f, 100f));
+            }
+
+            var originId = node.id + TransformOriginSuffix;
+            var origin = UpsertGeneratedObject(
+                originId,
+                "TransformOrigin",
+                true,
+                transformLayout.transform,
+                context);
+            context.DesiredIds.Add(originId);
+            origin.name = $"Transform Origin [{node.id}]";
+            origin.transform.SetSiblingIndex(0);
+            ConfigureTransformOrigin(origin, style, size);
+
+            var operationParent = origin.transform;
+            var operationCount = style.transformOperationTypes != null
+                ? style.transformOperationTypes.Length
+                : 0;
+            // The last operation is the outermost wrapper so points experience operations in array order.
+            for (var index = operationCount - 1; index >= 0; index--)
+            {
+                var operationId = node.id + TransformOperationSuffix + index;
+                var operationType = style.transformOperationTypes[index] ?? "unknown";
+                var operation = UpsertGeneratedObject(
+                    operationId,
+                    "TransformOperation:" + operationType,
+                    true,
+                    operationParent,
+                    context);
+                context.DesiredIds.Add(operationId);
+                operation.name = $"Transform {index}: {operationType} [{node.id}]";
+                operation.transform.SetSiblingIndex(0);
+                ConfigureTransformOperation(operation, style, index, size);
+                operationParent = operation.transform;
+            }
+
+            return operationParent;
+        }
+
+        private static void ConfigureTransformOrigin(
+            GameObject target,
+            UdomStyle style,
+            Vector2 size)
+        {
+            ConfigureTransformWrapperRect(target);
+            var rect = target.GetComponent<RectTransform>();
+            var origin = ResolveTransformOrigin(style, size);
+            Undo.RecordObject(rect, "Configure UDOM transform origin");
+            rect.anchoredPosition = origin;
+        }
+
+        private static void ConfigureTransformOperation(
+            GameObject target,
+            UdomStyle style,
+            int operationIndex,
+            Vector2 size)
+        {
+            ConfigureTransformWrapperRect(target);
+            var rect = target.GetComponent<RectTransform>();
+            var operationType = style.transformOperationTypes != null
+                                && operationIndex < style.transformOperationTypes.Length
+                ? style.transformOperationTypes[operationIndex]
+                : string.Empty;
+            var valueIndex = operationIndex * 2;
+            Undo.RecordObject(rect, "Configure UDOM transform operation");
+            switch (operationType)
+            {
+                case "translate":
+                {
+                    var translationX = ResolveTransformOperationValue(
+                        style,
+                        valueIndex,
+                        size.x,
+                        0f);
+                    var translationY = ResolveTransformOperationValue(
+                        style,
+                        valueIndex + 1,
+                        size.y,
+                        0f);
+                    rect.anchoredPosition = new Vector2(translationX, -translationY);
+                    break;
+                }
+                case "rotate":
+                {
+                    rect.localRotation = Quaternion.Euler(
+                        0f,
+                        0f,
+                        -GetTransformOperationValue(style, valueIndex, 0f));
+                    break;
+                }
+                case "scale":
+                {
+                    rect.localScale = new Vector3(
+                        GetTransformOperationValue(style, valueIndex, 1f),
+                        GetTransformOperationValue(style, valueIndex + 1, 1f),
+                        1f);
+                    break;
+                }
+            }
+        }
+
+        private static void ConfigureTransformWrapperRect(GameObject target)
+        {
+            var rect = target.GetComponent<RectTransform>();
+            Undo.RecordObject(rect, "Configure UDOM transform wrapper");
+            rect.anchorMin = new Vector2(0.5f, 0.5f);
+            rect.anchorMax = new Vector2(0.5f, 0.5f);
+            rect.pivot = new Vector2(0.5f, 0.5f);
+            rect.anchoredPosition = Vector2.zero;
+            rect.sizeDelta = Vector2.zero;
+            rect.localScale = Vector3.one;
+            rect.localRotation = Quaternion.identity;
+            rect.localPosition = new Vector3(rect.localPosition.x, rect.localPosition.y, 0f);
+            RemoveIfPresent<LayoutElement>(target);
+        }
+
+        private static void ConfigureTransformedNodeRect(
+            GameObject target,
+            UdomStyle style,
+            Vector2 size)
+        {
+            var rect = target.GetComponent<RectTransform>();
+            var origin = ResolveTransformOrigin(style, size);
+            Undo.RecordObject(rect, "Configure transformed UDOM node");
+            rect.anchorMin = new Vector2(0.5f, 0.5f);
+            rect.anchorMax = new Vector2(0.5f, 0.5f);
+            rect.pivot = new Vector2(0.5f, 0.5f);
+            rect.anchoredPosition = -origin;
+            rect.sizeDelta = size;
+            rect.localScale = Vector3.one;
+            rect.localRotation = Quaternion.identity;
+            rect.localPosition = new Vector3(rect.localPosition.x, rect.localPosition.y, 0f);
+            RemoveIfPresent<LayoutElement>(target);
+        }
+
+        private static Vector2 ResolveTransformOrigin(UdomStyle style, Vector2 size)
+        {
+            var x = ResolveTransformValue(
+                style.transformOrigin,
+                style.transformOriginIsPercent,
+                0,
+                size.x,
+                50f,
+                defaultIsPercent: true);
+            var y = ResolveTransformValue(
+                style.transformOrigin,
+                style.transformOriginIsPercent,
+                1,
+                size.y,
+                50f,
+                defaultIsPercent: true);
+            return new Vector2(-size.x * 0.5f + x, size.y * 0.5f - y);
+        }
+
+        private static float ResolveTransformOperationValue(
+            UdomStyle style,
+            int valueIndex,
+            float reference,
+            float fallback)
+        {
+            return ResolveTransformValue(
+                style.transformOperationValues,
+                style.transformOperationValuesArePercent,
+                valueIndex,
+                reference,
+                fallback,
+                defaultIsPercent: false);
+        }
+
+        private static float ResolveTransformValue(
+            float[] values,
+            bool[] percentages,
+            int index,
+            float reference,
+            float fallback,
+            bool defaultIsPercent)
+        {
+            var value = values != null && index < values.Length ? values[index] : fallback;
+            var isPercent = percentages != null && index < percentages.Length
+                ? percentages[index]
+                : defaultIsPercent;
+            return isPercent ? reference * value / 100f : value;
+        }
+
+        private static float GetTransformOperationValue(
+            UdomStyle style,
+            int valueIndex,
+            float fallback)
+        {
+            return style.transformOperationValues != null
+                   && valueIndex < style.transformOperationValues.Length
+                ? style.transformOperationValues[valueIndex]
+                : fallback;
         }
 
         private static void ConfigurePaint(GameObject target, UdomStyle style)
@@ -799,6 +1054,48 @@ namespace Html2Vrc.Editor
             if (string.Equals(nodeType, "Image", StringComparison.OrdinalIgnoreCase))
             {
                 GetOrAdd<RectMask2D>(target);
+            }
+        }
+
+        private static void RefreshTransformLayout(UdomNode node, BuildContext context)
+        {
+            var style = node.style ?? new UdomStyle();
+            if (HasTransform(style))
+            {
+                var transformLayout = FindNode(context.Root, node.id + TransformLayoutSuffix);
+                var origin = FindNode(context.Root, node.id + TransformOriginSuffix);
+                var target = FindNode(context.Root, node.id);
+                if (transformLayout != null && origin != null && target != null)
+                {
+                    var size = transformLayout.GetComponent<RectTransform>().rect.size;
+                    if (size.x <= 0f || size.y <= 0f)
+                    {
+                        size = GetVector2(style.size, new Vector2(100f, 100f));
+                    }
+
+                    ConfigureTransformOrigin(origin.gameObject, style, size);
+                    var operationCount = style.transformOperationTypes != null
+                        ? style.transformOperationTypes.Length
+                        : 0;
+                    for (var index = 0; index < operationCount; index++)
+                    {
+                        var operation = FindNode(
+                            context.Root,
+                            node.id + TransformOperationSuffix + index);
+                        if (operation != null)
+                        {
+                            ConfigureTransformOperation(operation.gameObject, style, index, size);
+                        }
+                    }
+
+                    ConfigureTransformedNodeRect(target.gameObject, style, size);
+                }
+            }
+
+            var children = node.children ?? Array.Empty<UdomNode>();
+            for (var index = 0; index < children.Length; index++)
+            {
+                RefreshTransformLayout(children[index], context);
             }
         }
 
@@ -1749,6 +2046,13 @@ namespace Html2Vrc.Editor
             }
 
             return false;
+        }
+
+        private static bool HasTransform(UdomStyle style)
+        {
+            return style != null
+                   && style.transformOperationTypes != null
+                   && style.transformOperationTypes.Length > 0;
         }
 
         private static Vector2 GetVector2(float[] values, Vector2 fallback)

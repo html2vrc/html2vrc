@@ -1,0 +1,94 @@
+{
+  "asset": {
+    "version": "0.1",
+    "generator": "@html2vrc/udom Unity transform fixture"
+  },
+  "viewport": {
+    "width": 520,
+    "height": 400
+  },
+  "root": {
+    "type": "element",
+    "id": "transform-root",
+    "name": "view",
+    "style": {
+      "layout": {
+        "mode": "flex",
+        "width": "100%",
+        "height": "100%",
+        "padding": {
+          "top": 40,
+          "right": 40,
+          "bottom": 40,
+          "left": 40
+        },
+        "flex": {
+          "direction": "column",
+          "rowGap": 20
+        }
+      }
+    },
+    "children": [
+      {
+        "type": "element",
+        "id": "transform-panel",
+        "name": "view",
+        "style": {
+          "layout": {
+            "width": 200,
+            "height": 100
+          },
+          "paint": {
+            "backgrounds": [
+              {
+                "type": "color",
+                "color": "#315D9FFF"
+              }
+            ]
+          },
+          "transform": {
+            "origin": {
+              "x": "25%",
+              "y": 20
+            },
+            "operations": [
+              {
+                "type": "translate",
+                "x": "10%",
+                "y": 12
+              },
+              {
+                "type": "rotate",
+                "degrees": 30
+              },
+              {
+                "type": "scale",
+                "x": 1.5,
+                "y": 0.75
+              }
+            ]
+          }
+        }
+      },
+      {
+        "type": "element",
+        "id": "layout-reference",
+        "name": "view",
+        "style": {
+          "layout": {
+            "width": 200,
+            "height": 50
+          },
+          "paint": {
+            "backgrounds": [
+              {
+                "type": "color",
+                "color": "#C9D7E8FF"
+              }
+            ]
+          }
+        }
+      }
+    ]
+  }
+}

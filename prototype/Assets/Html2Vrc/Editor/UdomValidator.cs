@@ -95,6 +95,8 @@ namespace Html2Vrc.Editor
             "cornerRadius", "cornerRadiusPercent", "borderWidth", "borderColor", "textColor", "fontSize", "alignment", "fontStyle", "childAlignment",
             "stretchChildrenWidth", "stretchChildrenHeight",
             "flexibleWidth", "flexibleHeight",
+            "transformOrigin", "transformOriginIsPercent", "transformOperationTypes",
+            "transformOperationValues", "transformOperationValuesArePercent",
             "action", "targetSlot", "fallbackLabel"
         };
 
@@ -438,6 +440,71 @@ namespace Html2Vrc.Editor
             if (!UdomBuilderUtility.TryParseChildAlignment(style.childAlignment, out _))
             {
                 AddError(result, path + ".childAlignment", $"지원하지 않는 child alignment '{style.childAlignment}'.");
+            }
+
+            ValidateTransform(style, path, result);
+        }
+
+        private static void ValidateTransform(
+            UdomStyle style,
+            string path,
+            UdomValidationResult result)
+        {
+            ValidateVector(
+                style.transformOrigin,
+                2,
+                path + ".transformOrigin",
+                result,
+                requirePositive: false);
+            ValidateBooleanVector(
+                style.transformOriginIsPercent,
+                2,
+                path + ".transformOriginIsPercent",
+                result);
+
+            var types = style.transformOperationTypes;
+            if (types == null)
+            {
+                AddError(result, path + ".transformOperationTypes", "transform operation type 배열이 필요하다.");
+                return;
+            }
+
+            ValidateVector(
+                style.transformOperationValues,
+                types.Length * 2,
+                path + ".transformOperationValues",
+                result,
+                requirePositive: false);
+            ValidateBooleanVector(
+                style.transformOperationValuesArePercent,
+                types.Length * 2,
+                path + ".transformOperationValuesArePercent",
+                result);
+
+            for (var index = 0; index < types.Length; index++)
+            {
+                var type = types[index];
+                if (!string.Equals(type, "translate", StringComparison.Ordinal)
+                    && !string.Equals(type, "rotate", StringComparison.Ordinal)
+                    && !string.Equals(type, "scale", StringComparison.Ordinal))
+                {
+                    AddError(
+                        result,
+                        $"{path}.transformOperationTypes[{index}]",
+                        $"unsupported transform operation '{type}'.");
+                }
+
+                if (!string.Equals(type, "translate", StringComparison.Ordinal)
+                    && style.transformOperationValuesArePercent != null
+                    && style.transformOperationValuesArePercent.Length >= (index + 1) * 2
+                    && (style.transformOperationValuesArePercent[index * 2]
+                        || style.transformOperationValuesArePercent[index * 2 + 1]))
+                {
+                    AddError(
+                        result,
+                        $"{path}.transformOperationValuesArePercent[{index * 2}]",
+                        "only translate operations may use percentage values.");
+                }
             }
         }
 

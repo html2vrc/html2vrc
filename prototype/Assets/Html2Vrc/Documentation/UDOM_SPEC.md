@@ -38,9 +38,11 @@ Canonical `conic-gradient`는 같은 LUT와 전용 UI Shader로 렌더링한다.
 
 Canonical `paint.radius`는 `[topLeft, topRight, bottomRight, bottomLeft]` design-unit 배열로 보존한다. percentage는 박스의 짧은 변을 기준으로 해석하고, 같은 변에 닿는 두 radius의 합이 변보다 크면 네 값을 같은 비율로 줄인다. 단색 배경은 rounded-corner SDF Material, linear/radial/conic gradient는 같은 SDF 계산을 합성한 gradient Material을 사용한다. 자식이 있는 노드는 Unity `Mask`로 같은 곡선을 stencil에 기록하며, 투명한 image 부모는 Graphic을 표시하지 않은 채 자식만 자른다. source TextAsset 기반 Material은 `Assets/Html2VrcGenerated/RoundedCorners` 아래 source GUID와 node ID 기반 안정 경로로 갱신된다.
 
+Canonical `transform`은 `origin`과 배열 순서의 `translate`, `rotate`, `scale`을 내부 `transformOrigin`, `transformOriginIsPercent`, `transformOperationTypes`, `transformOperationValues`, `transformOperationValuesArePercent` 배열로 정규화한다. 각 operation은 안정 ID의 RectTransform wrapper 하나로 생성해 비균일 scale과 rotate가 섞인 순서도 정확히 보존한다. percentage origin과 translate는 flex와 margin이 끝난 노드 자신의 최종 Layout Rect를 기준으로 갱신하고, transform wrapper 밖의 layout wrapper가 형제 배치 공간을 유지한다. 양의 회전은 화면 기준 시계 방향이다.
+
 Resource URI는 canonical 명세대로 UDOM TextAsset이 있는 폴더를 기준으로 해석한다. `Assets/`로 시작하는 절대 Unity 에셋 경로도 지원한다. `..`로 정규화하더라도 결과가 `Assets/` 밖으로 나가면 참조하지 않고 경고를 남긴다.
 
-아직 지원하지 않는 canonical 기능은 묵시하지 않고 검증 오류나 명시적 폴백 경고로 반환한다. 현재 변환과 그림자는 오류로 거부한다. font resource는 프로젝트 기본 TMP font로 폴백하고 경고를 남긴다. Text 노드 자체의 linear/radial/conic gradient와 radius는 TMP 텍스트와 별도 박스 graphic이 필요하므로 첫 stop 색 또는 square corner와 경고를 사용한다. Embed의 gradient와 radius도 외부 오브젝트가 graphic을 소유하므로 첫 stop 또는 square corner로 진단한다. source asset 경로가 없는 raw JSON 검증에서는 상대 resource URI를 추측하지 않고 빈 Image와 경고를 사용한다. `bind`와 `on`의 symbolic ID는 임의 로직으로 실행하지 않고, 안전한 Unity/Udon binding manifest가 없다는 경고로 남는다. Button, Toggle, Slider, Text input과 Scroll의 canonical focus/blur도 같은 방식으로 보존·진단한다. Slider의 step은 정수 범위의 `1`일 때 Unity `wholeNumbers`로 적용하고 그 외의 step은 아직 경고와 연속 Slider 폴백을 사용한다. Text input은 빈 문자열을 포함한 value와 placeholder, multiline, readOnly, disabled를 native `TMP_InputField`로 적용한다.
+아직 지원하지 않는 canonical 기능은 묵시하지 않고 검증 오류나 명시적 폴백 경고로 반환한다. 현재 그림자는 오류로 거부한다. font resource는 프로젝트 기본 TMP font로 폴백하고 경고를 남긴다. Text 노드 자체의 linear/radial/conic gradient와 radius는 TMP 텍스트와 별도 박스 graphic이 필요하므로 첫 stop 색 또는 square corner와 경고를 사용한다. Embed의 gradient와 radius도 외부 오브젝트가 graphic을 소유하므로 첫 stop 또는 square corner로 진단한다. source asset 경로가 없는 raw JSON 검증에서는 상대 resource URI를 추측하지 않고 빈 Image와 경고를 사용한다. `bind`와 `on`의 symbolic ID는 임의 로직으로 실행하지 않고, 안전한 Unity/Udon binding manifest가 없다는 경고로 남는다. Button, Toggle, Slider, Text input과 Scroll의 canonical focus/blur도 같은 방식으로 보존·진단한다. Slider의 step은 정수 범위의 `1`일 때 Unity `wholeNumbers`로 적용하고 그 외의 step은 아직 경고와 연속 Slider 폴백을 사용한다. Text input은 빈 문자열을 포함한 value와 placeholder, multiline, readOnly, disabled를 native `TMP_InputField`로 적용한다.
 
 ## 최상위 구조
 
@@ -132,6 +134,8 @@ Resource URI는 canonical 명세대로 UDOM TextAsset이 있는 폴더를 기준
 - `backgroundGradientCenterIsPercent`, `backgroundGradientRadiusIsPercent`: 대응 X/Y 값이 최종 Rect 축 기준 percentage인지 보존하는 내부 boolean 배열.
 - `cornerRadius`: 내부 정규화 형식의 `[topLeft, topRight, bottomRight, bottomLeft]` design-unit 반지름.
 - `cornerRadiusPercent`: 같은 순서의 percentage 배열. `-1`은 대응 `cornerRadius`가 절대값임을 뜻하고, 0 이상은 최종 Rect의 짧은 변을 기준으로 해석한다.
+- `transformOrigin`, `transformOriginIsPercent`: canonical transform origin의 X/Y 값과 percentage 여부.
+- `transformOperationTypes`, `transformOperationValues`, `transformOperationValuesArePercent`: 배열 순서를 유지한 translate/rotate/scale과 operation당 X/Y 슬롯.
 - `stretchChildrenWidth`, `stretchChildrenHeight`: canonical flex의 기본 `alignItems: stretch`를 Unity Layout Group의 cross-axis 제어로 보존하는 내부 플래그.
 - 색상: Unity HTML 색상 형식 `#RRGGBB` 또는 `#RRGGBBAA`.
 - `alignment`: `TopLeft`, `Top`, `TopRight`, `Left`, `Center`, `Right`, `BottomLeft`, `Bottom`, `BottomRight`, `MiddleLeft`, `MiddleRight`.

@@ -151,6 +151,13 @@ namespace Html2Vrc.Editor
             writer.BoolProperty("stretchChildrenHeight", style.stretchChildrenHeight);
             writer.FloatProperty("flexibleWidth", style.flexibleWidth);
             writer.FloatProperty("flexibleHeight", style.flexibleHeight);
+            writer.FloatArrayProperty("transformOrigin", style.transformOrigin);
+            writer.BoolArrayProperty("transformOriginIsPercent", style.transformOriginIsPercent);
+            writer.StringArrayProperty("transformOperationTypes", style.transformOperationTypes);
+            writer.FloatArrayProperty("transformOperationValues", style.transformOperationValues);
+            writer.BoolArrayProperty(
+                "transformOperationValuesArePercent",
+                style.transformOperationValuesArePercent);
             writer.EndObject();
         }
 

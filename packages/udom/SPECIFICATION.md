@@ -674,7 +674,7 @@ Transform 스타일은 다음 구조를 가진다.
 }
 ```
 
-Transform operation은 배열 순서대로 적용한다.
+Transform operation은 배열 순서대로 적용한다. Transform은 Layout이 계산한 박스의 크기나 형제 배치에는 영향을 주지 않고, 계산된 박스를 그리는 단계에만 적용한다.
 
 지원 operation:
 
@@ -683,6 +683,8 @@ Transform operation은 배열 순서대로 적용한다.
 - `scale`
 
 양의 `rotate.degrees`는 화면을 바라볼 때 시계 방향이다. Renderer는 Unity의 회전 방향을 그대로 노출하지 않고 UDOM 좌표계로 변환해야 한다.
+
+`origin`의 기본값은 `{ "x": "50%", "y": "50%" }`다. `translate.x/y`는 생략하거나 `auto`이면 `0`이고, percentage는 노드 자신의 최종 Layout 박스에서 대응하는 축을 기준으로 계산한다. `scale.x/y`의 기본값은 `1`이다.
 
 UDOM 0.1은 3D transform, skew와 임의 matrix를 핵심으로 정의하지 않는다.
 

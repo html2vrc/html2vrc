@@ -333,6 +333,41 @@ namespace Html2Vrc.Editor
                 style.flexibleHeight = GetFloat(flexibleHeight, path + ".flexibleHeight");
             }
 
+            if (value.TryGetValue("transformOrigin", out var transformOrigin))
+            {
+                style.transformOrigin = GetFloatArray(transformOrigin, path + ".transformOrigin");
+            }
+
+            if (value.TryGetValue("transformOriginIsPercent", out var transformOriginIsPercent))
+            {
+                style.transformOriginIsPercent = GetBooleanArray(
+                    transformOriginIsPercent,
+                    path + ".transformOriginIsPercent");
+            }
+
+            if (value.TryGetValue("transformOperationTypes", out var transformOperationTypes))
+            {
+                style.transformOperationTypes = GetStringArray(
+                    transformOperationTypes,
+                    path + ".transformOperationTypes");
+            }
+
+            if (value.TryGetValue("transformOperationValues", out var transformOperationValues))
+            {
+                style.transformOperationValues = GetFloatArray(
+                    transformOperationValues,
+                    path + ".transformOperationValues");
+            }
+
+            if (value.TryGetValue(
+                    "transformOperationValuesArePercent",
+                    out var transformOperationValuesArePercent))
+            {
+                style.transformOperationValuesArePercent = GetBooleanArray(
+                    transformOperationValuesArePercent,
+                    path + ".transformOperationValuesArePercent");
+            }
+
             return style;
         }
 
