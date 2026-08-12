@@ -56,6 +56,9 @@ namespace Html2Vrc.Tests
                 UdomRoundedCornerAssetUtility.DeleteGeneratedAssets(sample, "radial-panel");
                 UdomRoundedCornerAssetUtility.DeleteGeneratedAssets(sample, "conic-panel");
                 UdomRoundedCornerAssetUtility.DeleteGeneratedAssets(sample, "radius-panel");
+                UdomRoundedCornerAssetUtility.DeleteGeneratedAssets(sample, "shadow-panel");
+                UdomShadowAssetUtility.DeleteGeneratedAssets(sample, "shadow-panel::__shadow-0");
+                UdomShadowAssetUtility.DeleteGeneratedAssets(sample, "shadow-panel::__shadow-1");
             }
         }
 
@@ -1327,6 +1330,174 @@ namespace Html2Vrc.Tests
             Assert.That(panelRect.rect.size, Is.EqualTo(new Vector2(410f, 100f)));
             Assert.That(panelRect.localScale, Is.EqualTo(Vector3.one));
             Assert.That(panelRect.localRotation, Is.EqualTo(Quaternion.identity));
+        }
+
+        [Test]
+        public void CanonicalShadow_RendersLayeredBlurAndRegeneratesStably()
+        {
+            var json = LoadRepositoryFile(
+                "packages",
+                "udom",
+                "fixtures",
+                "valid",
+                "unity-shadow.udom.json");
+            var validation = UdomValidator.Validate(json);
+
+            Assert.That(validation.IsValid, Is.True, validation.Format());
+            Assert.That(validation.Issues, Is.Empty, validation.Format());
+            var panelNode = validation.Document.root.children.Single(node => node.id == "shadow-panel");
+            Assert.That(panelNode.style.shadowOffsets, Is.EqualTo(new[] { 16f, 12f, -6f, 4f }));
+            Assert.That(panelNode.style.shadowBlurs, Is.EqualTo(new[] { 18f, 0f }));
+            Assert.That(panelNode.style.shadowSpreads, Is.EqualTo(new[] { 4f, -2f }));
+            Assert.That(panelNode.style.shadowColors, Is.EqualTo(new[] { "#10204080", "#FF8040A0" }));
+            Assert.That(panelNode.style.shadowInsets, Is.EqualTo(new[] { false, false }));
+
+            const string insetJson = @"{
+              ""asset"": { ""version"": ""0.1"" },
+              ""viewport"": { ""width"": 200, ""height"": 100 },
+              ""root"": {
+                ""type"": ""element"", ""id"": ""inset-shadow"", ""name"": ""view"",
+                ""style"": { ""paint"": { ""shadows"": [{ ""inset"": true }] } }
+              }
+            }";
+            var inset = UdomValidator.Validate(insetJson);
+            Assert.That(inset.IsValid, Is.True, inset.Format());
+            Assert.That(inset.Document.root.style.shadowOffsets, Is.EqualTo(new[] { 0f, 0f }));
+            Assert.That(inset.Document.root.style.shadowBlurs, Is.EqualTo(new[] { 0f }));
+            Assert.That(inset.Document.root.style.shadowSpreads, Is.EqualTo(new[] { 0f }));
+            Assert.That(inset.Document.root.style.shadowColors, Is.EqualTo(new[] { "#00000080" }));
+            Assert.That(inset.Document.root.style.shadowInsets, Is.EqualTo(new[] { true }));
+            Assert.That(inset.Format(), Does.Contain("Inset shadow is preserved but not rendered"));
+
+            var build = UdomBuilder.GenerateOrRegenerate(validation.Document, null, sample);
+            var root = build.Root;
+            var layout = UdomBuilder.FindNode(root, "shadow-panel::__shadow-layout");
+            var shadow0 = UdomBuilder.FindNode(root, "shadow-panel::__shadow-0");
+            var shadow1 = UdomBuilder.FindNode(root, "shadow-panel::__shadow-1");
+            var panel = UdomBuilder.FindNode(root, "shadow-panel");
+            var documentRoot = UdomBuilder.FindNode(root, "shadow-root");
+            Assert.That(layout, Is.Not.Null);
+            Assert.That(shadow0, Is.Not.Null);
+            Assert.That(shadow1, Is.Not.Null);
+            Assert.That(panel, Is.Not.Null);
+            Assert.That(layout.transform.parent, Is.SameAs(documentRoot.transform));
+            Assert.That(shadow0.transform.parent, Is.SameAs(layout.transform));
+            Assert.That(shadow1.transform.parent, Is.SameAs(layout.transform));
+            Assert.That(panel.transform.parent, Is.SameAs(layout.transform));
+            Assert.That(shadow0.transform.GetSiblingIndex(), Is.EqualTo(0));
+            Assert.That(shadow1.transform.GetSiblingIndex(), Is.EqualTo(1));
+            Assert.That(panel.transform.GetSiblingIndex(), Is.EqualTo(2));
+
+            var layoutRect = layout.GetComponent<RectTransform>();
+            var shadow0Rect = shadow0.GetComponent<RectTransform>();
+            var shadow1Rect = shadow1.GetComponent<RectTransform>();
+            var panelRect = panel.GetComponent<RectTransform>();
+            var shadow0Image = shadow0.GetComponent<Image>();
+            var shadow1Image = shadow1.GetComponent<Image>();
+            var shadow0Material = shadow0Image.material;
+            var shadow0MaterialPath = AssetDatabase.GetAssetPath(shadow0Material);
+            var shadow0MaterialGuid = AssetDatabase.AssetPathToGUID(shadow0MaterialPath);
+            Assert.That(layoutRect.rect.size, Is.EqualTo(new Vector2(440f, 140f)));
+            Assert.That(layout.GetComponent<LayoutElement>(), Is.Not.Null);
+            Assert.That(panel.GetComponent<LayoutElement>(), Is.Null);
+            Assert.That(panelRect.rect.size, Is.EqualTo(new Vector2(440f, 140f)));
+            Assert.That(shadow0Rect.anchoredPosition, Is.EqualTo(new Vector2(16f, -12f)));
+            Assert.That(shadow0Rect.rect.size, Is.EqualTo(new Vector2(484f, 184f)));
+            Assert.That(shadow1Rect.anchoredPosition, Is.EqualTo(new Vector2(-6f, -4f)));
+            Assert.That(shadow1Rect.rect.size, Is.EqualTo(new Vector2(436f, 136f)));
+            Assert.That(shadow0Image.raycastTarget, Is.False);
+            Assert.That(shadow1Image.raycastTarget, Is.False);
+            Assert.That(shadow0Material.shader.name, Is.EqualTo(UdomShadowAssetUtility.ShaderName));
+            Assert.That(shadow1Image.material.shader.name, Is.EqualTo(UdomShadowAssetUtility.ShaderName));
+            Assert.That(shadow0MaterialPath, Does.StartWith("Assets/Html2VrcGenerated/Shadows/"));
+            Assert.That(shadow0Material.GetVector("_ShapeSize"),
+                Is.EqualTo(new Vector4(448f, 148f, 0f, 0f))
+                    .Using(Vector4ComparerWithEqualsOperator.Instance));
+            Assert.That(shadow0Material.GetVector("_CornerRadii"),
+                Is.EqualTo(new Vector4(32f, 28f, 20f, 12f))
+                    .Using(Vector4ComparerWithEqualsOperator.Instance));
+            Assert.That(shadow0Material.GetFloat("_Blur"), Is.EqualTo(18f).Within(0.001f));
+            Assert.That(
+                shadow0Image.color,
+                Is.EqualTo((Color)new Color32(0x10, 0x20, 0x40, 0x80)).Using(ColorComparer.Instance));
+
+#if UDONSHARP
+            var validationClone = Object.Instantiate(layout.gameObject);
+            try
+            {
+                WorldValidation.RemoveIllegalComponents(
+                    new List<GameObject> { validationClone },
+                    WorldValidation.WhiteListConfiguration.VRCSDK3);
+                var images = validationClone.GetComponentsInChildren<Image>(true);
+                Assert.That(images.Length, Is.EqualTo(3));
+                Assert.That(
+                    images.Count(image => image.material.shader.name == UdomShadowAssetUtility.ShaderName),
+                    Is.EqualTo(2));
+            }
+            finally
+            {
+                Object.DestroyImmediate(validationClone);
+            }
+#endif
+
+            panelNode.style.shadowOffsets[0] = 24f;
+            panelNode.style.shadowBlurs[0] = 10f;
+            panelNode.style.shadowSpreads[0] = 8f;
+            UdomBuilder.GenerateOrRegenerate(validation.Document, root, sample);
+            Assert.That(layout, Is.SameAs(UdomBuilder.FindNode(root, "shadow-panel::__shadow-layout")));
+            Assert.That(shadow0, Is.SameAs(UdomBuilder.FindNode(root, "shadow-panel::__shadow-0")));
+            Assert.That(shadow1, Is.SameAs(UdomBuilder.FindNode(root, "shadow-panel::__shadow-1")));
+            Assert.That(panel, Is.SameAs(UdomBuilder.FindNode(root, "shadow-panel")));
+            Assert.That(shadow0Rect.anchoredPosition, Is.EqualTo(new Vector2(24f, -12f)));
+            Assert.That(shadow0Rect.rect.size, Is.EqualTo(new Vector2(476f, 176f)));
+            Assert.That(AssetDatabase.GetAssetPath(shadow0Image.material), Is.EqualTo(shadow0MaterialPath));
+            Assert.That(AssetDatabase.AssetPathToGUID(shadow0MaterialPath), Is.EqualTo(shadow0MaterialGuid));
+            Assert.That(shadow0Image.material.GetVector("_ShapeSize"),
+                Is.EqualTo(new Vector4(456f, 156f, 0f, 0f))
+                    .Using(Vector4ComparerWithEqualsOperator.Instance));
+            Assert.That(shadow0Image.material.GetFloat("_Blur"), Is.EqualTo(10f).Within(0.001f));
+
+            panelNode.style.shadowOffsets = panelNode.style.shadowOffsets.Take(2).ToArray();
+            panelNode.style.shadowBlurs = panelNode.style.shadowBlurs.Take(1).ToArray();
+            panelNode.style.shadowSpreads = panelNode.style.shadowSpreads.Take(1).ToArray();
+            panelNode.style.shadowColors = panelNode.style.shadowColors.Take(1).ToArray();
+            panelNode.style.shadowInsets = panelNode.style.shadowInsets.Take(1).ToArray();
+            UdomBuilder.GenerateOrRegenerate(validation.Document, root, sample);
+            Assert.That(shadow0, Is.SameAs(UdomBuilder.FindNode(root, "shadow-panel::__shadow-0")));
+            Assert.That(UdomBuilder.FindNode(root, "shadow-panel::__shadow-1"), Is.Null);
+
+            panelNode.style.transformOperationTypes = new[] { "rotate" };
+            panelNode.style.transformOperationValues = new[] { 15f, 0f };
+            panelNode.style.transformOperationValuesArePercent = new[] { false, false };
+            UdomBuilder.GenerateOrRegenerate(validation.Document, root, sample);
+            var transformLayout = UdomBuilder.FindNode(root, "shadow-panel::__transform-layout");
+            var rotate = UdomBuilder.FindNode(root, "shadow-panel::__transform-operation-0");
+            Assert.That(transformLayout, Is.Not.Null);
+            Assert.That(rotate, Is.Not.Null);
+            Assert.That(UdomBuilder.FindNode(root, "shadow-panel::__shadow-layout"), Is.Null);
+            Assert.That(shadow0, Is.SameAs(UdomBuilder.FindNode(root, "shadow-panel::__shadow-0")));
+            Assert.That(panel, Is.SameAs(UdomBuilder.FindNode(root, "shadow-panel")));
+            Assert.That(shadow0.transform.parent, Is.SameAs(rotate.transform));
+            Assert.That(panel.transform.parent, Is.SameAs(rotate.transform));
+            Assert.That(shadow0.transform.GetSiblingIndex(), Is.EqualTo(0));
+            Assert.That(panel.transform.GetSiblingIndex(), Is.EqualTo(1));
+            Assert.That(rotate.GetComponent<RectTransform>().localEulerAngles.z, Is.EqualTo(345f).Within(0.001f));
+
+            panelNode.style.shadowOffsets = System.Array.Empty<float>();
+            panelNode.style.shadowBlurs = System.Array.Empty<float>();
+            panelNode.style.shadowSpreads = System.Array.Empty<float>();
+            panelNode.style.shadowColors = System.Array.Empty<string>();
+            panelNode.style.shadowInsets = System.Array.Empty<bool>();
+            panelNode.style.transformOperationTypes = System.Array.Empty<string>();
+            panelNode.style.transformOperationValues = System.Array.Empty<float>();
+            panelNode.style.transformOperationValuesArePercent = System.Array.Empty<bool>();
+            UdomBuilder.GenerateOrRegenerate(validation.Document, root, sample);
+            Assert.That(panel, Is.SameAs(UdomBuilder.FindNode(root, "shadow-panel")));
+            Assert.That(panel.transform.parent, Is.SameAs(documentRoot.transform));
+            Assert.That(UdomBuilder.FindNode(root, "shadow-panel::__shadow-layout"), Is.Null);
+            Assert.That(UdomBuilder.FindNode(root, "shadow-panel::__transform-layout"), Is.Null);
+            Assert.That(UdomBuilder.FindNode(root, "shadow-panel::__shadow-0"), Is.Null);
+            Assert.That(panelRect.rect.size, Is.EqualTo(new Vector2(440f, 140f)));
         }
 
         [Test]

@@ -142,6 +142,11 @@ namespace Html2Vrc.Editor
             writer.FloatArrayProperty("cornerRadiusPercent", style.cornerRadiusPercent);
             writer.FloatArrayProperty("borderWidth", style.borderWidth);
             writer.StringArrayProperty("borderColor", style.borderColor);
+            writer.FloatArrayProperty("shadowOffsets", style.shadowOffsets);
+            writer.FloatArrayProperty("shadowBlurs", style.shadowBlurs);
+            writer.FloatArrayProperty("shadowSpreads", style.shadowSpreads);
+            writer.StringArrayProperty("shadowColors", style.shadowColors);
+            writer.BoolArrayProperty("shadowInsets", style.shadowInsets);
             writer.StringProperty("textColor", style.textColor);
             writer.FloatProperty("fontSize", style.fontSize);
             writer.StringProperty("alignment", style.alignment);

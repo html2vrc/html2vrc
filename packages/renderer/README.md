@@ -331,8 +331,8 @@ ReactUnity에서는 CSS 값 정규화, 속성 매핑, uGUI와 UI Toolkit 백엔�
 | border radius | SDF Rounded Corners Material (Unity 프로토타입 구현) | 9-slice | Material 또는 9-slice |
 | 단순 border | Material 또는 추가 Image | 9-slice | 동일 |
 | 2D transform | operation별 RectTransform wrapper (Unity 프로토타입 구현) | Matrix bake | 동일 |
-| 단순 shadow | UIEffect 또는 복제 Image | 부분 이미지 | 축소하거나 비활성화 |
-| blur shadow | UIEffect | 부분 이미지 | 기본 비활성화 |
+| 단순 shadow | SDF Shadow Material (Unity 프로토타입 구현) | 복제 Image | 축소하거나 비활성화 |
+| blur shadow | SDF Shadow Material (Unity 프로토타입 구현) | 부분 이미지 | 기본 비활성화 |
 | 사진·일러스트 | Sprite 또는 Texture | Atlas | 압축 Texture |
 | TextNode | TextMeshPro | 별도 Font 폴백 | TextMeshPro |
 
@@ -585,7 +585,7 @@ AI는 특정 Unity 라이브러리 API보다 HTML, CSS, React와 일반적인 Un
 
 ### 4단계: 장식과 폴백
 
-- shadow와 outline
+- outer shadow (VRChat-safe SDF Material 구현), inset shadow와 outline
 - blur
 - Gradient LUT 품질·성능 프로파일 확장
 - 부분 Texture Bake

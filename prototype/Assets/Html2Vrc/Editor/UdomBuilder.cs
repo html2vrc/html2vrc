@@ -99,6 +99,8 @@ namespace Html2Vrc.Editor
         private const string TransformLayoutSuffix = "::__transform-layout";
         private const string TransformOriginSuffix = "::__transform-origin";
         private const string TransformOperationSuffix = "::__transform-operation-";
+        private const string ShadowLayoutSuffix = "::__shadow-layout";
+        private const string ShadowSuffix = "::__shadow-";
         private const string ViewportSuffix = "::__viewport";
         private const string ContentSuffix = "::__content";
         private const string ToggleCheckmarkSuffix = "::__toggle-checkmark";
@@ -257,7 +259,7 @@ namespace Html2Vrc.Editor
             EditorUtility.SetDirty(root);
             PrefabUtility.RecordPrefabInstancePropertyModifications(root);
             Canvas.ForceUpdateCanvases();
-            RefreshTransformLayout(document.root, context);
+            RefreshVisualLayout(document.root, context);
             Canvas.ForceUpdateCanvases();
             RefreshPaintLayout(document.root, context);
             return result;
@@ -459,6 +461,7 @@ namespace Html2Vrc.Editor
             var actualParent = parent;
             var hasMargin = HasNonZero(style.margin);
             var hasTransform = HasTransform(style);
+            var hasShadows = HasRenderableShadow(style);
 
             if (hasMargin)
             {
@@ -471,6 +474,7 @@ namespace Html2Vrc.Editor
             }
 
             GameObject transformLayout = null;
+            GameObject shadowLayout = null;
             var nodeParent = actualParent;
             if (hasTransform)
             {
@@ -502,6 +506,46 @@ namespace Html2Vrc.Editor
                     style,
                     context);
             }
+            else if (hasShadows)
+            {
+                var shadowLayoutId = node.id + ShadowLayoutSuffix;
+                shadowLayout = UpsertGeneratedObject(
+                    shadowLayoutId,
+                    "ShadowLayout",
+                    true,
+                    actualParent,
+                    context);
+                context.DesiredIds.Add(shadowLayoutId);
+                shadowLayout.name = $"Shadow Layout [{node.id}]";
+                if (hasMargin)
+                {
+                    shadowLayout.transform.SetSiblingIndex(0);
+                    ConfigureInsideMargin(
+                        shadowLayout.GetComponent<RectTransform>(),
+                        style.margin);
+                }
+                else
+                {
+                    shadowLayout.transform.SetSiblingIndex(Mathf.Min(siblingIndex, parent.childCount - 1));
+                    ConfigureRect(shadowLayout, style, parent);
+                }
+
+                nodeParent = shadowLayout.transform;
+            }
+
+            var visualLayout = transformLayout != null ? transformLayout : shadowLayout;
+            var visualSize = visualLayout != null
+                ? visualLayout.GetComponent<RectTransform>().rect.size
+                : GetVector2(style.size, new Vector2(100f, 100f));
+            if (visualSize.x <= 0f || visualSize.y <= 0f)
+            {
+                visualSize = GetVector2(style.size, new Vector2(100f, 100f));
+            }
+
+            if (hasShadows)
+            {
+                ConfigureShadows(nodeParent, node, style, visualSize, context);
+            }
 
             var nodeObject = UpsertGeneratedObject(node.id, node.type, false, nodeParent, context);
             context.DesiredIds.Add(node.id);
@@ -509,14 +553,13 @@ namespace Html2Vrc.Editor
 
             if (hasTransform)
             {
-                nodeObject.transform.SetSiblingIndex(0);
-                var transformSize = transformLayout.GetComponent<RectTransform>().rect.size;
-                if (transformSize.x <= 0f || transformSize.y <= 0f)
-                {
-                    transformSize = GetVector2(style.size, new Vector2(100f, 100f));
-                }
-
-                ConfigureTransformedNodeRect(nodeObject, style, transformSize);
+                nodeObject.transform.SetAsLastSibling();
+                ConfigureTransformedNodeRect(nodeObject, style, visualSize);
+            }
+            else if (hasShadows)
+            {
+                nodeObject.transform.SetAsLastSibling();
+                ConfigureStackedNodeRect(nodeObject, visualSize);
             }
             else if (hasMargin)
             {
@@ -529,7 +572,15 @@ namespace Html2Vrc.Editor
                 ConfigureRect(nodeObject, style, parent);
             }
 
-            ConfigurePaint(nodeObject, style);
+            if (hasShadows)
+            {
+                ConfigurePaint(visualLayout, style);
+                ConfigurePaint(nodeObject, null);
+            }
+            else
+            {
+                ConfigurePaint(nodeObject, style);
+            }
 
             var panelForChildren = documentPanel;
             if (panelForChildren == null && string.Equals(node.type, "Panel", StringComparison.OrdinalIgnoreCase))
@@ -819,6 +870,99 @@ namespace Html2Vrc.Editor
             RemoveIfPresent<LayoutElement>(target);
         }
 
+        private static void ConfigureStackedNodeRect(GameObject target, Vector2 size)
+        {
+            var rect = target.GetComponent<RectTransform>();
+            Undo.RecordObject(rect, "Configure stacked UDOM node");
+            rect.anchorMin = new Vector2(0.5f, 0.5f);
+            rect.anchorMax = new Vector2(0.5f, 0.5f);
+            rect.pivot = new Vector2(0.5f, 0.5f);
+            rect.anchoredPosition = Vector2.zero;
+            rect.sizeDelta = size;
+            rect.localScale = Vector3.one;
+            rect.localRotation = Quaternion.identity;
+            rect.localPosition = new Vector3(rect.localPosition.x, rect.localPosition.y, 0f);
+            RemoveIfPresent<LayoutElement>(target);
+        }
+
+        private static void ConfigureShadows(
+            Transform parent,
+            UdomNode node,
+            UdomStyle style,
+            Vector2 size,
+            BuildContext context)
+        {
+            var baseCenter = HasTransform(style) ? -ResolveTransformOrigin(style, size) : Vector2.zero;
+            var siblingIndex = 0;
+            var shadowCount = UdomShadowAssetUtility.GetCount(style);
+            for (var index = 0; index < shadowCount; index++)
+            {
+                if (!UdomShadowAssetUtility.IsRenderable(style, index))
+                {
+                    continue;
+                }
+
+                var shadowId = node.id + ShadowSuffix + index;
+                var shadow = UpsertGeneratedObject(
+                    shadowId,
+                    "Shadow",
+                    true,
+                    parent,
+                    context);
+                context.DesiredIds.Add(shadowId);
+                shadow.name = $"Shadow {index} [{node.id}]";
+                shadow.transform.SetSiblingIndex(siblingIndex++);
+                ConfigureShadowRect(shadow, style, index, size, baseCenter);
+
+                var image = GetOrAdd<Image>(shadow);
+                Undo.RecordObject(image, "Configure UDOM shadow");
+                UdomShadowAssetUtility.Configure(
+                    image,
+                    style,
+                    index,
+                    size,
+                    context.SourceAsset,
+                    shadowId);
+            }
+        }
+
+        private static void ConfigureShadowRect(
+            GameObject target,
+            UdomStyle style,
+            int shadowIndex,
+            Vector2 size,
+            Vector2 baseCenter)
+        {
+            var rect = target.GetComponent<RectTransform>();
+            var offset = UdomShadowAssetUtility.GetOffset(style, shadowIndex);
+            var geometrySize = UdomShadowAssetUtility.GetGeometrySize(style, shadowIndex, size);
+            Undo.RecordObject(rect, "Configure UDOM shadow rect");
+            rect.anchorMin = new Vector2(0.5f, 0.5f);
+            rect.anchorMax = new Vector2(0.5f, 0.5f);
+            rect.pivot = new Vector2(0.5f, 0.5f);
+            rect.anchoredPosition = baseCenter + new Vector2(offset.x, -offset.y);
+            rect.sizeDelta = geometrySize;
+            rect.localScale = Vector3.one;
+            rect.localRotation = Quaternion.identity;
+            rect.localPosition = new Vector3(rect.localPosition.x, rect.localPosition.y, 0f);
+            RemoveIfPresent<LayoutElement>(target);
+
+            var image = target.GetComponent<Image>();
+            if (image != null && image.material != null)
+            {
+                Undo.RecordObject(image, "Refresh UDOM shadow");
+                image.color = UdomBuilderUtility.ParseColor(
+                    style.shadowColors[shadowIndex],
+                    Color.clear);
+                UdomShadowAssetUtility.ApplyProperties(
+                    image.material,
+                    style,
+                    shadowIndex,
+                    size);
+                SavePaintMaterial(image.material);
+            }
+        }
+
         private static Vector2 ResolveTransformOrigin(UdomStyle style, Vector2 size)
         {
             var x = ResolveTransformValue(
@@ -1057,45 +1201,78 @@ namespace Html2Vrc.Editor
             }
         }
 
-        private static void RefreshTransformLayout(UdomNode node, BuildContext context)
+        private static void RefreshVisualLayout(UdomNode node, BuildContext context)
         {
             var style = node.style ?? new UdomStyle();
-            if (HasTransform(style))
+            var hasTransform = HasTransform(style);
+            var hasShadows = HasRenderableShadow(style);
+            if (hasTransform || hasShadows)
             {
-                var transformLayout = FindNode(context.Root, node.id + TransformLayoutSuffix);
-                var origin = FindNode(context.Root, node.id + TransformOriginSuffix);
+                var layout = FindNode(
+                    context.Root,
+                    node.id + (hasTransform ? TransformLayoutSuffix : ShadowLayoutSuffix));
                 var target = FindNode(context.Root, node.id);
-                if (transformLayout != null && origin != null && target != null)
+                if (layout != null && target != null)
                 {
-                    var size = transformLayout.GetComponent<RectTransform>().rect.size;
+                    var size = layout.GetComponent<RectTransform>().rect.size;
                     if (size.x <= 0f || size.y <= 0f)
                     {
                         size = GetVector2(style.size, new Vector2(100f, 100f));
                     }
 
-                    ConfigureTransformOrigin(origin.gameObject, style, size);
-                    var operationCount = style.transformOperationTypes != null
-                        ? style.transformOperationTypes.Length
-                        : 0;
-                    for (var index = 0; index < operationCount; index++)
+                    if (hasTransform)
                     {
-                        var operation = FindNode(
-                            context.Root,
-                            node.id + TransformOperationSuffix + index);
-                        if (operation != null)
+                        var origin = FindNode(context.Root, node.id + TransformOriginSuffix);
+                        if (origin != null)
                         {
-                            ConfigureTransformOperation(operation.gameObject, style, index, size);
+                            ConfigureTransformOrigin(origin.gameObject, style, size);
                         }
+
+                        var operationCount = style.transformOperationTypes != null
+                            ? style.transformOperationTypes.Length
+                            : 0;
+                        for (var index = 0; index < operationCount; index++)
+                        {
+                            var operation = FindNode(
+                                context.Root,
+                                node.id + TransformOperationSuffix + index);
+                            if (operation != null)
+                            {
+                                ConfigureTransformOperation(operation.gameObject, style, index, size);
+                            }
+                        }
+
+                        ConfigureTransformedNodeRect(target.gameObject, style, size);
+                    }
+                    else
+                    {
+                        ConfigureStackedNodeRect(target.gameObject, size);
                     }
 
-                    ConfigureTransformedNodeRect(target.gameObject, style, size);
+                    var baseCenter = hasTransform
+                        ? -ResolveTransformOrigin(style, size)
+                        : Vector2.zero;
+                    var shadowCount = UdomShadowAssetUtility.GetCount(style);
+                    for (var index = 0; index < shadowCount; index++)
+                    {
+                        if (!UdomShadowAssetUtility.IsRenderable(style, index))
+                        {
+                            continue;
+                        }
+
+                        var shadow = FindNode(context.Root, node.id + ShadowSuffix + index);
+                        if (shadow != null)
+                        {
+                            ConfigureShadowRect(shadow.gameObject, style, index, size, baseCenter);
+                        }
+                    }
                 }
             }
 
             var children = node.children ?? Array.Empty<UdomNode>();
             for (var index = 0; index < children.Length; index++)
             {
-                RefreshTransformLayout(children[index], context);
+                RefreshVisualLayout(children[index], context);
             }
         }
 
@@ -2053,6 +2230,20 @@ namespace Html2Vrc.Editor
             return style != null
                    && style.transformOperationTypes != null
                    && style.transformOperationTypes.Length > 0;
+        }
+
+        private static bool HasRenderableShadow(UdomStyle style)
+        {
+            var count = UdomShadowAssetUtility.GetCount(style);
+            for (var index = 0; index < count; index++)
+            {
+                if (UdomShadowAssetUtility.IsRenderable(style, index))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private static Vector2 GetVector2(float[] values, Vector2 fallback)

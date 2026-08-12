@@ -79,6 +79,11 @@ namespace Html2Vrc
         public float[] cornerRadiusPercent = { -1f, -1f, -1f, -1f };
         public float[] borderWidth = { 0f, 0f, 0f, 0f };
         public string[] borderColor = { "#00000000", "#00000000", "#00000000", "#00000000" };
+        public float[] shadowOffsets = Array.Empty<float>();
+        public float[] shadowBlurs = Array.Empty<float>();
+        public float[] shadowSpreads = Array.Empty<float>();
+        public string[] shadowColors = Array.Empty<string>();
+        public bool[] shadowInsets = Array.Empty<bool>();
         public string textColor = "#FFFFFFFF";
         public float fontSize = 24f;
         public string alignment = "MiddleLeft";

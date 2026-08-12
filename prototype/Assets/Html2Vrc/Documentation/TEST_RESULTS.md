@@ -31,11 +31,12 @@
 - canonical conic-gradient의 위쪽 0°·시계 방향 순회, start angle과 mixed unit center 보존, 다중 stop LUT, radius SDF 합성, radial 전환 시 GUID 재사용과 VRChat 허용 컴포넌트 검사를 확인했다.
 - canonical per-corner radius의 절대값·percentage 해석, SDF Material, 최종 Layout Rect 기반 갱신, 과도한 반지름 비율 정규화, gradient 합성, 투명 image 자식 stencil clipping, Material 안정 재사용·정리와 VRChat 허용 컴포넌트 검사를 확인했다.
 - canonical transform의 mixed-unit origin/translate, 시계 방향 rotate와 비균일 scale 배열 순서를 안정 RectTransform wrapper로 보존했다. flex stretch 뒤의 최종 Rect 갱신, margin 추가와 transform 제거 시 GameObject 재사용·wrapper 정리, VRChat 허용 컴포넌트 보존도 확인했다.
+- canonical outer shadow의 다중 layer offset·blur·양수/음수 spread·color를 radius-aware SDF Material로 생성했다. flex 최종 Rect 갱신, layer 순서, transform 합성, Material GUID와 GameObject 안정 재사용, layer·wrapper 제거 및 VRChat 허용 컴포넌트 보존을 확인했다. inset shadow는 값을 보존하고 명시적 폴백 경고를 남긴다.
 
 자동 검증 결과:
 
-- `npm run check`: UDOM conformance 27/27, React 5/5, TypeScript typecheck와 build 통과
-- Unity EditMode `Html2Vrc.Tests.UdomPrototypeTests`: **28/28 통과, 실패 0**
+- `npm run check`: UDOM conformance 28/28, React 5/5, TypeScript typecheck와 build 통과
+- Unity EditMode `Html2Vrc.Tests.UdomPrototypeTests`: **29/29 통과, 실패 0**
 - Unity 종료 코드 0, C# 컴파일 오류 0
 - Windows CRLF에서 기존 HTML 재생성 테스트가 문자열을 교체하지 못하던 문제도 함께 수정했다.
 
@@ -65,7 +66,7 @@
 
 ## 자동 회귀 검증
 
-HTML2VRC 전용 Unity Test Framework 테스트 28개를 실행한다. 검증 범위는 다음과 같다.
+HTML2VRC 전용 Unity Test Framework 테스트 29개를 실행한다. 검증 범위는 다음과 같다.
 
 1. 샘플 UDOM Validation 성공과 잘못된 속성/중복 ID 거부
 2. Canvas, TextMeshProUGUI, Image, Button, ScrollRect, LayoutGroup과 VRChat용 `VRCUiShape` 생성
@@ -95,11 +96,12 @@ HTML2VRC 전용 Unity Test Framework 테스트 28개를 실행한다. 검증 범
 26. canonical radial-gradient의 mixed unit center/radius 타원, 최종 Rect 계산, rounded Mask 합성, linear 전환 재사용과 VRChat 허용 컴포넌트 검사
 27. canonical conic-gradient의 위쪽 0°·시계 방향 진행, mixed unit center/start angle, rounded Mask 합성, radial 전환 재사용과 VRChat 허용 컴포넌트 검사
 28. canonical transform의 mixed-unit origin/translate, 배열 순서 rotate·비균일 scale, flex/margin 최종 Rect 갱신, 안정 wrapper 재생성과 제거 수명주기
+29. canonical outer shadow의 다중 layer blur/spread/radius, flex 최종 Rect, transform 합성, 안정 Material·wrapper 재생성과 inset 폴백 진단
 
 최종 자동 테스트 결과:
 
-- 전체 28개
-- 통과 28개
+- 전체 29개
+- 통과 29개
 - 실패 0개
 - 건너뜀 0개
 - Unity 종료 코드 0

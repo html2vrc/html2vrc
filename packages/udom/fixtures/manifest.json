@@ -60,6 +60,10 @@
     "valid": true
   },
   {
+    "file": "valid/unity-shadow.udom.json",
+    "valid": true
+  },
+  {
     "file": "invalid/duplicate-node-id.udom.json",
     "valid": false,
     "code": "H2VRC-NODE-001"

@@ -1489,7 +1489,14 @@ namespace Html2Vrc.Editor
                     result.Style);
             }
 
-            RejectNonEmptyArray(value, "shadows", path + ".shadows", "canonical shadows are not supported yet");
+            if (value.TryGetValue("shadows", out var shadowsValue))
+            {
+                MapShadows(
+                    RequireArray(shadowsValue, path + ".shadows"),
+                    path + ".shadows",
+                    result.Style,
+                    warnings);
+            }
             if (value.TryGetValue("radius", out var radiusValue))
             {
                 MapCornerRadius(
@@ -1554,6 +1561,93 @@ namespace Html2Vrc.Editor
             }
 
             result.HasBackground = true;
+        }
+
+        private static void MapShadows(
+            List<object> values,
+            string path,
+            UdomStyle style,
+            List<UdomParseWarning> warnings)
+        {
+            var count = values.Count;
+            style.shadowOffsets = new float[count * 2];
+            style.shadowBlurs = new float[count];
+            style.shadowSpreads = new float[count];
+            style.shadowColors = new string[count];
+            style.shadowInsets = new bool[count];
+            for (var index = 0; index < count; index++)
+            {
+                var shadowPath = $"{path}[{index}]";
+                var shadow = RequireObject(values[index], shadowPath);
+                EnsureOnlyKeys(
+                    shadow,
+                    shadowPath,
+                    "offsetX",
+                    "offsetY",
+                    "blur",
+                    "spread",
+                    "color",
+                    "inset");
+                style.shadowOffsets[index * 2] = GetOptionalFiniteShadowNumber(
+                    shadow,
+                    "offsetX",
+                    0f,
+                    shadowPath + ".offsetX");
+                style.shadowOffsets[index * 2 + 1] = GetOptionalFiniteShadowNumber(
+                    shadow,
+                    "offsetY",
+                    0f,
+                    shadowPath + ".offsetY");
+                style.shadowBlurs[index] = GetOptionalFiniteShadowNumber(
+                    shadow,
+                    "blur",
+                    0f,
+                    shadowPath + ".blur");
+                if (style.shadowBlurs[index] < 0f)
+                {
+                    throw new FormatException($"{shadowPath}.blur: shadow blur must be non-negative.");
+                }
+
+                style.shadowSpreads[index] = GetOptionalFiniteShadowNumber(
+                    shadow,
+                    "spread",
+                    0f,
+                    shadowPath + ".spread");
+                style.shadowColors[index] = shadow.TryGetValue("color", out var colorValue)
+                    ? RequireString(colorValue, shadowPath + ".color")
+                    : "#00000080";
+                style.shadowInsets[index] = GetBoolean(
+                    shadow,
+                    "inset",
+                    false,
+                    shadowPath + ".inset");
+                if (style.shadowInsets[index])
+                {
+                    warnings.Add(new UdomParseWarning(
+                        shadowPath + ".inset",
+                        "Inset shadow is preserved but not rendered by the Unity compatibility backend."));
+                }
+            }
+        }
+
+        private static float GetOptionalFiniteShadowNumber(
+            Dictionary<string, object> value,
+            string key,
+            float defaultValue,
+            string path)
+        {
+            if (!value.TryGetValue(key, out var raw))
+            {
+                return defaultValue;
+            }
+
+            var result = RequireFloat(raw, path);
+            if (float.IsNaN(result) || float.IsInfinity(result))
+            {
+                throw new FormatException($"{path}: shadow value must be finite.");
+            }
+
+            return result;
         }
 
         private static void MapBorder(Dictionary<string, object> value, string path, UdomStyle style)

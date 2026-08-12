@@ -93,6 +93,7 @@ namespace Html2Vrc.Editor
             "backgroundGradientCenter", "backgroundGradientCenterIsPercent",
             "backgroundGradientRadius", "backgroundGradientRadiusIsPercent",
             "cornerRadius", "cornerRadiusPercent", "borderWidth", "borderColor", "textColor", "fontSize", "alignment", "fontStyle", "childAlignment",
+            "shadowOffsets", "shadowBlurs", "shadowSpreads", "shadowColors", "shadowInsets",
             "stretchChildrenWidth", "stretchChildrenHeight",
             "flexibleWidth", "flexibleHeight",
             "transformOrigin", "transformOriginIsPercent", "transformOperationTypes",
@@ -420,6 +421,7 @@ namespace Html2Vrc.Editor
             ValidateColor(style.backgroundColor, path + ".backgroundColor", result);
             ValidateBackground(style, path, result);
             ValidateColorArray(style.borderColor, path + ".borderColor", result);
+            ValidateShadows(style, path, result);
             ValidateColor(style.textColor, path + ".textColor", result);
 
             if (style.fontSize <= 0f)
@@ -443,6 +445,49 @@ namespace Html2Vrc.Editor
             }
 
             ValidateTransform(style, path, result);
+        }
+
+        private static void ValidateShadows(
+            UdomStyle style,
+            string path,
+            UdomValidationResult result)
+        {
+            var colors = style.shadowColors;
+            if (colors == null)
+            {
+                AddError(result, path + ".shadowColors", "shadow color 배열이 필요하다.");
+                return;
+            }
+
+            var count = colors.Length;
+            ValidateVector(
+                style.shadowOffsets,
+                count * 2,
+                path + ".shadowOffsets",
+                result,
+                requirePositive: false);
+            ValidateVector(
+                style.shadowBlurs,
+                count,
+                path + ".shadowBlurs",
+                result,
+                requirePositive: false,
+                requireNonNegative: true);
+            ValidateVector(
+                style.shadowSpreads,
+                count,
+                path + ".shadowSpreads",
+                result,
+                requirePositive: false);
+            ValidateBooleanVector(
+                style.shadowInsets,
+                count,
+                path + ".shadowInsets",
+                result);
+            for (var index = 0; index < colors.Length; index++)
+            {
+                ValidateColor(colors[index], $"{path}.shadowColors[{index}]", result);
+            }
         }
 
         private static void ValidateTransform(

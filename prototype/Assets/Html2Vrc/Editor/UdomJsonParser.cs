@@ -284,6 +284,31 @@ namespace Html2Vrc.Editor
                 style.borderColor = GetStringArray(borderColor, path + ".borderColor");
             }
 
+            if (value.TryGetValue("shadowOffsets", out var shadowOffsets))
+            {
+                style.shadowOffsets = GetFloatArray(shadowOffsets, path + ".shadowOffsets");
+            }
+
+            if (value.TryGetValue("shadowBlurs", out var shadowBlurs))
+            {
+                style.shadowBlurs = GetFloatArray(shadowBlurs, path + ".shadowBlurs");
+            }
+
+            if (value.TryGetValue("shadowSpreads", out var shadowSpreads))
+            {
+                style.shadowSpreads = GetFloatArray(shadowSpreads, path + ".shadowSpreads");
+            }
+
+            if (value.TryGetValue("shadowColors", out var shadowColors))
+            {
+                style.shadowColors = GetStringArray(shadowColors, path + ".shadowColors");
+            }
+
+            if (value.TryGetValue("shadowInsets", out var shadowInsets))
+            {
+                style.shadowInsets = GetBooleanArray(shadowInsets, path + ".shadowInsets");
+            }
+
             if (value.TryGetValue("textColor", out _))
             {
                 style.textColor = GetString(value, "textColor");
