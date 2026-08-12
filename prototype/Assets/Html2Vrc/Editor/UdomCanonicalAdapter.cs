@@ -1281,7 +1281,10 @@ namespace Html2Vrc.Editor
                 "flex",
                 "flexItem");
 
-            RejectPresent(value, path, "zIndex", "z-index is not supported yet");
+            if (value.TryGetValue("zIndex", out var zIndexValue))
+            {
+                result.Style.zIndex = RequireInteger(zIndexValue, path + ".zIndex");
+            }
             RequireDefaultString(value, "overflowX", "visible", path + ".overflowX");
             RequireDefaultString(value, "overflowY", "visible", path + ".overflowY");
 
@@ -1623,9 +1626,10 @@ namespace Html2Vrc.Editor
                 return;
             }
 
-            if (!string.Equals(style.flexWrap, "NoWrap", StringComparison.Ordinal))
+            var wrapsLines = !string.Equals(style.flexWrap, "NoWrap", StringComparison.Ordinal);
+            if (wrapsLines || RequiresZIndexOrdering(children))
             {
-                ResolveWrappedFlexChildren(node, isVertical);
+                ResolveWrappedFlexChildren(node, isVertical, wrapsLines);
                 return;
             }
 
@@ -1867,7 +1871,7 @@ namespace Html2Vrc.Editor
             }
         }
 
-        private static void ResolveWrappedFlexChildren(UdomNode node, bool isVertical)
+        private static void ResolveWrappedFlexChildren(UdomNode node, bool isVertical, bool wrapsLines)
         {
             var style = node.style ?? new UdomStyle();
             var children = node.children ?? Array.Empty<UdomNode>();
@@ -1960,7 +1964,8 @@ namespace Html2Vrc.Editor
                 var index = orderedIndices[orderedIndex];
                 var required = baseOuterSizes[index]
                                + (currentLine != null && currentLine.Indices.Count > 0 ? mainGap : 0f);
-                if (currentLine != null
+                if (wrapsLines
+                    && currentLine != null
                     && currentLine.Indices.Count > 0
                     && currentOuterSize + required > mainAvailable + 0.0001f)
                 {
@@ -2125,6 +2130,32 @@ namespace Html2Vrc.Editor
             }
 
             style.useResolvedChildPositions = true;
+        }
+
+        private static bool RequiresZIndexOrdering(UdomNode[] children)
+        {
+            var hasVisibleChild = false;
+            var firstZIndex = 0;
+            for (var index = 0; index < children.Length; index++)
+            {
+                var childStyle = children[index] != null ? children[index].style : null;
+                if (childStyle == null || childStyle.displayNone)
+                {
+                    continue;
+                }
+
+                if (!hasVisibleChild)
+                {
+                    firstZIndex = childStyle.zIndex;
+                    hasVisibleChild = true;
+                }
+                else if (childStyle.zIndex != firstZIndex)
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private static void ResolveWrappedLineMainSizes(

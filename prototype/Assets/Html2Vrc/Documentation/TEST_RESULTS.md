@@ -43,11 +43,12 @@
 - 제한형 HTML CSS의 row/column reverse, justify-content, align-items, align-self, order, grow/shrink/basis를 canonical flex 해석기와 공유했다. Percentage basis·기본 shrink, 실제 Unity Rect 좌표·형제 순서, `display: none`, absolute left/top, wrapper 제거·노드 재사용과 지원하지 않는 값의 명시적 진단을 확인했다.
 - canonical flex의 wrap·wrap-reverse, alignContent 여섯 모드, 물리 row/column gap을 결정론적인 multi-line 배치로 해석했다. Line별 grow/max 재분배, reverse 주·교차축, alignSelf와 stretch, top-left Rect bake, nowrap 전환과 normalized JSON round-trip을 확인했다.
 - canonical font resource의 문서 상대 경로를 기존 TMP Font Asset 또는 TTF/OTF Unity Font로 해석했다. Source font는 GUID 기반 안정 경로의 dynamic TMP asset으로 생성하며 Text·TextInput·placeholder 적용, normalized JSON round-trip, 반복 재생성의 asset GUID·GameObject 재사용, 누락 경로의 기본 TMP font 폴백을 확인했다.
+- canonical 정수 zIndex를 낮은 값부터 높은 값의 paint 순서로 적용하면서 flex 위치와 hierarchy 순서를 분리했다. Order 기반 flow 위치, absolute flow 제외, 음수·양수·동률 zIndex, margin·transform 외곽 wrapper, normalized JSON round-trip, 반복 재생성과 zIndex 제거 시 native Layout Group 복원을 확인했다.
 
 자동 검증 결과:
 
-- `npm run check`: UDOM conformance 37/37, React 5/5, TypeScript typecheck와 build 통과
-- Unity EditMode `Html2Vrc.Tests.UdomPrototypeTests`: **41/41 통과, 실패 0**
+- `npm run check`: UDOM conformance 38/38, React 5/5, TypeScript typecheck와 build 통과
+- Unity EditMode `Html2Vrc.Tests.UdomPrototypeTests`: **42/42 통과, 실패 0**
 - Unity 종료 코드 0, C# 컴파일 오류 0
 - Windows CRLF에서 기존 HTML 재생성 테스트가 문자열을 교체하지 못하던 문제도 함께 수정했다.
 
@@ -77,7 +78,7 @@
 
 ## 자동 회귀 검증
 
-HTML2VRC 전용 Unity Test Framework 테스트 41개를 실행한다. 검증 범위는 다음과 같다.
+HTML2VRC 전용 Unity Test Framework 테스트 42개를 실행한다. 검증 범위는 다음과 같다.
 
 1. 샘플 UDOM Validation 성공과 잘못된 속성/중복 ID 거부
 2. Canvas, TextMeshProUGUI, Image, Button, ScrollRect, LayoutGroup과 VRChat용 `VRCUiShape` 생성
@@ -120,11 +121,12 @@ HTML2VRC 전용 Unity Test Framework 테스트 41개를 실행한다. 검증 범
 39. 제한형 HTML CSS flex의 지원하지 않는 alignment·basis·order·음수 shrink 값을 명시적 오류로 거부
 40. canonical flex wrap·wrap-reverse의 line 분할, row/column gap, alignContent·alignSelf·stretch, line별 grow/max, reverse 축, top-left Rect bake와 nowrap 전환을 검증
 41. canonical font resource의 기존 TMP asset 직접 로드와 TTF/OTF source의 안정 dynamic TMP asset 생성, Text·TextInput 적용, round-trip·재생성·fallback 수명주기 검증
+42. canonical zIndex의 flex layout/paint 순서 분리, order·absolute flow·음수/양수/동률·외곽 wrapper 정렬, round-trip·재생성·native Layout Group 복원 검증
 
 최종 자동 테스트 결과:
 
-- 전체 41개
-- 통과 41개
+- 전체 42개
+- 통과 42개
 - 실패 0개
 - 건너뜀 0개
 - Unity 종료 코드 0

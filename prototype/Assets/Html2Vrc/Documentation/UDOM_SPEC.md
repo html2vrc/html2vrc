@@ -34,6 +34,8 @@ Canonical flex의 `wrap`과 `wrap-reverse`는 order가 적용된 항목을 부�
 
 Canonical `position: absolute`는 내부 `positionAbsolute`로 보존한다. 해당 항목은 부모 flex의 main-axis 크기 계산, grow 재분배와 gap 개수에서 제외하고 Unity `LayoutElement.ignoreLayout`을 켠다. 숫자와 percentage `x/y`는 부모 design box를 기준으로 미리 해석한 뒤 RectTransform의 top-left anchor와 pivot에서 `(x, -y)`로 적용한다. Margin이 있으면 margin wrapper가 좌표와 외곽 크기를 소유하고, transform·shadow wrapper는 그 안쪽 box를 채운다. Absolute/flow 전환 시에도 같은 wrapper와 노드를 재사용한다.
 
+Canonical 정수 `zIndex`는 같은 부모가 만든 stacking context에서 낮은 값부터 높은 값 순으로 그리며 동률은 기존 시각 순서를 유지한다. 일반·absolute 부모는 source 순서, flex 부모는 order와 reverse가 적용된 순서가 동률 기준이다. 서로 다른 zIndex를 가진 flex 형제는 Unity Layout Group의 hierarchy 순서가 레이아웃까지 바꾸지 않도록 먼저 기존 flex 계산기로 최종 top-left Rect를 굽는다. 그다음 직접 노드 또는 margin·transform·shadow의 가장 바깥 안정 wrapper를 `(zIndex, 기존 시각 순서)`로 재배치한다. 따라서 absolute 항목은 flex flow에서 계속 제외되고, zIndex를 모두 같게 되돌리면 native Layout Group으로 복원하면서 GameObject를 재사용한다.
+
 Canonical `layout.mode`의 생략 기본값은 `absolute`다. Explicit `mode: none`은 내부 `displayNone`으로 보존하고 해당 노드와 subtree를 flex 크기·gap 계산, GameObject 생성, paint 갱신과 신규 external slot 수집에서 제외한다. 이전 생성 결과가 있으면 안정 ID prune 단계에서 margin·transform·shadow wrapper와 모든 자식을 제거한다. 이미 사용자가 연결한 external slot entry와 target은 프로젝트 계약에 따라 보존하며 target을 삭제하거나 reparent하지 않는다. Root가 none이어도 생성기 root와 viewport wrapper는 유지되어 다음 재생성이 안전하다.
 
 Canonical image의 `fit`은 `fill`, `contain`, `cover`, `none`을 모두 지원하며 생략 시 `contain`이다. resource에 선언된 width/height를 원본 크기로 사용하고, 없으면 로드한 Texture2D 또는 Sprite 크기를 사용한다. 이미지 콘텐츠는 `<node-id>::__image-content` 안정 ID의 내부 자식에 배치한다. 사각형은 부모 RectMask2D, radius가 있으면 부모의 SDF Image와 stencil Mask로 자른다. `position.x/y`의 백분율은 `(박스 크기 - 콘텐츠 크기) × 백분율`, 숫자는 왼쪽·위 기준 design-unit 오프셋, `auto`는 남는 공간의 가운데로 해석한다.
@@ -163,6 +165,7 @@ Resource URI는 canonical 명세대로 UDOM TextAsset이 있는 폴더를 기준
 - `textWrap`, `textOverflow`, `preserveWhitespace`: canonical wrap/nowrap, visible/clip/ellipsis와 whitespace 보존 여부.
 - `fontAssetPath`: canonical font resource에서 해석한 Unity `Assets/` 경로. 기존 TMP Font Asset 또는 TMP asset을 생성할 TTF/OTF source를 가리킨다.
 - `positionAbsolute`: canonical 노드가 부모 flex 흐름에서 빠지고 top-left `x/y` 좌표를 사용하는지 나타내는 내부 플래그.
+- `zIndex`: 같은 부모 안의 canonical 정수 paint 순서. 낮은 값이 먼저, 높은 값이 나중에 그려진다.
 - `displayNone`: canonical `layout.mode: none`으로 인해 노드와 subtree가 렌더링·레이아웃에서 제외되는지 나타내는 내부 플래그.
 - `stretchChildrenWidth`, `stretchChildrenHeight`: canonical flex의 기본 `alignItems: stretch`를 Unity Layout Group의 cross-axis 제어로 보존하는 내부 플래그.
 - `justifyContent`: canonical flex의 `start`, `center`, `end`, `space-between`, `space-around`, `space-evenly`를 보존하는 내부 enum 문자열.

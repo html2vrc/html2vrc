@@ -686,7 +686,7 @@ namespace Html2Vrc.Editor
             var parentLayout = parentNode.style != null ? parentNode.style.layout : null;
             var isFlexLayout = string.Equals(parentLayout, "Horizontal", StringComparison.OrdinalIgnoreCase)
                                || string.Equals(parentLayout, "Vertical", StringComparison.OrdinalIgnoreCase);
-            var orderedChildren = isFlexLayout
+            var layoutOrderedChildren = isFlexLayout
                 ? indexedChildren
                     .OrderBy(item => item.Child != null && item.Child.style != null
                         ? item.Child.style.flexOrder
@@ -696,8 +696,27 @@ namespace Html2Vrc.Editor
                 : indexedChildren.ToArray();
             if (isFlexLayout && parentNode.style != null && parentNode.style.reverseChildren)
             {
-                Array.Reverse(orderedChildren);
+                Array.Reverse(layoutOrderedChildren);
             }
+
+            var usesZIndex = layoutOrderedChildren
+                .Where(item => item.Child != null
+                               && item.Child.style != null
+                               && !item.Child.style.displayNone)
+                .Select(item => item.Child.style.zIndex)
+                .Distinct()
+                .Skip(1)
+                .Any();
+            var orderedChildren = usesZIndex
+                ? layoutOrderedChildren
+                    .Select((item, layoutIndex) => new { Item = item, LayoutIndex = layoutIndex })
+                    .OrderBy(entry => entry.Item.Child != null && entry.Item.Child.style != null
+                        ? entry.Item.Child.style.zIndex
+                        : 0)
+                    .ThenBy(entry => entry.LayoutIndex)
+                    .Select(entry => entry.Item)
+                    .ToArray()
+                : layoutOrderedChildren;
 
             for (var index = 0; index < orderedChildren.Length; index++)
             {

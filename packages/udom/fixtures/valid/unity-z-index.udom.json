@@ -1,0 +1,191 @@
+{
+  "asset": {
+    "version": "0.1",
+    "generator": "@html2vrc/udom Unity z-index fixture"
+  },
+  "viewport": {
+    "width": 640,
+    "height": 500
+  },
+  "root": {
+    "type": "element",
+    "id": "z-index-root",
+    "name": "view",
+    "style": {
+      "layout": {
+        "mode": "flex",
+        "width": "100%",
+        "height": "100%",
+        "padding": {
+          "top": 20,
+          "right": 20,
+          "bottom": 20,
+          "left": 20
+        },
+        "flex": {
+          "direction": "column",
+          "alignItems": "start",
+          "rowGap": 20
+        }
+      }
+    },
+    "children": [
+      {
+        "type": "element",
+        "id": "z-flex",
+        "name": "view",
+        "style": {
+          "layout": {
+            "mode": "flex",
+            "width": 520,
+            "height": 200,
+            "padding": {
+              "top": 20,
+              "right": 20,
+              "bottom": 20,
+              "left": 20
+            },
+            "flex": {
+              "direction": "row",
+              "alignItems": "start",
+              "columnGap": 10
+            }
+          }
+        },
+        "children": [
+          {
+            "type": "element",
+            "id": "paint-high",
+            "name": "view",
+            "style": {
+              "layout": {
+                "width": 100,
+                "height": 60,
+                "zIndex": -10,
+                "flexItem": {
+                  "order": 2
+                }
+              },
+              "transform": {
+                "operations": [
+                  {
+                    "type": "rotate",
+                    "degrees": 4
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "type": "element",
+            "id": "paint-low",
+            "name": "view",
+            "style": {
+              "layout": {
+                "width": 100,
+                "height": 60,
+                "zIndex": 10,
+                "margin": {
+                  "left": 5,
+                  "right": 5
+                },
+                "flexItem": {
+                  "order": 0
+                }
+              }
+            }
+          },
+          {
+            "type": "element",
+            "id": "paint-mid",
+            "name": "view",
+            "style": {
+              "layout": {
+                "width": 100,
+                "height": 60,
+                "zIndex": 0,
+                "flexItem": {
+                  "order": 1
+                }
+              }
+            }
+          },
+          {
+            "type": "element",
+            "id": "paint-overlay",
+            "name": "view",
+            "style": {
+              "layout": {
+                "position": "absolute",
+                "x": 60,
+                "y": 80,
+                "width": 120,
+                "height": 80,
+                "zIndex": 5
+              }
+            }
+          }
+        ]
+      },
+      {
+        "type": "element",
+        "id": "z-absolute",
+        "name": "view",
+        "style": {
+          "layout": {
+            "mode": "absolute",
+            "width": 320,
+            "height": 180
+          }
+        },
+        "children": [
+          {
+            "type": "element",
+            "id": "absolute-a",
+            "name": "view",
+            "style": {
+              "layout": {
+                "position": "absolute",
+                "x": 20,
+                "y": 20,
+                "width": 120,
+                "height": 100,
+                "zIndex": 3
+              }
+            }
+          },
+          {
+            "type": "element",
+            "id": "absolute-b",
+            "name": "view",
+            "style": {
+              "layout": {
+                "position": "absolute",
+                "x": 20,
+                "y": 20,
+                "width": 120,
+                "height": 100,
+                "zIndex": -2
+              }
+            }
+          },
+          {
+            "type": "element",
+            "id": "absolute-c",
+            "name": "view",
+            "style": {
+              "layout": {
+                "position": "absolute",
+                "x": 20,
+                "y": 20,
+                "width": 120,
+                "height": 100,
+                "zIndex": 3
+              }
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

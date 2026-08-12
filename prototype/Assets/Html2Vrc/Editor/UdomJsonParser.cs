@@ -181,6 +181,11 @@ namespace Html2Vrc.Editor
                     path + ".positionAbsolute");
             }
 
+            if (value.TryGetValue("zIndex", out var zIndex))
+            {
+                style.zIndex = GetInteger(zIndex, path + ".zIndex");
+            }
+
             if (value.TryGetValue("size", out var size))
             {
                 style.size = GetFloatArray(size, path + ".size");

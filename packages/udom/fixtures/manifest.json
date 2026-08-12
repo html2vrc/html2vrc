@@ -92,6 +92,10 @@
     "valid": true
   },
   {
+    "file": "valid/unity-z-index.udom.json",
+    "valid": true
+  },
+  {
     "file": "valid/unity-absolute-position.udom.json",
     "valid": true
   },

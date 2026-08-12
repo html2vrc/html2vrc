@@ -121,6 +121,7 @@ namespace Html2Vrc.Editor
             writer.FloatProperty("opacity", style.opacity);
             writer.FloatArrayProperty("position", style.position);
             writer.BoolProperty("positionAbsolute", style.positionAbsolute);
+            writer.IntProperty("zIndex", style.zIndex);
             writer.FloatArrayProperty("size", style.size);
             writer.FloatArrayProperty("minSize", style.minSize);
             writer.FloatArrayProperty("maxSize", style.maxSize);

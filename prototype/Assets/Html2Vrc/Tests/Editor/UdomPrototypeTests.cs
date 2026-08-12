@@ -1546,6 +1546,96 @@ namespace Html2Vrc.Tests
         }
 
         [Test]
+        public void CanonicalZIndex_SeparatesPaintOrderFromFlexAndAbsoluteLayout()
+        {
+            var json = LoadRepositoryFile(
+                "packages",
+                "udom",
+                "fixtures",
+                "valid",
+                "unity-z-index.udom.json");
+            var validation = UdomValidator.Validate(json);
+
+            Assert.That(validation.IsValid, Is.True, validation.Format());
+            Assert.That(validation.Issues, Is.Empty, validation.Format());
+            var document = validation.Document;
+            var flex = document.root.children[0];
+            var absolute = document.root.children[1];
+            Assert.That(flex.style.useResolvedChildPositions, Is.True);
+            Assert.That(flex.children[0].style.zIndex, Is.EqualTo(-10));
+            Assert.That(flex.children[1].style.zIndex, Is.EqualTo(10));
+            Assert.That(flex.children[2].style.zIndex, Is.Zero);
+            Assert.That(flex.children[3].style.zIndex, Is.EqualTo(5));
+            Assert.That(flex.children[0].style.position, Is.EqualTo(new[] { 250f, 20f }));
+            Assert.That(flex.children[1].style.position, Is.EqualTo(new[] { 20f, 20f }));
+            Assert.That(flex.children[2].style.position, Is.EqualTo(new[] { 140f, 20f }));
+            Assert.That(flex.children[3].style.position, Is.EqualTo(new[] { 60f, 80f }));
+            Assert.That(flex.children[0].style.useResolvedPosition, Is.True);
+            Assert.That(flex.children[1].style.useResolvedPosition, Is.True);
+            Assert.That(flex.children[2].style.useResolvedPosition, Is.True);
+            Assert.That(flex.children[3].style.positionAbsolute, Is.True);
+            Assert.That(absolute.children.Select(child => child.style.zIndex),
+                Is.EqualTo(new[] { 3, -2, 3 }));
+
+            var normalized = UdomJsonWriter.Write(document);
+            var roundTrip = UdomValidator.Validate(normalized);
+            Assert.That(roundTrip.IsValid, Is.True, roundTrip.Format());
+            Assert.That(roundTrip.Document.root.children[0].children[0].style.zIndex, Is.EqualTo(-10));
+            Assert.That(
+                roundTrip.Document.root.children[0].children[2].style.position,
+                Is.EqualTo(new[] { 140f, 20f }));
+
+            var build = UdomBuilder.GenerateOrRegenerate(document);
+            var root = build.Root;
+            var flexObject = UdomBuilder.FindNode(root, "z-flex").gameObject;
+            Assert.That(flexObject.GetComponent<HorizontalLayoutGroup>(), Is.Null);
+            AssertResolvedTopLeftRect(root, "paint-high::__transform-layout", new Vector2(250f, 20f), new Vector2(100f, 60f));
+            AssertResolvedTopLeftRect(root, "paint-low::__margin", new Vector2(20f, 20f), new Vector2(110f, 60f));
+            AssertResolvedTopLeftRect(root, "paint-mid", new Vector2(140f, 20f), new Vector2(100f, 60f));
+            AssertResolvedTopLeftRect(root, "paint-overlay", new Vector2(60f, 80f), new Vector2(120f, 80f));
+            Assert.That(UdomBuilder.FindNode(root, "paint-high::__transform-layout").transform.GetSiblingIndex(), Is.EqualTo(0));
+            Assert.That(UdomBuilder.FindNode(root, "paint-mid").transform.GetSiblingIndex(), Is.EqualTo(1));
+            Assert.That(UdomBuilder.FindNode(root, "paint-overlay").transform.GetSiblingIndex(), Is.EqualTo(2));
+            Assert.That(UdomBuilder.FindNode(root, "paint-low::__margin").transform.GetSiblingIndex(), Is.EqualTo(3));
+            Assert.That(UdomBuilder.FindNode(root, "absolute-b").transform.GetSiblingIndex(), Is.EqualTo(0));
+            Assert.That(UdomBuilder.FindNode(root, "absolute-a").transform.GetSiblingIndex(), Is.EqualTo(1));
+            Assert.That(UdomBuilder.FindNode(root, "absolute-c").transform.GetSiblingIndex(), Is.EqualTo(2));
+
+            var highWrapper = UdomBuilder.FindNode(root, "paint-high::__transform-layout").gameObject;
+            var lowWrapper = UdomBuilder.FindNode(root, "paint-low::__margin").gameObject;
+            var repeated = UdomBuilder.GenerateOrRegenerate(roundTrip.Document, root);
+            Assert.That(repeated.Created, Is.Zero);
+            Assert.That(UdomBuilder.FindNode(root, "paint-high::__transform-layout").gameObject, Is.SameAs(highWrapper));
+            Assert.That(UdomBuilder.FindNode(root, "paint-low::__margin").gameObject, Is.SameAs(lowWrapper));
+
+            var zeroJson = json
+                .Replace("\"zIndex\": -10", "\"zIndex\": 0")
+                .Replace("\"zIndex\": 10", "\"zIndex\": 0")
+                .Replace("\"zIndex\": 5", "\"zIndex\": 0")
+                .Replace("\"zIndex\": -2", "\"zIndex\": 0")
+                .Replace("\"zIndex\": 3", "\"zIndex\": 0");
+            var zeroValidation = UdomValidator.Validate(zeroJson);
+            Assert.That(zeroValidation.IsValid, Is.True, zeroValidation.Format());
+            var zeroBuild = UdomBuilder.GenerateOrRegenerate(zeroValidation.Document, root);
+            Assert.That(zeroBuild.Created, Is.Zero);
+            Assert.That(flexObject.GetComponent<HorizontalLayoutGroup>(), Is.Not.Null);
+            Assert.That(UdomBuilder.FindNode(root, "paint-low::__margin").transform.GetSiblingIndex(), Is.EqualTo(0));
+            Assert.That(UdomBuilder.FindNode(root, "paint-overlay").transform.GetSiblingIndex(), Is.EqualTo(1));
+            Assert.That(UdomBuilder.FindNode(root, "paint-mid").transform.GetSiblingIndex(), Is.EqualTo(2));
+            Assert.That(UdomBuilder.FindNode(root, "paint-high::__transform-layout").transform.GetSiblingIndex(), Is.EqualTo(3));
+            Assert.That(UdomBuilder.FindNode(root, "absolute-a").transform.GetSiblingIndex(), Is.EqualTo(0));
+            Assert.That(UdomBuilder.FindNode(root, "absolute-b").transform.GetSiblingIndex(), Is.EqualTo(1));
+            Assert.That(UdomBuilder.FindNode(root, "absolute-c").transform.GetSiblingIndex(), Is.EqualTo(2));
+            Assert.That(UdomBuilder.FindNode(root, "paint-high::__transform-layout").gameObject, Is.SameAs(highWrapper));
+            Assert.That(UdomBuilder.FindNode(root, "paint-low::__margin").gameObject, Is.SameAs(lowWrapper));
+            Object.DestroyImmediate(root.gameObject);
+
+            var invalid = UdomValidator.Validate(json.Replace("\"zIndex\": -10", "\"zIndex\": 1.5"));
+            Assert.That(invalid.IsValid, Is.False);
+            Assert.That(invalid.Format(), Does.Contain("zIndex"));
+        }
+
+        [Test]
         public void CanonicalAbsolutePosition_LeavesFlexFlowAndUsesTopLeftCoordinates()
         {
             var json = LoadRepositoryFile(
