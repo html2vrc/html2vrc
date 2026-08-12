@@ -204,6 +204,16 @@ namespace Html2Vrc.Editor
                 style.backgroundColor = GetString(value, "backgroundColor");
             }
 
+            if (value.TryGetValue("borderWidth", out var borderWidth))
+            {
+                style.borderWidth = GetFloatArray(borderWidth, path + ".borderWidth");
+            }
+
+            if (value.TryGetValue("borderColor", out var borderColor))
+            {
+                style.borderColor = GetStringArray(borderColor, path + ".borderColor");
+            }
+
             if (value.TryGetValue("textColor", out _))
             {
                 style.textColor = GetString(value, "textColor");
@@ -217,6 +227,16 @@ namespace Html2Vrc.Editor
             if (value.TryGetValue("alignment", out _))
             {
                 style.alignment = GetString(value, "alignment");
+            }
+
+            if (value.TryGetValue("fontStyle", out _))
+            {
+                style.fontStyle = GetString(value, "fontStyle");
+            }
+
+            if (value.TryGetValue("childAlignment", out _))
+            {
+                style.childAlignment = GetString(value, "childAlignment");
             }
 
             if (value.TryGetValue("flexibleWidth", out var flexibleWidth))
@@ -250,6 +270,19 @@ namespace Html2Vrc.Editor
             for (var index = 0; index < array.Count; index++)
             {
                 result[index] = GetFloat(array[index], $"{path}[{index}]");
+            }
+
+            return result;
+        }
+
+        private static string[] GetStringArray(object value, string path)
+        {
+            var array = RequireArray(value, path);
+            var result = new string[array.Count];
+            for (var index = 0; index < array.Count; index++)
+            {
+                result[index] = array[index] as string
+                    ?? throw new FormatException($"{path}[{index}]: a string is required.");
             }
 
             return result;

@@ -88,8 +88,9 @@ namespace Html2Vrc.Editor
             "textInputValue", "textInputPlaceholder", "textInputMultiline", "textInputReadOnly",
             "scrollAxisExplicit", "scrollHorizontal", "scrollVertical", "scrollInitialOffset",
             "style", "binding", "embed", "children",
-            "visible", "opacity", "position", "layout", "padding", "margin", "spacing", "backgroundColor", "textColor",
-            "fontSize", "alignment", "flexibleWidth", "flexibleHeight",
+            "visible", "opacity", "position", "layout", "padding", "margin", "spacing", "backgroundColor",
+            "borderWidth", "borderColor", "textColor", "fontSize", "alignment", "fontStyle", "childAlignment",
+            "flexibleWidth", "flexibleHeight",
             "action", "targetSlot", "fallbackLabel"
         };
 
@@ -376,6 +377,13 @@ namespace Html2Vrc.Editor
             ValidateVector(style.size, 2, path + ".size", result, requirePositive: true);
             ValidateVector(style.padding, 4, path + ".padding", result, requirePositive: false, requireNonNegative: true);
             ValidateVector(style.margin, 4, path + ".margin", result, requirePositive: false, requireNonNegative: true);
+            ValidateVector(
+                style.borderWidth,
+                4,
+                path + ".borderWidth",
+                result,
+                requirePositive: false,
+                requireNonNegative: true);
 
             if (style.opacity < 0f
                 || style.opacity > 1f
@@ -396,6 +404,7 @@ namespace Html2Vrc.Editor
             }
 
             ValidateColor(style.backgroundColor, path + ".backgroundColor", result);
+            ValidateColorArray(style.borderColor, path + ".borderColor", result);
             ValidateColor(style.textColor, path + ".textColor", result);
 
             if (style.fontSize <= 0f)
@@ -575,6 +584,20 @@ namespace Html2Vrc.Editor
             if (string.IsNullOrWhiteSpace(value) || !ColorUtility.TryParseHtmlString(value, out _))
             {
                 AddError(result, path, $"잘못된 색상 '{value}'. #RRGGBB 또는 #RRGGBBAA 형식을 사용한다.");
+            }
+        }
+
+        private static void ValidateColorArray(string[] value, string path, UdomValidationResult result)
+        {
+            if (value == null || value.Length != 4)
+            {
+                AddError(result, path, "four colors are required in left, top, right, bottom order.");
+                return;
+            }
+
+            for (var index = 0; index < value.Length; index++)
+            {
+                ValidateColor(value[index], $"{path}[{index}]", result);
             }
         }
 

@@ -126,9 +126,13 @@ namespace Html2Vrc.Editor
             writer.FloatArrayProperty("margin", style.margin);
             writer.FloatProperty("spacing", style.spacing);
             writer.StringProperty("backgroundColor", style.backgroundColor);
+            writer.FloatArrayProperty("borderWidth", style.borderWidth);
+            writer.StringArrayProperty("borderColor", style.borderColor);
             writer.StringProperty("textColor", style.textColor);
             writer.FloatProperty("fontSize", style.fontSize);
             writer.StringProperty("alignment", style.alignment);
+            writer.StringProperty("fontStyle", style.fontStyle);
+            writer.StringProperty("childAlignment", style.childAlignment);
             writer.FloatProperty("flexibleWidth", style.flexibleWidth);
             writer.FloatProperty("flexibleHeight", style.flexibleHeight);
             writer.EndObject();
@@ -240,6 +244,37 @@ namespace Html2Vrc.Editor
                     }
 
                     AppendFloat(values[index]);
+                }
+
+                builder.Append(']');
+                needsComma = true;
+            }
+
+            public void StringArrayProperty(string name, string[] values)
+            {
+                PropertyName(name);
+                if (values == null)
+                {
+                    Null();
+                    return;
+                }
+
+                builder.Append('[');
+                for (var index = 0; index < values.Length; index++)
+                {
+                    if (index > 0)
+                    {
+                        builder.Append(", ");
+                    }
+
+                    if (values[index] == null)
+                    {
+                        builder.Append("null");
+                    }
+                    else
+                    {
+                        AppendEscaped(values[index]);
+                    }
                 }
 
                 builder.Append(']');

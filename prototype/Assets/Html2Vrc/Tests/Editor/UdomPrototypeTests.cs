@@ -656,6 +656,91 @@ namespace Html2Vrc.Tests
         }
 
         [Test]
+        public void CanonicalBorder_GeneratesPerEdgeImagesAndRegeneratesStably()
+        {
+            var json = LoadRepositoryFile(
+                "packages",
+                "udom",
+                "fixtures",
+                "valid",
+                "unity-border.udom.json");
+            var validation = UdomValidator.Validate(json);
+
+            Assert.That(validation.IsValid, Is.True, validation.Format());
+            Assert.That(validation.Issues, Is.Empty, validation.Format());
+            var panelNode = validation.Document.root.children.Single(node => node.id == "border-panel");
+            Assert.That(panelNode.style.borderWidth, Is.EqualTo(new[] { 20f, 8f, 12f, 16f }));
+            Assert.That(
+                panelNode.style.borderColor,
+                Is.EqualTo(new[] { "#FFD84DFF", "#FF4D4DFF", "#4DFF88FF", "#4D88FFFF" }));
+
+            var build = UdomBuilder.GenerateOrRegenerate(validation.Document);
+            var root = build.Root;
+            var panel = UdomBuilder.FindNode(root, "border-panel");
+            var label = UdomBuilder.FindNode(root, "border-label");
+            var border = UdomBuilder.FindNode(root, "border-panel::__border");
+            var top = AssertBorderEdge(
+                root,
+                "border-panel::__border-top",
+                "#FF4D4DFF",
+                new Vector2(0f, 1f),
+                Vector2.one,
+                new Vector2(0f, -8f),
+                Vector2.zero);
+            var right = AssertBorderEdge(
+                root,
+                "border-panel::__border-right",
+                "#4DFF88FF",
+                new Vector2(1f, 0f),
+                Vector2.one,
+                new Vector2(-12f, 16f),
+                new Vector2(0f, -8f));
+            var bottom = AssertBorderEdge(
+                root,
+                "border-panel::__border-bottom",
+                "#4D88FFFF",
+                Vector2.zero,
+                new Vector2(1f, 0f),
+                Vector2.zero,
+                new Vector2(0f, 16f));
+            var left = AssertBorderEdge(
+                root,
+                "border-panel::__border-left",
+                "#FFD84DFF",
+                Vector2.zero,
+                new Vector2(0f, 1f),
+                new Vector2(0f, 16f),
+                new Vector2(20f, -8f));
+
+            Assert.That(panel.GetComponent<VerticalLayoutGroup>(), Is.Not.Null);
+            Assert.That(border.GetComponent<LayoutElement>().ignoreLayout, Is.True);
+            Assert.That(border.transform.GetSiblingIndex(), Is.GreaterThan(label.transform.GetSiblingIndex()));
+            Assert.That(top.transform.parent, Is.SameAs(border.transform));
+            Assert.That(right.transform.parent, Is.SameAs(border.transform));
+            Assert.That(bottom.transform.parent, Is.SameAs(border.transform));
+            Assert.That(left.transform.parent, Is.SameAs(border.transform));
+
+            panelNode.style.borderWidth[1] = 10f;
+            panelNode.style.borderWidth[2] = 0f;
+            panelNode.style.borderColor[0] = "#00000000";
+            UdomBuilder.GenerateOrRegenerate(validation.Document, root);
+
+            Assert.That(UdomBuilder.FindNode(root, "border-panel::__border-top"), Is.SameAs(top));
+            Assert.That(
+                UdomBuilder.FindNode(root, "border-panel::__border-top").GetComponent<RectTransform>().offsetMin.y,
+                Is.EqualTo(-10f).Within(0.001f));
+            Assert.That(UdomBuilder.FindNode(root, "border-panel::__border-bottom"), Is.SameAs(bottom));
+            Assert.That(UdomBuilder.FindNode(root, "border-panel::__border-right"), Is.Null);
+            Assert.That(UdomBuilder.FindNode(root, "border-panel::__border-left"), Is.Null);
+
+            panelNode.style.borderWidth = new[] { 0f, 0f, 0f, 0f };
+            UdomBuilder.GenerateOrRegenerate(validation.Document, root);
+            Assert.That(UdomBuilder.FindNode(root, "border-panel::__border"), Is.Null);
+            Assert.That(UdomBuilder.FindNode(root, "border-panel::__border-top"), Is.Null);
+            Assert.That(UdomBuilder.FindNode(root, "border-panel::__border-bottom"), Is.Null);
+        }
+
+        [Test]
         public void CanonicalUdom_RejectsUnknownElementName()
         {
             const string json = @"{
@@ -685,6 +770,10 @@ namespace Html2Vrc.Tests
             Assert.That(conversion.Document.root.style.layout, Is.EqualTo("Vertical"));
             Assert.That(conversion.Json, Does.Contain("\"ToggleLight\""));
             Assert.That(conversion.Json, Does.Contain("\"ScrollView\""));
+            Assert.That(conversion.Json, Does.Contain("\"borderWidth\""));
+            Assert.That(conversion.Json, Does.Contain("\"borderColor\""));
+            Assert.That(conversion.Json, Does.Contain("\"fontStyle\""));
+            Assert.That(conversion.Json, Does.Contain("\"childAlignment\""));
 
             var validation = UdomValidator.Validate(conversion.Json);
             Assert.That(validation.IsValid, Is.True, validation.Format());
@@ -1016,6 +1105,34 @@ namespace Html2Vrc.Tests
             Assert.That(rect.sizeDelta.y, Is.EqualTo(expectedSize.y).Within(0.001f));
             Assert.That(rect.anchoredPosition.x, Is.EqualTo(expectedPosition.x).Within(0.001f));
             Assert.That(rect.anchoredPosition.y, Is.EqualTo(expectedPosition.y).Within(0.001f));
+        }
+
+        private static UdomGeneratedNode AssertBorderEdge(
+            UdomGeneratedRoot root,
+            string stableId,
+            string expectedColor,
+            Vector2 expectedAnchorMin,
+            Vector2 expectedAnchorMax,
+            Vector2 expectedOffsetMin,
+            Vector2 expectedOffsetMax)
+        {
+            var edge = UdomBuilder.FindNode(root, stableId);
+            var rect = edge.GetComponent<RectTransform>();
+            var image = edge.GetComponent<Image>();
+
+            Assert.That(image, Is.Not.Null);
+            Assert.That(
+                image.color,
+                Is.EqualTo(UdomBuilderUtility.ParseColor(expectedColor, Color.clear)).Using(ColorComparer.Instance));
+            Assert.That(image.raycastTarget, Is.False);
+            Assert.That(edge.GetComponent<LayoutElement>(), Is.Null);
+            Assert.That(rect.anchorMin, Is.EqualTo(expectedAnchorMin));
+            Assert.That(rect.anchorMax, Is.EqualTo(expectedAnchorMax));
+            Assert.That(rect.offsetMin.x, Is.EqualTo(expectedOffsetMin.x).Within(0.001f));
+            Assert.That(rect.offsetMin.y, Is.EqualTo(expectedOffsetMin.y).Within(0.001f));
+            Assert.That(rect.offsetMax.x, Is.EqualTo(expectedOffsetMax.x).Within(0.001f));
+            Assert.That(rect.offsetMax.y, Is.EqualTo(expectedOffsetMax.y).Within(0.001f));
+            return edge;
         }
 
         private static void InvokeGeneratedActionInEditMode(Button button)

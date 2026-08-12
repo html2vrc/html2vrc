@@ -28,9 +28,11 @@ Canonical viewport 크기는 디자인 좌표계를 유지한다. UDOM Importer�
 
 Canonical `paint.visible`과 0~1 `paint.opacity`는 CanvasGroup으로 노드와 자식 결과 전체에 적용한다. `visible: false`는 GameObject를 비활성화하지 않아 Flex/Layout 공간을 유지하지만 interactable과 raycast는 차단한다. `opacity: 0`은 시각적으로만 투명하므로 canonical 의미대로 입력 상태는 유지한다. 사용자가 이미 추가한 CanvasGroup은 원래 alpha와 입력 설정을 캡처해 canonical opacity를 곱하고, 해당 스타일이 사라지면 원래 설정으로 복원한다.
 
+Canonical `paint.border`는 왼쪽·위·오른쪽·아래 edge별 `width`, `color`, `solid` style을 보존한다. Unity 생성기는 `<node-id>::__border` overlay 아래에 각 edge를 Image로 만들며 LayoutGroup에서 제외한다. 위·아래 edge가 전체 폭을 차지하고 왼쪽·오른쪽 edge는 그 사이를 채우므로 네 색과 폭이 겹치지 않는다. 폭이 0이거나 완전히 투명한 edge는 만들지 않고, 모든 edge가 사라지면 overlay도 제거한다.
+
 Resource URI는 canonical 명세대로 UDOM TextAsset이 있는 폴더를 기준으로 해석한다. `Assets/`로 시작하는 절대 Unity 에셋 경로도 지원한다. `..`로 정규화하더라도 결과가 `Assets/` 밖으로 나가면 참조하지 않고 경고를 남긴다.
 
-아직 지원하지 않는 canonical 기능은 묵시하지 않고 검증 오류나 명시적 폴백 경고로 반환한다. 현재 변환·테두리·그림자는 오류로 거부한다. gradient는 첫 color stop, radius는 square corner, font resource는 프로젝트 기본 TMP font로 폴백하고 각각 경고를 남긴다. source asset 경로가 없는 raw JSON 검증에서는 상대 resource URI를 추측하지 않고 빈 Image와 경고를 사용한다. `bind`와 `on`의 symbolic ID는 임의 로직으로 실행하지 않고, 안전한 Unity/Udon binding manifest가 없다는 경고로 남는다. Button, Toggle, Slider, Text input과 Scroll의 canonical focus/blur도 같은 방식으로 보존·진단한다. Slider의 step은 정수 범위의 `1`일 때 Unity `wholeNumbers`로 적용하고 그 외의 step은 아직 경고와 연속 Slider 폴백을 사용한다. Text input은 빈 문자열을 포함한 value와 placeholder, multiline, readOnly, disabled를 native `TMP_InputField`로 적용한다.
+아직 지원하지 않는 canonical 기능은 묵시하지 않고 검증 오류나 명시적 폴백 경고로 반환한다. 현재 변환과 그림자는 오류로 거부한다. gradient는 첫 color stop, radius는 square corner, font resource는 프로젝트 기본 TMP font로 폴백하고 각각 경고를 남긴다. source asset 경로가 없는 raw JSON 검증에서는 상대 resource URI를 추측하지 않고 빈 Image와 경고를 사용한다. `bind`와 `on`의 symbolic ID는 임의 로직으로 실행하지 않고, 안전한 Unity/Udon binding manifest가 없다는 경고로 남는다. Button, Toggle, Slider, Text input과 Scroll의 canonical focus/blur도 같은 방식으로 보존·진단한다. Slider의 step은 정수 범위의 `1`일 때 Unity `wholeNumbers`로 적용하고 그 외의 step은 아직 경고와 연속 Slider 폴백을 사용한다. Text input은 빈 문자열을 포함한 value와 placeholder, multiline, readOnly, disabled를 native `TMP_InputField`로 적용한다.
 
 ## 최상위 구조
 
@@ -111,6 +113,8 @@ Resource URI는 canonical 명세대로 UDOM TextAsset이 있는 폴더를 기준
 - `layout`: `None`, `Vertical`, `Horizontal`.
 - `padding`, `margin`: `[left, top, right, bottom]`.
 - `spacing`: 레이아웃 자식 사이 간격.
+- `borderWidth`: 내부 정규화 형식의 `[left, top, right, bottom]` edge 폭.
+- `borderColor`: 내부 정규화 형식의 `[left, top, right, bottom]` edge 색.
 - 색상: Unity HTML 색상 형식 `#RRGGBB` 또는 `#RRGGBBAA`.
 - `alignment`: `TopLeft`, `Top`, `TopRight`, `Left`, `Center`, `Right`, `BottomLeft`, `Bottom`, `BottomRight`, `MiddleLeft`, `MiddleRight`.
 - `flexibleWidth`, `flexibleHeight`: 레이아웃 안에서 남는 공간을 차지하는 정도.

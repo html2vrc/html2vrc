@@ -104,6 +104,8 @@ Canonical `paint.visible`과 `paint.opacity`는 CanvasGroup으로 자식 전체�
 
 Canonical image의 `fit`은 `fill`, `contain`, `cover`, `none`을 지원합니다. 이미지 콘텐츠는 안정 ID를 가진 내부 자식에 배치되고 원본 비율·크기와 `position.x/y`에 따라 정렬되며, 노드 영역을 넘는 부분은 마스크로 잘립니다. 백분율 위치는 남는 공간에 대한 비율, 숫자는 왼쪽·위 기준 design-unit 오프셋, `auto`는 가운데 정렬로 해석합니다.
 
+Canonical `paint.border`의 왼쪽·위·오른쪽·아래 `solid` edge는 각 폭과 색을 유지한 Unity Image overlay로 생성됩니다. Border 계층은 안정 ID를 사용하고 레이아웃에서 제외되므로 UI 자식 배치에 영향을 주지 않으며, 재생성할 때 사라진 edge와 빈 overlay도 정리됩니다.
+
 ## Embed
 
 Embed는 HTML2VRC 레이아웃에 기존 Unity GameObject나 VRChat 프리팹을 연결합니다. 연결된 오브젝트의 내부 구조는 HTML2VRC가 소유하지 않습니다.

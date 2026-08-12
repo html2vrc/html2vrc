@@ -25,11 +25,12 @@
 - React exporter가 Toggle, Slider, TextInput, Scroll과 Embed를 canonical 속성·binding·event로 출력하고, 같은 fixture를 Unity가 네이티브 컨트롤로 생성하는 것을 확인했다. 빈 문자열과 0/false 값, Button/Toggle의 focus·blur, 연결 상태에 반응하는 Embed fallbackLabel도 포함한다.
 - canonical paint.visible과 opacity를 중첩 CanvasGroup으로 적용하고, hidden 노드의 Layout 공간 보존, opacity 0 컨트롤의 입력 유지, 생성기 CanvasGroup 정리와 기존 사용자 CanvasGroup 설정 복원을 확인했다.
 - canonical image의 fill/contain/cover/none 크기 계산, percentage·numeric·auto 위치, RectMask2D clipping, Texture2D 로딩과 안정 내부 콘텐츠 재생성을 확인했다.
+- canonical per-edge solid border의 비대칭 폭·색 정규화, 레이아웃 비간섭 overlay 생성, anchor/offset, draw order, 안정 재생성과 edge·overlay 정리를 확인했다.
 
 자동 검증 결과:
 
-- `npm run check`: UDOM conformance 21/21, React 5/5, TypeScript typecheck와 build 통과
-- Unity EditMode `Html2Vrc.Tests.UdomPrototypeTests`: **22/22 통과, 실패 0**
+- `npm run check`: UDOM conformance 22/22, React 5/5, TypeScript typecheck와 build 통과
+- Unity EditMode `Html2Vrc.Tests.UdomPrototypeTests`: **23/23 통과, 실패 0**
 - Unity 종료 코드 0, C# 컴파일 오류 0
 - Windows CRLF에서 기존 HTML 재생성 테스트가 문자열을 교체하지 못하던 문제도 함께 수정했다.
 
@@ -59,7 +60,7 @@
 
 ## 자동 회귀 검증
 
-HTML2VRC 전용 Unity Test Framework 테스트 22개를 실행한다. 검증 범위는 다음과 같다.
+HTML2VRC 전용 Unity Test Framework 테스트 23개를 실행한다. 검증 범위는 다음과 같다.
 
 1. 샘플 UDOM Validation 성공과 잘못된 속성/중복 ID 거부
 2. Canvas, TextMeshProUGUI, Image, Button, ScrollRect, LayoutGroup과 VRChat용 `VRCUiShape` 생성
@@ -83,11 +84,12 @@ HTML2VRC 전용 Unity Test Framework 테스트 22개를 실행한다. 검증 범
 20. React control fixture의 Toggle, Slider, TextInput, Scroll, Embed 네이티브 생성과 빈 값 보존, focus/blur 진단, 동적 Embed fallback 표시
 21. canonical paint visible/opacity의 자식 합성, hidden Layout 보존, opacity 0 입력 유지, 생성기·사용자 CanvasGroup 재생성 수명주기
 22. canonical image의 fill/contain/cover/none 원본 비율·크기 계산, percentage·numeric·auto 위치, clipping과 안정 내부 콘텐츠 재생성
+23. canonical per-edge solid border의 폭·색 보존, 레이아웃 비간섭 overlay, anchor/offset, draw order와 edge·overlay 재생성 수명주기
 
 최종 자동 테스트 결과:
 
-- 전체 22개
-- 통과 22개
+- 전체 23개
+- 통과 23개
 - 실패 0개
 - 건너뜀 0개
 - Unity 종료 코드 0

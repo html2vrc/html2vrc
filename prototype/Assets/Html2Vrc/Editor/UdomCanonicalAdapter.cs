@@ -1260,7 +1260,14 @@ namespace Html2Vrc.Editor
                 }
             }
 
-            RejectPresent(value, path, "border", "canonical borders are not supported yet");
+            if (value.TryGetValue("border", out var borderValue))
+            {
+                MapBorder(
+                    RequireObject(borderValue, path + ".border"),
+                    path + ".border",
+                    result.Style);
+            }
+
             RejectNonEmptyArray(value, "shadows", path + ".shadows", "canonical shadows are not supported yet");
             if (value.TryGetValue("radius", out var radiusValue))
             {
@@ -1314,6 +1321,56 @@ namespace Html2Vrc.Editor
             }
 
             result.HasBackground = true;
+        }
+
+        private static void MapBorder(Dictionary<string, object> value, string path, UdomStyle style)
+        {
+            EnsureOnlyKeys(value, path, "top", "right", "bottom", "left");
+            MapBorderEdge(value, "left", 0, path, style);
+            MapBorderEdge(value, "top", 1, path, style);
+            MapBorderEdge(value, "right", 2, path, style);
+            MapBorderEdge(value, "bottom", 3, path, style);
+        }
+
+        private static void MapBorderEdge(
+            Dictionary<string, object> border,
+            string key,
+            int index,
+            string path,
+            UdomStyle style)
+        {
+            if (!border.TryGetValue(key, out var edgeValue))
+            {
+                return;
+            }
+
+            var edgePath = path + "." + key;
+            var edge = RequireObject(edgeValue, edgePath);
+            EnsureOnlyKeys(edge, edgePath, "width", "color", "style");
+            if (edge.TryGetValue("width", out var widthValue))
+            {
+                var width = RequireFloat(widthValue, edgePath + ".width");
+                if (width < 0f || float.IsNaN(width) || float.IsInfinity(width))
+                {
+                    throw new FormatException($"{edgePath}.width: border width must be finite and non-negative.");
+                }
+
+                style.borderWidth[index] = width;
+            }
+
+            if (edge.TryGetValue("color", out var colorValue))
+            {
+                style.borderColor[index] = RequireString(colorValue, edgePath + ".color");
+            }
+
+            if (edge.TryGetValue("style", out var styleValue)
+                && !string.Equals(
+                    RequireString(styleValue, edgePath + ".style"),
+                    "solid",
+                    StringComparison.Ordinal))
+            {
+                throw new FormatException($"{edgePath}.style: only solid borders are supported.");
+            }
         }
 
         private static void ValidateCornerRadius(Dictionary<string, object> value, string path)

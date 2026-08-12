@@ -578,7 +578,7 @@ AI는 특정 Unity 라이브러리 API보다 HTML, CSS, React와 일반적인 Un
 - Vertex Gradient
 - 다중·각도·radial gradient
 - border radius
-- border
+- square-corner per-edge border (Unity 프로토타입 구현, radius 결합은 후속)
 - Mask와 ScrollView 조합
 
 ### 4단계: 장식과 폴백

@@ -67,6 +67,8 @@ namespace Html2Vrc
         public float[] margin = { 0f, 0f, 0f, 0f };
         public float spacing;
         public string backgroundColor = "#00000000";
+        public float[] borderWidth = { 0f, 0f, 0f, 0f };
+        public string[] borderColor = { "#00000000", "#00000000", "#00000000", "#00000000" };
         public string textColor = "#FFFFFFFF";
         public float fontSize = 24f;
         public string alignment = "MiddleLeft";
