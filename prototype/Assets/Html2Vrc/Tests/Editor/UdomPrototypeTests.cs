@@ -3308,6 +3308,130 @@ namespace Html2Vrc.Tests
         }
 
         [Test]
+        public void HtmlConverter_LinearGradientUsesCanonicalLutAndCssStops()
+        {
+            const string html = @"
+              <main id=""html-gradient-root"" data-canvas-size=""700 240""
+                style=""width: 700px; height: 240px; display: flex; align-items: flex-start; padding: 40px; gap: 20px"">
+                <section id=""html-gradient-panel""
+                  style=""width: 300px; height: 140px; border-radius: 24px;
+                    background-image: linear-gradient(0.25turn, #FF0000FF 0%, currentColor 50%, transparent);
+                    color: #0000FFFF""></section>
+                <section id=""html-gradient-defaults""
+                  style=""width: 300px; height: 140px;
+                    background: linear-gradient(to bottom, #112233FF, #445566FF, #778899FF 75%, #AABBCCFF)""></section>
+              </main>";
+
+            var conversion = HtmlToUdomConverter.Convert(html);
+
+            Assert.That(conversion.IsValid, Is.True, conversion.Format());
+            var panelNode = conversion.Document.root.children[0];
+            var defaultsNode = conversion.Document.root.children[1];
+            Assert.That(panelNode.style.backgroundType, Is.EqualTo("linear-gradient"));
+            Assert.That(panelNode.style.backgroundGradientAngle, Is.EqualTo(90f).Within(0.001f));
+            Assert.That(panelNode.style.backgroundGradientPositions, Is.EqualTo(new[] { 0f, 0.5f, 1f }));
+            Assert.That(
+                panelNode.style.backgroundGradientColors,
+                Is.EqualTo(new[] { "#FF0000FF", "#0000FFFF", "#00000000" }));
+            Assert.That(defaultsNode.style.backgroundGradientAngle, Is.EqualTo(180f).Within(0.001f));
+            Assert.That(
+                defaultsNode.style.backgroundGradientPositions,
+                Is.EqualTo(new[] { 0f, 0.375f, 0.75f, 1f }).Within(0.001f));
+
+            var normalized = UdomValidator.Validate(conversion.Json);
+            Assert.That(normalized.IsValid, Is.True, normalized.Format());
+            Assert.That(
+                normalized.Document.root.children[0].style.backgroundGradientColors,
+                Is.EqualTo(panelNode.style.backgroundGradientColors));
+
+            var build = UdomBuilder.GenerateOrRegenerate(conversion.Document);
+            var root = build.Root;
+            var panel = UdomBuilder.FindNode(root, "html-gradient-panel");
+            var defaultsPanel = UdomBuilder.FindNode(root, "html-gradient-defaults");
+            var image = panel.GetComponent<Image>();
+            var defaultsImage = defaultsPanel.GetComponent<Image>();
+            var material = image.material;
+            var texture = material.GetTexture("_GradientTex") as Texture2D;
+            Assert.That(material.shader.name, Is.EqualTo(UdomGradientAssetUtility.ShaderName));
+            Assert.That(texture, Is.Not.Null);
+            Assert.That(texture.width, Is.EqualTo(UdomGradientAssetUtility.LutWidth));
+            Assert.That(texture.GetPixel(0, 0), Is.EqualTo(Color.red).Using(ColorComparer.Instance));
+            Assert.That(texture.GetPixel(texture.width / 2, 0), Is.EqualTo(Color.blue).Using(ColorComparer.Instance));
+            Assert.That(texture.GetPixel(texture.width - 1, 0), Is.EqualTo(Color.clear).Using(ColorComparer.Instance));
+            Assert.That(
+                material.GetVector("_GradientAxis"),
+                Is.EqualTo(new Vector4(300f, 0f, 0f, 0f))
+                    .Using(Vector4ComparerWithEqualsOperator.Instance));
+            Assert.That(panel.GetComponent<Mask>(), Is.Not.Null);
+            Assert.That(defaultsImage.material.shader.name, Is.EqualTo(UdomGradientAssetUtility.ShaderName));
+            Assert.That(defaultsImage.material.GetVector("_GradientAxis").x, Is.Zero.Within(0.001f));
+            Assert.That(defaultsImage.material.GetVector("_GradientAxis").y, Is.EqualTo(-140f).Within(0.001f));
+
+            var originalPanel = panel.gameObject;
+            var changedAngle = HtmlToUdomConverter.Convert(html.Replace("0.25turn", "180deg"));
+            Assert.That(changedAngle.IsValid, Is.True, changedAngle.Format());
+            UdomBuilder.GenerateOrRegenerate(changedAngle.Document, root);
+            panel = UdomBuilder.FindNode(root, "html-gradient-panel");
+            image = panel.GetComponent<Image>();
+            Assert.That(panel.gameObject, Is.SameAs(originalPanel));
+            Assert.That(image.material, Is.SameAs(material));
+            Assert.That(image.material.GetTexture("_GradientTex"), Is.SameAs(texture));
+            Assert.That(image.material.GetVector("_GradientAxis").x, Is.Zero.Within(0.001f));
+            Assert.That(image.material.GetVector("_GradientAxis").y, Is.EqualTo(-140f).Within(0.001f));
+
+            var withoutGradient = HtmlToUdomConverter.Convert(
+                html.Replace(
+                    "background-image: linear-gradient(0.25turn, #FF0000FF 0%, currentColor 50%, transparent)",
+                    "background-image: none; background-color: #123456FF"));
+            Assert.That(withoutGradient.IsValid, Is.True, withoutGradient.Format());
+            UdomBuilder.GenerateOrRegenerate(withoutGradient.Document, root);
+            panel = UdomBuilder.FindNode(root, "html-gradient-panel");
+            image = panel.GetComponent<Image>();
+            Assert.That(panel.gameObject, Is.SameAs(originalPanel));
+            Assert.That(image.material.shader.name, Is.EqualTo(UdomRoundedCornerAssetUtility.ShaderName));
+            Assert.That(
+                image.color,
+                Is.EqualTo((Color)new Color32(0x12, 0x34, 0x56, 0xFF)).Using(ColorComparer.Instance));
+            Object.DestroyImmediate(root.gameObject);
+
+            var fixedStops = HtmlToUdomConverter.Convert(
+                html.Replace(
+                    "#FF0000FF 0%, currentColor 50%, transparent",
+                    "#FF0000FF 60%, #00FF00FF 20%"));
+            Assert.That(fixedStops.IsValid, Is.True, fixedStops.Format());
+            Assert.That(
+                fixedStops.Document.root.children[0].style.backgroundGradientPositions,
+                Is.EqualTo(new[] { 0.6f, 0.6f }).Within(0.001f));
+
+            var cornerDirection = HtmlToUdomConverter.Convert(
+                html.Replace("0.25turn", "to top right"));
+            Assert.That(cornerDirection.IsValid, Is.False);
+            Assert.That(cornerDirection.Format(), Does.Contain("방향"));
+
+            var pixelStop = HtmlToUdomConverter.Convert(
+                html.Replace("currentColor 50%", "currentColor 40px"));
+            Assert.That(pixelStop.IsValid, Is.False);
+            Assert.That(pixelStop.Format(), Does.Contain("40px"));
+
+            var oneStop = HtmlToUdomConverter.Convert(
+                html.Replace(
+                    "#FF0000FF 0%, currentColor 50%, transparent",
+                    "#FF0000FF"));
+            Assert.That(oneStop.IsValid, Is.False);
+            Assert.That(oneStop.Format(), Does.Contain("두 개 이상"));
+
+            var radial = HtmlToUdomConverter.Convert(
+                html.Replace("linear-gradient(0.25turn", "radial-gradient(circle"));
+            Assert.That(radial.IsValid, Is.False);
+            Assert.That(radial.Format(), Does.Contain("background-image"));
+
+            var nestedColor = HtmlToUdomConverter.Convert(
+                html.Replace("#FF0000FF 0%", "rgb(255, 0, 0) 0%"));
+            Assert.That(nestedColor.IsValid, Is.False);
+            Assert.That(nestedColor.Format(), Does.Contain("rgb()"));
+        }
+
+        [Test]
         public void HtmlConverter_FlexCssUsesCanonicalSizingAlignmentAndStableHierarchy()
         {
             const string html = @"

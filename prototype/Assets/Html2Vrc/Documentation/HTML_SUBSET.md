@@ -53,6 +53,8 @@
 - `row-gap`, `column-gap`: 숫자 또는 `px`
 - `padding`, `margin`: CSS의 1~4개 값
 - `background-color`, `color`: `#RRGGBB` 또는 `#RRGGBBAA`
+- `background`, `background-image`: 단일 `linear-gradient(...)`, `none`; `background`은 단일 hex color와 `transparent`도 지원
+- `linear-gradient`: 기본 아래 방향, cardinal `to top | right | bottom | left` 또는 숫자·deg·rad·grad·turn angle, 두 개 이상의 hex·transparent·currentColor stop과 선택적 0%~100% 위치
 - `border`: 0 이상 숫자·`px` width, `solid | none`, hex color·`transparent | currentColor`의 shorthand
 - `border-width`, `border-style`, `border-color`: CSS 순서의 1~4개 값
 - `border-top|right|bottom|left` 및 각 edge의 `-width`, `-style`, `-color` longhand
@@ -79,7 +81,9 @@ Border shorthand와 longhand는 inline 선언의 source-order대로 합성한다
 
 `box-shadow`의 처음 두 length는 오른쪽·아래 방향 offset이며 blur는 음수가 아닌 값, spread는 음수를 허용한다. 생략한 blur/spread는 0, color는 최종 `color`다. CSS는 첫 shadow를 위에 그리지만 canonical은 뒤 shadow를 위에 그리므로 Converter가 layer 배열을 역전한다. 각 layer는 radius-aware SDF Image가 되고 outer shadow는 레이아웃 밖에서, inset shadow는 배경 위·콘텐츠와 border 아래에서 그려진다.
 
-CSS 전체 호환은 목표가 아니다. `flex-basis`, transform, object-position 이외의 percentage 길이, 양축이 모두 auto이거나 반대 고정 축·aspect-ratio가 없는 크기 auto, `aspect-ratio: auto`, `calc`, flex shorthand, transform의 matrix·skew·perspective와 3~4값 origin, dashed/dotted/double border, percentage border width, percentage 및 `/` 타원형 radius, named/rgb/hsl shadow color와 percentage shadow length, `object-fit: scale-down`, object-position의 3~4값 edge offset, `align-content: space-evenly`, `overflow: auto | scroll`, visible/hidden이 섞인 축별 overflow, Grid, 선택자, 외부 스타일시트, 애니메이션과 지원 목록 밖의 속성은 오류로 표시한다.
+`linear-gradient`의 생략된 첫·마지막 stop은 0%·100%이고 그 사이의 연속 생략 stop은 양옆 위치 사이에 균등 배치한다. 뒤 stop 위치가 앞보다 작으면 CSS 규칙대로 앞 위치까지 올린다. 결과는 canonical의 1025×1 LUT와 VRChat-safe UI Material을 사용하며 radius mask와 합성된다. `background-image: none`은 현재 단색 background-color를 유지하고 gradient 에셋만 제거한다.
+
+CSS 전체 호환은 목표가 아니다. `flex-basis`, transform, object-position 이외의 percentage 길이, 양축이 모두 auto이거나 반대 고정 축·aspect-ratio가 없는 크기 auto, `aspect-ratio: auto`, `calc`, flex shorthand, transform의 matrix·skew·perspective와 3~4값 origin, dashed/dotted/double border, percentage border width, percentage 및 `/` 타원형 radius, named/rgb/hsl color, percentage shadow length, linear-gradient의 corner 방향·px stop·color hint·double-position stop, radial/conic/repeating gradient와 다중 background, `object-fit: scale-down`, object-position의 3~4값 edge offset, `align-content: space-evenly`, `overflow: auto | scroll`, visible/hidden이 섞인 축별 overflow, Grid, 선택자, 외부 스타일시트, 애니메이션과 지원 목록 밖의 속성은 오류로 표시한다.
 
 ## 안전한 버튼 동작
 

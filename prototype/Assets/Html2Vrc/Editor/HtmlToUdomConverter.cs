@@ -487,6 +487,7 @@ namespace Html2Vrc.Editor
             var hasBorderDeclaration = false;
             List<CssBoxShadow> boxShadows = null;
             var hasBoxShadowDeclaration = false;
+            CssLinearGradient backgroundGradient = null;
             foreach (var declaration in declarations)
             {
                 switch (declaration.Key)
@@ -699,6 +700,30 @@ namespace Html2Vrc.Editor
                         break;
                     case "background-color":
                         SetColor(declaration.Value, path, declaration.Key, result, value => style.backgroundColor = value);
+                        break;
+                    case "background":
+                        if (TrySetCssBackground(
+                                declaration.Value,
+                                path,
+                                result,
+                                style,
+                                out var shorthandGradient))
+                        {
+                            backgroundGradient = shorthandGradient;
+                        }
+
+                        break;
+                    case "background-image":
+                        if (TrySetCssBackgroundImage(
+                                declaration.Value,
+                                path,
+                                result,
+                                style,
+                                out var imageGradient))
+                        {
+                            backgroundGradient = imageGradient;
+                        }
+
                         break;
                     case "border":
                         hasBorderDeclaration = true;
@@ -920,6 +945,10 @@ namespace Html2Vrc.Editor
             if (hasBoxShadowDeclaration && boxShadows != null)
             {
                 ApplyBoxShadows(style, boxShadows);
+            }
+            if (backgroundGradient != null)
+            {
+                ApplyCssLinearGradient(style, backgroundGradient);
             }
 
             ConfigureOverflow(style, overflowX, overflowY, path, result);
@@ -1630,6 +1659,354 @@ namespace Html2Vrc.Editor
             public float Spread;
             public string Color;
             public bool Inset;
+        }
+
+        private static bool TrySetCssBackground(
+            string source,
+            string path,
+            HtmlToUdomResult result,
+            UdomStyle style,
+            out CssLinearGradient gradient)
+        {
+            var value = source.Trim();
+            if (string.Equals(value, "none", StringComparison.OrdinalIgnoreCase))
+            {
+                ClearBackgroundGradient(style);
+                style.backgroundColor = "#00000000";
+                gradient = null;
+                return true;
+            }
+
+            if (value.StartsWith("linear-gradient", StringComparison.OrdinalIgnoreCase))
+            {
+                gradient = ParseCssLinearGradient(value, path, result);
+                if (gradient != null)
+                {
+                    style.backgroundColor = "#00000000";
+                    return true;
+                }
+
+                return false;
+            }
+
+            if (TryNormalizeSolidBackgroundColor(value, out var color))
+            {
+                ClearBackgroundGradient(style);
+                style.backgroundColor = color;
+                gradient = null;
+                return true;
+            }
+
+            AddError(
+                result,
+                path + "/@style",
+                $"background 값 '{source}'은 지원하지 않는다. 단일 hex color, transparent, linear-gradient 또는 none만 사용할 수 있다.");
+            gradient = null;
+            return false;
+        }
+
+        private static bool TrySetCssBackgroundImage(
+            string source,
+            string path,
+            HtmlToUdomResult result,
+            UdomStyle style,
+            out CssLinearGradient gradient)
+        {
+            var value = source.Trim();
+            if (string.Equals(value, "none", StringComparison.OrdinalIgnoreCase))
+            {
+                ClearBackgroundGradient(style);
+                gradient = null;
+                return true;
+            }
+
+            if (value.StartsWith("linear-gradient", StringComparison.OrdinalIgnoreCase))
+            {
+                gradient = ParseCssLinearGradient(value, path, result);
+                return gradient != null;
+            }
+
+            AddError(
+                result,
+                path + "/@style",
+                $"background-image 값 '{source}'은 지원하지 않는다. 단일 linear-gradient 또는 none만 사용할 수 있다.");
+            gradient = null;
+            return false;
+        }
+
+        private static CssLinearGradient ParseCssLinearGradient(
+            string source,
+            string path,
+            HtmlToUdomResult result)
+        {
+            const string functionName = "linear-gradient";
+            var value = source.Trim();
+            if (!value.StartsWith(functionName + "(", StringComparison.OrdinalIgnoreCase)
+                || !value.EndsWith(")", StringComparison.Ordinal))
+            {
+                AddError(result, path + "/@style", $"linear-gradient 형식 '{source}'이 잘못됐다.");
+                return null;
+            }
+
+            var body = value.Substring(functionName.Length + 1, value.Length - functionName.Length - 2);
+            if (body.IndexOf('(') >= 0 || body.IndexOf(')') >= 0)
+            {
+                AddError(
+                    result,
+                    path + "/@style",
+                    "linear-gradient 안의 rgb(), hsl(), calc() 또는 다중 background 함수는 지원하지 않는다.");
+                return null;
+            }
+
+            var parts = body.Split(',');
+            if (parts.Any(part => string.IsNullOrWhiteSpace(part)))
+            {
+                AddError(result, path + "/@style", "linear-gradient에 빈 항목이 있다.");
+                return null;
+            }
+
+            var angle = 180f;
+            var firstStop = 0;
+            if (parts.Length > 0)
+            {
+                var parsedDirection = TryParseCssGradientDirection(
+                    parts[0],
+                    out var parsedAngle,
+                    out var hasDirectionSyntax);
+                if (hasDirectionSyntax && !parsedDirection)
+                {
+                    AddError(
+                        result,
+                        path + "/@style",
+                        $"linear-gradient 방향 '{parts[0].Trim()}'은 지원하지 않는다. cardinal 방향 또는 angle을 사용해야 한다.");
+                    return null;
+                }
+
+                if (parsedDirection)
+                {
+                    angle = Mathf.Repeat(parsedAngle, 360f);
+                    firstStop = 1;
+                }
+            }
+
+            var stopCount = parts.Length - firstStop;
+            if (stopCount < 2)
+            {
+                AddError(result, path + "/@style", "linear-gradient에는 color stop이 두 개 이상 필요하다.");
+                return null;
+            }
+
+            var colors = new string[stopCount];
+            var positions = new float?[stopCount];
+            for (var index = 0; index < stopCount; index++)
+            {
+                var stopSource = parts[firstStop + index].Trim();
+                var stopParts = stopSource.Split(
+                    new[] { ' ', '\t', '\r', '\n' },
+                    StringSplitOptions.RemoveEmptyEntries);
+                if (stopParts.Length < 1 || stopParts.Length > 2
+                    || !TryNormalizeBorderColor(stopParts[0], out colors[index]))
+                {
+                    AddError(
+                        result,
+                        path + "/@style",
+                        $"linear-gradient stop {index + 1} '{stopSource}'은 hex color와 선택적 percentage 하나만 지원한다.");
+                    return null;
+                }
+
+                if (stopParts.Length == 2)
+                {
+                    if (!TryParseGradientStopPosition(stopParts[1], out var position))
+                    {
+                        AddError(
+                            result,
+                            path + "/@style",
+                            $"linear-gradient stop {index + 1} 위치 '{stopParts[1]}'은 0%~100% percentage여야 한다.");
+                        return null;
+                    }
+
+                    positions[index] = position;
+                }
+            }
+
+            return new CssLinearGradient
+            {
+                Angle = angle,
+                Colors = colors,
+                Positions = ResolveCssGradientStopPositions(positions)
+            };
+        }
+
+        private static bool TryParseCssGradientDirection(
+            string source,
+            out float angle,
+            out bool hasDirectionSyntax)
+        {
+            var value = string.Join(
+                " ",
+                source.Trim().ToLowerInvariant().Split(
+                    new[] { ' ', '\t', '\r', '\n' },
+                    StringSplitOptions.RemoveEmptyEntries));
+            if (value.StartsWith("to ", StringComparison.Ordinal))
+            {
+                hasDirectionSyntax = true;
+                switch (value)
+                {
+                    case "to top":
+                        angle = 0f;
+                        return true;
+                    case "to right":
+                        angle = 90f;
+                        return true;
+                    case "to bottom":
+                        angle = 180f;
+                        return true;
+                    case "to left":
+                        angle = 270f;
+                        return true;
+                    default:
+                        angle = 0f;
+                        return false;
+                }
+            }
+
+            if (TryParseTransformAngle(value, out angle))
+            {
+                hasDirectionSyntax = true;
+                return true;
+            }
+
+            angle = 0f;
+            hasDirectionSyntax = false;
+            return false;
+        }
+
+        private static bool TryParseGradientStopPosition(string source, out float position)
+        {
+            var value = source.Trim();
+            if (value.EndsWith("%", StringComparison.Ordinal)
+                && TryParseNumber(value.Substring(0, value.Length - 1).Trim(), out var percentage)
+                && percentage >= 0f
+                && percentage <= 100f)
+            {
+                position = percentage / 100f;
+                return true;
+            }
+
+            if (TryParseNumber(value, out var zero) && Mathf.Approximately(zero, 0f))
+            {
+                position = 0f;
+                return true;
+            }
+
+            position = 0f;
+            return false;
+        }
+
+        private static float[] ResolveCssGradientStopPositions(float?[] source)
+        {
+            var result = new float?[source.Length];
+            Array.Copy(source, result, source.Length);
+            if (!result[0].HasValue)
+            {
+                result[0] = 0f;
+            }
+            if (!result[result.Length - 1].HasValue)
+            {
+                result[result.Length - 1] = 1f;
+            }
+
+            var previous = result[0].Value;
+            for (var index = 1; index < result.Length; index++)
+            {
+                if (!result[index].HasValue)
+                {
+                    continue;
+                }
+
+                result[index] = Mathf.Max(previous, result[index].Value);
+                previous = result[index].Value;
+            }
+
+            var left = 0;
+            while (left < result.Length - 1)
+            {
+                var right = left + 1;
+                while (!result[right].HasValue)
+                {
+                    right++;
+                }
+
+                var start = result[left].Value;
+                var end = result[right].Value;
+                for (var index = left + 1; index < right; index++)
+                {
+                    result[index] = Mathf.LerpUnclamped(
+                        start,
+                        end,
+                        (index - left) / (float)(right - left));
+                }
+
+                left = right;
+            }
+
+            return result.Select(item => item.Value).ToArray();
+        }
+
+        private static void ApplyCssLinearGradient(UdomStyle style, CssLinearGradient gradient)
+        {
+            var colors = new string[gradient.Colors.Length];
+            for (var index = 0; index < colors.Length; index++)
+            {
+                colors[index] = gradient.Colors[index] == "currentcolor"
+                    ? style.textColor
+                    : gradient.Colors[index];
+            }
+
+            style.backgroundType = "linear-gradient";
+            style.backgroundGradientAngle = gradient.Angle;
+            style.backgroundGradientPositions = gradient.Positions;
+            style.backgroundGradientColors = colors;
+            style.backgroundColor = colors[0];
+        }
+
+        private static void ClearBackgroundGradient(UdomStyle style)
+        {
+            style.backgroundType = "color";
+            style.backgroundGradientAngle = 180f;
+            style.backgroundGradientPositions = Array.Empty<float>();
+            style.backgroundGradientColors = Array.Empty<string>();
+            style.backgroundGradientCenter = new[] { 50f, 50f };
+            style.backgroundGradientCenterIsPercent = new[] { true, true };
+            style.backgroundGradientRadius = new[] { 50f, 50f };
+            style.backgroundGradientRadiusIsPercent = new[] { true, true };
+        }
+
+        private static bool TryNormalizeSolidBackgroundColor(string source, out string color)
+        {
+            var value = source.Trim();
+            if (string.Equals(value, "transparent", StringComparison.OrdinalIgnoreCase))
+            {
+                color = "#00000000";
+                return true;
+            }
+
+            if (value.StartsWith("#", StringComparison.Ordinal)
+                && ColorUtility.TryParseHtmlString(value, out _))
+            {
+                color = value;
+                return true;
+            }
+
+            color = null;
+            return false;
+        }
+
+        private sealed class CssLinearGradient
+        {
+            public float Angle;
+            public float[] Positions;
+            public string[] Colors;
         }
 
         private static void SetObjectFit(

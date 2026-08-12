@@ -52,6 +52,8 @@ Canonical `paint.border`는 왼쪽·위·오른쪽·아래 edge별 `width`, `col
 
 Canonical `linear-gradient`는 임의 각도와 두 개 이상의 color stop을 보존한다. Unity 생성기는 1025×1 RGBA LUT Texture와 UI stencil·clip을 지원하는 Material을 만들고, 노드 크기를 반영한 축으로 LUT를 샘플링한다. canonical 각도 `0`은 아래에서 위, `90`은 왼쪽에서 오른쪽이다. source TextAsset이 있으면 생성 에셋은 `Assets/Html2VrcGenerated/Gradients` 아래에서 source GUID와 node ID 기반 안정 경로로 갱신되고, raw document 생성은 저장되지 않는 임시 에셋을 사용한다. 결과 GameObject에는 VRChat 검사를 통과하지 못할 사용자 런타임 컴포넌트를 추가하지 않는다.
 
+제한형 HTML의 `background`·`background-image` 단일 linear-gradient는 CSS 기본 아래 방향, cardinal 방향과 deg/rad/grad/turn을 canonical angle로 정규화한다. Percentage stop과 생략 stop의 균등 배치, 감소 위치의 CSS fix-up, transparent·currentColor를 canonical 0~1 stop 배열로 보존한다. Angle만 바뀌면 기존 LUT·Material을 재사용하고 `none` 또는 단색 전환은 같은 노드를 유지한 채 gradient paint를 정리한다.
+
 Canonical `radial-gradient`는 같은 LUT와 별도 VRChat-safe UI Shader로 렌더링한다. `center.x/y`와 타원형 `radius.x/y`는 design-unit과 percentage 여부를 내부 모델에 함께 보존하고, percentage는 Layout이 끝난 최종 Rect의 width/height 축을 기준으로 해석한다. 생략되거나 `auto`인 축은 canonical 기본값 `50%`를 사용한다. Material과 LUT는 linear gradient와 같은 안정 경로를 사용하며 두 gradient 종류 사이를 전환해도 에셋 GUID를 유지한다.
 
 Canonical `conic-gradient`는 같은 LUT와 전용 UI Shader로 렌더링한다. 생략된 시작 `angle`은 `0`이며 중심에서 위쪽으로 향하는 선을 기준으로 stop을 시계 방향으로 순회한다. `center.x/y`의 design-unit·percentage 보존과 최종 Layout Rect 계산, 안정 Material/LUT 경로 및 radius SDF 합성은 radial gradient와 동일하다.
@@ -161,7 +163,7 @@ Resource URI는 canonical 명세대로 UDOM TextAsset이 있는 폴더를 기준
 - `spacing`: 레이아웃 자식 사이 간격.
 - `borderWidth`: 내부 정규화 형식의 `[left, top, right, bottom]` edge 폭.
 - `borderColor`: 내부 정규화 형식의 `[left, top, right, bottom]` edge 색.
-- `backgroundType`: `color` 또는 `linear-gradient`.
+- `backgroundType`: `color`, `linear-gradient`, `radial-gradient` 또는 `conic-gradient`.
 - `backgroundGradientAngle`: linear gradient에서는 `0`이 아래→위, `90`이 왼쪽→오른쪽인 진행 각도이고, conic gradient에서는 위쪽 기준 시계 방향 시작 각도.
 - `backgroundGradientPositions`, `backgroundGradientColors`: 위치가 0~1로 정렬된 두 개 이상의 대응 color stop 배열.
 - `backgroundGradientCenter`: radial/conic gradient의 X/Y 중심값. `backgroundGradientRadius`는 radial gradient의 X/Y 반지름.

@@ -48,6 +48,7 @@
 - 제한형 HTML `<img>`의 Texture2D/Sprite 자동 구분과 CSS object-fit fill/contain/cover/none, object-position의 px·percentage·방향 키워드를 canonical 이미지 콘텐츠 경로로 연결했다. 실제 원본 크기 기반 배치·clipping, normalized JSON, 재생성 시 안정 내부 콘텐츠와 지원하지 않는 문법 진단을 확인했다.
 - 제한형 HTML CSS의 border shorthand와 width/style/color·edge longhand를 source-order로 합성했다. CurrentColor, 비대칭 width/color, px corner radius, canonical SDF border·rounded mask, normalized JSON, 스타일 제거 시 원본 GameObject 재사용과 overlay·mask 정리, dashed·percentage·타원형 radius 오류를 확인했다.
 - 제한형 HTML CSS의 다중 box-shadow를 canonical paint 순서에 맞게 역전했다. Outer·inset, 음수 offset·spread, blur, currentColor, radius-aware SDF geometry, normalized JSON, layer 순서, none 전환 시 원본 노드 재사용과 wrapper 정리, 잘못된 blur·offset·percentage·none·inset 진단을 확인했다.
+- 제한형 HTML CSS의 background/background-image 단일 linear-gradient를 canonical LUT paint로 변환했다. CSS angle·cardinal 방향, percentage·생략 stop 보간, 감소 위치 fix-up, transparent·currentColor, normalized JSON, LUT 픽셀·axis·rounded mask, angle 변경 시 material/texture 재사용과 none→단색 복원, corner·px·단일 stop·radial·rgb 오류를 확인했다.
 - canonical flex의 wrap·wrap-reverse, alignContent 여섯 모드, 물리 row/column gap을 결정론적인 multi-line 배치로 해석했다. Line별 grow/max 재분배, reverse 주·교차축, alignSelf와 stretch, top-left Rect bake, nowrap 전환과 normalized JSON round-trip을 확인했다.
 - canonical font resource의 문서 상대 경로를 기존 TMP Font Asset 또는 TTF/OTF Unity Font로 해석했다. Source font는 GUID 기반 안정 경로의 dynamic TMP asset으로 생성하며 Text·TextInput·placeholder 적용, normalized JSON round-trip, 반복 재생성의 asset GUID·GameObject 재사용, 누락 경로의 기본 TMP font 폴백을 확인했다.
 - canonical 정수 zIndex를 낮은 값부터 높은 값의 paint 순서로 적용하면서 flex 위치와 hierarchy 순서를 분리했다. Order 기반 flow 위치, absolute flow 제외, 음수·양수·동률 zIndex, margin·transform 외곽 wrapper, normalized JSON round-trip, 반복 재생성과 zIndex 제거 시 native Layout Group 복원을 확인했다.
@@ -56,7 +57,7 @@
 자동 검증 결과:
 
 - `npm run check`: UDOM conformance 39/39, React 5/5, TypeScript typecheck와 build 통과
-- Unity EditMode `Html2Vrc.Tests.UdomPrototypeTests`: **50/50 통과, 실패 0**
+- Unity EditMode `Html2Vrc.Tests.UdomPrototypeTests`: **51/51 통과, 실패 0**
 - Unity 종료 코드 0, C# 컴파일 오류 0
 - Windows CRLF에서 기존 HTML 재생성 테스트가 문자열을 교체하지 못하던 문제도 함께 수정했다.
 
@@ -86,7 +87,7 @@
 
 ## 자동 회귀 검증
 
-HTML2VRC 전용 Unity Test Framework 테스트 50개를 실행한다. 검증 범위는 다음과 같다.
+HTML2VRC 전용 Unity Test Framework 테스트 51개를 실행한다. 검증 범위는 다음과 같다.
 
 1. 샘플 UDOM Validation 성공과 잘못된 속성/중복 ID 거부
 2. Canvas, TextMeshProUGUI, Image, Button, ScrollRect, LayoutGroup과 VRChat용 `VRCUiShape` 생성
@@ -138,11 +139,12 @@ HTML2VRC 전용 Unity Test Framework 테스트 50개를 실행한다. 검증 범
 48. 제한형 HTML 이미지의 Texture2D/Sprite 판별, object-fit 네 모드와 object-position mixed unit·키워드 정규화, 실제 콘텐츠 Rect·clipping·안정 재생성과 오류 진단 검증
 49. 제한형 HTML border shorthand·longhand source-order, currentColor·비대칭 edge, px radius, SDF border·rounded clipping, normalized 상태·재생성 정리와 미지원 문법 진단 검증
 50. 제한형 HTML 다중 box-shadow의 CSS/canonical paint 순서 변환, outer·inset geometry, offset·blur·spread·currentColor, SDF layer·none 수명주기와 오류 진단 검증
+51. 제한형 HTML linear-gradient의 angle·cardinal 방향, percentage·생략 stop 보간과 fix-up, currentColor, LUT·axis·rounded mask, paint 전환 재사용·정리와 미지원 문법 진단 검증
 
 최종 자동 테스트 결과:
 
-- 전체 50개
-- 통과 50개
+- 전체 51개
+- 통과 51개
 - 실패 0개
 - 건너뜀 0개
 - Unity 종료 코드 0
