@@ -127,6 +127,7 @@ namespace Html2Vrc.Editor
             writer.BoolArrayProperty("autoSize", style.autoSize);
             writer.FloatProperty("aspectRatio", style.aspectRatio);
             writer.StringProperty("aspectRatioMode", style.aspectRatioMode);
+            writer.BoolProperty("displayNone", style.displayNone);
             writer.StringProperty("layout", style.layout);
             writer.FloatArrayProperty("padding", style.padding);
             writer.FloatArrayProperty("margin", style.margin);

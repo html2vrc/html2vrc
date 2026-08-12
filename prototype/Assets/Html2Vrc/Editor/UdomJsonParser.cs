@@ -211,6 +211,11 @@ namespace Html2Vrc.Editor
                 style.aspectRatioMode = GetString(value, "aspectRatioMode");
             }
 
+            if (value.TryGetValue("displayNone", out var displayNone))
+            {
+                style.displayNone = GetBoolean(displayNone, path + ".displayNone");
+            }
+
             if (value.TryGetValue("layout", out _))
             {
                 style.layout = GetString(value, "layout");

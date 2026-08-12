@@ -110,6 +110,8 @@ Canonical flex의 `row-reverse`, `column-reverse`, 정수 `flexItem.order`를 �
 
 Canonical `position: absolute` 항목은 부모 flex의 크기 분배와 gap에서 제외하고, `x/y`를 부모 design box의 왼쪽·위 기준 숫자 또는 percentage 좌표로 배치합니다. 직접 노드와 margin·transform·shadow wrapper 모두 같은 top-left anchor 규칙을 사용하며 absolute와 flow 사이를 재생성해도 안정 GameObject를 유지합니다.
 
+Canonical `layout.mode: none`은 해당 노드와 전체 subtree를 Unity hierarchy, flex 공간, gap과 신규 binding slot 수집에서 제외합니다. 이전에 생성된 subtree는 재생성 시 안정 ID 기준으로 모두 정리하되, 사용자가 연결한 외부 slot target 자체는 삭제하거나 reparent하지 않습니다. 생략된 mode는 명세 기본값인 `absolute`로 처리합니다.
+
 Canonical text의 `lineHeight`, `letterSpacing`, justify 정렬, wrap/nowrap, visible/clip/ellipsis overflow와 `preserveWhitespace`를 TextMeshPro로 보존합니다. 절대 line height는 실제 TMP FontAsset metric에서 spacing을 역산하고, letter spacing은 design unit을 TMP em 단위로 변환합니다. 생략된 canonical 텍스트는 명세 기본값인 16px, 검정, top/start, wrap, clip을 사용합니다.
 
 Canonical image의 `fit`은 `fill`, `contain`, `cover`, `none`을 지원합니다. 이미지 콘텐츠는 안정 ID를 가진 내부 자식에 배치되고 원본 비율·크기와 `position.x/y`에 따라 정렬되며, 노드 영역을 넘는 부분은 마스크로 잘립니다. 백분율 위치는 남는 공간에 대한 비율, 숫자는 왼쪽·위 기준 design-unit 오프셋, `auto`는 가운데 정렬로 해석합니다.

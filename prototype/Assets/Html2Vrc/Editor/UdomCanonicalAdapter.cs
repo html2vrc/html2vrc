@@ -1394,14 +1394,19 @@ namespace Html2Vrc.Editor
                     true);
             }
 
-            var mode = GetString(value, "mode") ?? "none";
+            var mode = GetString(value, "mode") ?? "absolute";
             if (string.Equals(mode, "flex", StringComparison.Ordinal))
             {
                 MapFlex(value, path, result);
             }
-            else if (string.Equals(mode, "absolute", StringComparison.Ordinal)
-                     || string.Equals(mode, "none", StringComparison.Ordinal))
+            else if (string.Equals(mode, "absolute", StringComparison.Ordinal))
             {
+                result.Style.layout = "None";
+                RejectNonEmptyObject(value, "flex", path + ".flex", "flex settings require layout mode 'flex'");
+            }
+            else if (string.Equals(mode, "none", StringComparison.Ordinal))
+            {
+                result.Style.displayNone = true;
                 result.Style.layout = "None";
                 RejectNonEmptyObject(value, "flex", path + ".flex", "flex settings require layout mode 'flex'");
             }
@@ -1518,7 +1523,7 @@ namespace Html2Vrc.Editor
 
         private static void ResolveFlexLayoutTree(UdomNode node)
         {
-            if (node == null)
+            if (node == null || (node.style != null && node.style.displayNone))
             {
                 return;
             }
@@ -1547,7 +1552,7 @@ namespace Html2Vrc.Editor
             for (var index = 0; index < children.Length; index++)
             {
                 var childStyle = children[index].style;
-                if (childStyle != null && childStyle.positionAbsolute)
+                if (childStyle != null && (childStyle.displayNone || childStyle.positionAbsolute))
                 {
                     continue;
                 }
@@ -1584,7 +1589,7 @@ namespace Html2Vrc.Editor
             for (var index = 0; index < children.Length; index++)
             {
                 var childStyle = children[index].style ?? new UdomStyle();
-                if (childStyle.positionAbsolute)
+                if (childStyle.displayNone || childStyle.positionAbsolute)
                 {
                     continue;
                 }
@@ -1654,7 +1659,7 @@ namespace Html2Vrc.Editor
             for (var index = 0; index < children.Length; index++)
             {
                 var childStyle = children[index].style ?? new UdomStyle();
-                if (childStyle.positionAbsolute)
+                if (childStyle.displayNone || childStyle.positionAbsolute)
                 {
                     continue;
                 }

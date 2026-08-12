@@ -245,17 +245,20 @@ namespace Html2Vrc.Editor
 
             var buildParent = viewport.transform;
             var documentRoot = BuildNode(document.root, buildParent, null, 0, context);
-            var viewportContent = documentRoot.transform;
-            while (viewportContent.parent != null && viewportContent.parent != buildParent)
+            if (documentRoot != null)
             {
-                viewportContent = viewportContent.parent;
-            }
+                var viewportContent = documentRoot.transform;
+                while (viewportContent.parent != null && viewportContent.parent != buildParent)
+                {
+                    viewportContent = viewportContent.parent;
+                }
 
-            Undo.RecordObject(viewportContent, "Configure UDOM viewport fit");
-            viewportContent.localScale = new Vector3(
-                canvasFit.ContentScale.x,
-                canvasFit.ContentScale.y,
-                1f);
+                Undo.RecordObject(viewportContent, "Configure UDOM viewport fit");
+                viewportContent.localScale = new Vector3(
+                    canvasFit.ContentScale.x,
+                    canvasFit.ContentScale.y,
+                    1f);
+            }
             PruneStaleGeneratedNodes(context);
 #if UDONSHARP
             UdomVrchatSetup.RefreshBindingTargets(root);
@@ -434,7 +437,7 @@ namespace Html2Vrc.Editor
 
         private static void CollectExternalSlots(UdomNode node, UdomGeneratedRoot root)
         {
-            if (node == null)
+            if (node == null || (node.style != null && node.style.displayNone))
             {
                 return;
             }
@@ -463,7 +466,17 @@ namespace Html2Vrc.Editor
             int siblingIndex,
             BuildContext context)
         {
+            if (node == null)
+            {
+                return null;
+            }
+
             var style = node.style ?? new UdomStyle();
+            if (style.displayNone)
+            {
+                return null;
+            }
+
             var actualParent = parent;
             var hasMargin = HasNonZero(style.margin);
             var hasTransform = HasTransform(style);
@@ -1348,6 +1361,11 @@ namespace Html2Vrc.Editor
 
         private static void RefreshVisualLayout(UdomNode node, BuildContext context)
         {
+            if (node == null || (node.style != null && node.style.displayNone))
+            {
+                return;
+            }
+
             var style = node.style ?? new UdomStyle();
             var hasTransform = HasTransform(style);
             var hasOuterShadows = HasRenderableOuterShadow(style);
@@ -1467,7 +1485,7 @@ namespace Html2Vrc.Editor
 
         private static void RefreshAbsoluteLayout(UdomNode node, BuildContext context)
         {
-            if (node == null)
+            if (node == null || (node.style != null && node.style.displayNone))
             {
                 return;
             }
@@ -1509,6 +1527,11 @@ namespace Html2Vrc.Editor
 
         private static void RefreshPaintLayout(UdomNode node, BuildContext context)
         {
+            if (node == null || (node.style != null && node.style.displayNone))
+            {
+                return;
+            }
+
             var style = node.style ?? new UdomStyle();
             var marker = FindNode(context.Root, node.id);
             if (marker != null)

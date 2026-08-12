@@ -36,11 +36,12 @@
 - canonical lineHeight·letterSpacing의 TMP metric 환산, justify와 세로 정렬, wrap/nowrap, visible/clip/ellipsis, whitespace 축약·보존, 명세 기본값과 안정 재생성을 확인했다.
 - canonical row/column reverse와 음수·동률 `flexItem.order`의 안정 정렬, main-start 정렬, margin·transform·shadow wrapper 재사용을 확인했다. 내부 normalized JSON이 min/max·aspect ratio·text flow·flex order 상태를 round-trip하는 회귀도 포함한다.
 - canonical `position: absolute`의 numeric·percentage `x/y`를 top-left RectTransform 좌표로 적용하고, 부모 flex grow·gap에서 제외했다. 직접 노드와 margin·transform·shadow wrapper, absolute/flow 전환, normalized JSON round-trip과 안정 재생성을 확인했다.
+- canonical `layout.mode: none` subtree의 flex·gap·GameObject·신규 slot 제외, visible 전환 후 wrapper 안정 재사용, none 복귀 시 전체 prune와 사용자 external target 보존, root none 안전 재생성을 확인했다.
 
 자동 검증 결과:
 
-- `npm run check`: UDOM conformance 32/32, React 5/5, TypeScript typecheck와 build 통과
-- Unity EditMode `Html2Vrc.Tests.UdomPrototypeTests`: **33/33 통과, 실패 0**
+- `npm run check`: UDOM conformance 33/33, React 5/5, TypeScript typecheck와 build 통과
+- Unity EditMode `Html2Vrc.Tests.UdomPrototypeTests`: **34/34 통과, 실패 0**
 - Unity 종료 코드 0, C# 컴파일 오류 0
 - Windows CRLF에서 기존 HTML 재생성 테스트가 문자열을 교체하지 못하던 문제도 함께 수정했다.
 
@@ -70,7 +71,7 @@
 
 ## 자동 회귀 검증
 
-HTML2VRC 전용 Unity Test Framework 테스트 33개를 실행한다. 검증 범위는 다음과 같다.
+HTML2VRC 전용 Unity Test Framework 테스트 34개를 실행한다. 검증 범위는 다음과 같다.
 
 1. 샘플 UDOM Validation 성공과 잘못된 속성/중복 ID 거부
 2. Canvas, TextMeshProUGUI, Image, Button, ScrollRect, LayoutGroup과 VRChat용 `VRCUiShape` 생성
@@ -105,11 +106,12 @@ HTML2VRC 전용 Unity Test Framework 테스트 33개를 실행한다. 검증 범
 31. canonical lineHeight·letterSpacing의 TMP baseline/em 환산, justify·wrap·overflow, whitespace 축약·보존, 기본값과 안정 재생성
 32. canonical row/column reverse와 order-modified flex 순서, wrapper 단위 안정 재배치, normalized layout·text·order 상태 round-trip
 33. canonical absolute의 top-left numeric·percentage 좌표, flex flow 제외, margin·transform·shadow wrapper와 absolute/flow 전환, normalized 상태 round-trip
+34. canonical mode none subtree의 flex·생성·slot 제외, visible/none 전환 wrapper 수명주기, 외부 target 보존과 hidden document root
 
 최종 자동 테스트 결과:
 
-- 전체 33개
-- 통과 33개
+- 전체 34개
+- 통과 34개
 - 실패 0개
 - 건너뜀 0개
 - Unity 종료 코드 0

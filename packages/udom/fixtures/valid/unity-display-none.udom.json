@@ -1,0 +1,141 @@
+{
+  "asset": {
+    "version": "0.1",
+    "generator": "@html2vrc/udom Unity display none fixture"
+  },
+  "viewport": {
+    "width": 500,
+    "height": 350
+  },
+  "root": {
+    "type": "element",
+    "id": "display-none-root",
+    "name": "view",
+    "style": {
+      "layout": {
+        "mode": "flex",
+        "width": "100%",
+        "height": "100%",
+        "padding": {
+          "top": 20,
+          "right": 20,
+          "bottom": 20,
+          "left": 20
+        },
+        "flex": {
+          "direction": "column",
+          "alignItems": "start",
+          "rowGap": 10
+        }
+      }
+    },
+    "children": [
+      {
+        "type": "element",
+        "id": "visible-first",
+        "name": "view",
+        "style": {
+          "layout": {
+            "width": 200,
+            "height": 80,
+            "maxHeight": 100,
+            "flexItem": {
+              "grow": 1
+            }
+          },
+          "paint": {
+            "backgrounds": [
+              {
+                "type": "color",
+                "color": "#264653FF"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "type": "element",
+        "id": "hidden-branch",
+        "name": "view",
+        "style": {
+          "layout": {
+            "mode": "none",
+            "width": 220,
+            "height": 250,
+            "margin": {
+              "top": 5,
+              "right": 7,
+              "bottom": 9,
+              "left": 3
+            },
+            "flexItem": {
+              "grow": 100
+            }
+          },
+          "paint": {
+            "backgrounds": [
+              {
+                "type": "color",
+                "color": "#E76F51FF"
+              }
+            ],
+            "shadows": [
+              {
+                "offsetX": 6,
+                "offsetY": 8,
+                "blur": 10,
+                "color": "#00000066"
+              }
+            ]
+          },
+          "transform": {
+            "operations": [
+              {
+                "type": "rotate",
+                "degrees": 8
+              }
+            ]
+          }
+        },
+        "children": [
+          {
+            "type": "text",
+            "id": "hidden-label",
+            "value": "This subtree must not be generated"
+          },
+          {
+            "type": "element",
+            "id": "hidden-embed",
+            "name": "embed",
+            "properties": {
+              "object": "hidden.worldObject",
+              "fallbackLabel": "Hidden fallback"
+            }
+          }
+        ]
+      },
+      {
+        "type": "element",
+        "id": "visible-second",
+        "name": "view",
+        "style": {
+          "layout": {
+            "width": 200,
+            "height": 80,
+            "flexItem": {
+              "grow": 1
+            }
+          },
+          "paint": {
+            "backgrounds": [
+              {
+                "type": "color",
+                "color": "#2A9D8FFF"
+              }
+            ]
+          }
+        }
+      }
+    ]
+  }
+}

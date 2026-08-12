@@ -68,6 +68,7 @@ namespace Html2Vrc
         public bool[] autoSize = { false, false };
         public float aspectRatio;
         public string aspectRatioMode = "None";
+        public bool displayNone;
         public string layout = "None";
         public float[] padding = { 0f, 0f, 0f, 0f };
         public float[] margin = { 0f, 0f, 0f, 0f };

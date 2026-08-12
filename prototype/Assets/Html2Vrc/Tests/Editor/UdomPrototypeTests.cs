@@ -1058,6 +1058,121 @@ namespace Html2Vrc.Tests
         }
 
         [Test]
+        public void CanonicalDisplayNone_ExcludesAndPrunesEntireSubtree()
+        {
+            var json = LoadRepositoryFile(
+                "packages",
+                "udom",
+                "fixtures",
+                "valid",
+                "unity-display-none.udom.json");
+            var validation = UdomValidator.Validate(json);
+
+            Assert.That(validation.IsValid, Is.True, validation.Format());
+            Assert.That(validation.Issues, Is.Empty, validation.Format());
+
+            var document = validation.Document;
+            var firstNode = document.root.children[0];
+            var hiddenNode = document.root.children[1];
+            var secondNode = document.root.children[2];
+            Assert.That(hiddenNode.style.displayNone, Is.True);
+            Assert.That(hiddenNode.style.layout, Is.EqualTo("None"));
+            Assert.That(hiddenNode.children[0].style.displayNone, Is.False);
+            Assert.That(firstNode.style.size[1], Is.EqualTo(100f).Within(0.001f));
+            Assert.That(secondNode.style.size[1], Is.EqualTo(200f).Within(0.001f));
+            Assert.That(hiddenNode.style.size[1], Is.EqualTo(250f));
+
+            var normalized = UdomJsonWriter.Write(document);
+            var roundTrip = UdomValidator.Validate(normalized);
+            Assert.That(roundTrip.IsValid, Is.True, roundTrip.Format());
+            Assert.That(roundTrip.Document.root.children[1].style.displayNone, Is.True);
+
+            var firstBuild = UdomBuilder.GenerateOrRegenerate(document);
+            var root = firstBuild.Root;
+            var panel = UdomBuilder.FindNode(root, "display-none-root").gameObject;
+            var first = UdomBuilder.FindNode(root, "visible-first").gameObject;
+            var second = UdomBuilder.FindNode(root, "visible-second").gameObject;
+            Assert.That(UdomBuilder.FindNode(root, "hidden-branch"), Is.Null);
+            Assert.That(UdomBuilder.FindNode(root, "hidden-branch::__margin"), Is.Null);
+            Assert.That(UdomBuilder.FindNode(root, "hidden-branch::__transform-layout"), Is.Null);
+            Assert.That(UdomBuilder.FindNode(root, "hidden-branch::__shadow-0"), Is.Null);
+            Assert.That(UdomBuilder.FindNode(root, "hidden-label"), Is.Null);
+            Assert.That(UdomBuilder.FindNode(root, "hidden-embed"), Is.Null);
+            Assert.That(
+                root.ExternalReferences.Any(reference => reference.slot == "hidden.worldObject"),
+                Is.False);
+            Assert.That(first.transform.GetSiblingIndex(), Is.EqualTo(0));
+            Assert.That(second.transform.GetSiblingIndex(), Is.EqualTo(1));
+            Assert.That(panel.transform.childCount, Is.EqualTo(2));
+
+            Canvas.ForceUpdateCanvases();
+            LayoutRebuilder.ForceRebuildLayoutImmediate(panel.GetComponent<RectTransform>());
+            Assert.That(first.GetComponent<RectTransform>().rect.height, Is.EqualTo(100f).Within(0.001f));
+            Assert.That(second.GetComponent<RectTransform>().rect.height, Is.EqualTo(200f).Within(0.001f));
+
+            var visibleJson = json.Replace("\"mode\": \"none\"", "\"mode\": \"absolute\"");
+            var visibleValidation = UdomValidator.Validate(visibleJson);
+            Assert.That(visibleValidation.IsValid, Is.True, visibleValidation.Format());
+            Assert.That(visibleValidation.Document.root.children[1].style.displayNone, Is.False);
+            var visibleBuild = UdomBuilder.GenerateOrRegenerate(visibleValidation.Document, root);
+            var hidden = UdomBuilder.FindNode(root, "hidden-branch").gameObject;
+            var hiddenMargin = UdomBuilder.FindNode(root, "hidden-branch::__margin").gameObject;
+            var hiddenTransform = UdomBuilder.FindNode(
+                root,
+                "hidden-branch::__transform-layout").gameObject;
+            var hiddenShadow = UdomBuilder.FindNode(root, "hidden-branch::__shadow-0").gameObject;
+            var hiddenLabel = UdomBuilder.FindNode(root, "hidden-label").gameObject;
+            var hiddenEmbed = UdomBuilder.FindNode(root, "hidden-embed").gameObject;
+            Assert.That(visibleBuild.Created, Is.GreaterThan(0));
+            Assert.That(hidden, Is.Not.Null);
+            Assert.That(hiddenMargin, Is.Not.Null);
+            Assert.That(hiddenTransform, Is.Not.Null);
+            Assert.That(hiddenShadow, Is.Not.Null);
+            Assert.That(hiddenLabel, Is.Not.Null);
+            Assert.That(hiddenEmbed, Is.Not.Null);
+            Assert.That(
+                root.ExternalReferences.Any(reference => reference.slot == "hidden.worldObject"),
+                Is.True);
+
+            var stableVisible = UdomBuilder.GenerateOrRegenerate(visibleValidation.Document, root);
+            Assert.That(stableVisible.Created, Is.Zero);
+            Assert.That(UdomBuilder.FindNode(root, "hidden-branch").gameObject, Is.SameAs(hidden));
+            Assert.That(
+                UdomBuilder.FindNode(root, "hidden-branch::__margin").gameObject,
+                Is.SameAs(hiddenMargin));
+
+            var externalTarget = new GameObject("Hidden Slot Target");
+            root.SetExternalReference("hidden.worldObject", externalTarget);
+            var hiddenAgain = UdomBuilder.GenerateOrRegenerate(document, root);
+            Assert.That(hiddenAgain.Removed, Is.GreaterThan(0));
+            Assert.That(UdomBuilder.FindNode(root, "hidden-branch"), Is.Null);
+            Assert.That(UdomBuilder.FindNode(root, "hidden-branch::__margin"), Is.Null);
+            Assert.That(UdomBuilder.FindNode(root, "hidden-label"), Is.Null);
+            Assert.That(UdomBuilder.FindNode(root, "hidden-embed"), Is.Null);
+            Assert.That(root.Resolve("hidden.worldObject"), Is.SameAs(externalTarget));
+            Assert.That(externalTarget.transform.parent, Is.Null);
+
+            document.root.style.displayNone = true;
+            var hiddenRoot = UdomBuilder.GenerateOrRegenerate(document, root);
+            Assert.That(hiddenRoot.Root, Is.SameAs(root));
+            Assert.That(UdomBuilder.FindNode(root, "display-none-root"), Is.Null);
+            Assert.That(UdomBuilder.FindNode(root, "visible-first"), Is.Null);
+            Assert.That(UdomBuilder.FindNode(root, "visible-second"), Is.Null);
+            Assert.That(
+                UdomBuilder.FindNode(root, "display-none-root::__viewport-fit"),
+                Is.Not.Null);
+
+            Object.DestroyImmediate(root.gameObject);
+            Object.DestroyImmediate(externalTarget);
+
+            var invalid = UdomValidator.Validate(json.Replace(
+                "\"mode\": \"none\"",
+                "\"mode\": \"grid\""));
+            Assert.That(invalid.IsValid, Is.False);
+            Assert.That(invalid.Format(), Does.Contain("mode"));
+        }
+
+        [Test]
         public void CanonicalBorder_RendersAsymmetricRoundedContourAndRegeneratesStably()
         {
             var json = LoadRepositoryFile(
