@@ -1,0 +1,105 @@
+{
+  "asset": {
+    "version": "0.1",
+    "generator": "@html2vrc/udom Unity text flow fixture"
+  },
+  "viewport": {
+    "width": 640,
+    "height": 420
+  },
+  "root": {
+    "type": "element",
+    "id": "text-flow-root",
+    "name": "view",
+    "style": {
+      "layout": {
+        "mode": "flex",
+        "width": "100%",
+        "height": "100%",
+        "padding": {
+          "top": 32,
+          "right": 32,
+          "bottom": 32,
+          "left": 32
+        },
+        "flex": {
+          "direction": "column",
+          "alignItems": "start",
+          "rowGap": 12
+        }
+      }
+    },
+    "children": [
+      {
+        "type": "text",
+        "id": "text-metrics",
+        "value": "  Alpha \n   Beta  ",
+        "style": {
+          "layout": {
+            "width": 300,
+            "height": 64
+          },
+          "text": {
+            "fontSize": 32,
+            "lineHeight": 48,
+            "letterSpacing": 4,
+            "align": "justify",
+            "verticalAlign": "top",
+            "wrap": "nowrap",
+            "overflow": "clip"
+          }
+        }
+      },
+      {
+        "type": "text",
+        "id": "text-preserved",
+        "value": "  First  \nSecond   line  ",
+        "style": {
+          "layout": {
+            "width": 300,
+            "height": 112
+          },
+          "text": {
+            "fontSize": 30,
+            "lineHeight": 45,
+            "align": "center",
+            "verticalAlign": "top",
+            "wrap": "wrap",
+            "overflow": "visible",
+            "preserveWhitespace": true
+          }
+        }
+      },
+      {
+        "type": "text",
+        "id": "text-ellipsis",
+        "value": "A deliberately long single line that must be shortened",
+        "style": {
+          "layout": {
+            "width": 180,
+            "height": 40
+          },
+          "text": {
+            "fontSize": 24,
+            "lineHeight": "normal",
+            "wrap": "nowrap",
+            "overflow": "ellipsis",
+            "align": "end",
+            "verticalAlign": "bottom"
+          }
+        }
+      },
+      {
+        "type": "text",
+        "id": "text-defaults",
+        "value": "  Canonical   defaults \n collapse  ",
+        "style": {
+          "layout": {
+            "width": 300,
+            "height": 48
+          }
+        }
+      }
+    ]
+  }
+}

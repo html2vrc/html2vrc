@@ -93,7 +93,9 @@ namespace Html2Vrc.Editor
             "backgroundType", "backgroundGradientAngle", "backgroundGradientPositions", "backgroundGradientColors",
             "backgroundGradientCenter", "backgroundGradientCenterIsPercent",
             "backgroundGradientRadius", "backgroundGradientRadiusIsPercent",
-            "cornerRadius", "cornerRadiusPercent", "borderWidth", "borderColor", "textColor", "fontSize", "alignment", "fontStyle", "childAlignment",
+            "cornerRadius", "cornerRadiusPercent", "borderWidth", "borderColor", "textColor", "fontSize",
+            "lineHeight", "letterSpacing", "textWrap", "textOverflow", "preserveWhitespace",
+            "alignment", "fontStyle", "childAlignment",
             "shadowOffsets", "shadowBlurs", "shadowSpreads", "shadowColors", "shadowInsets",
             "stretchChildrenWidth", "stretchChildrenHeight", "useResolvedChildrenWidth", "useResolvedChildrenHeight",
             "flexibleWidth", "flexibleHeight",
@@ -445,6 +447,25 @@ namespace Html2Vrc.Editor
             if (style.fontSize <= 0f)
             {
                 AddError(result, path + ".fontSize", "fontSize는 0보다 커야 한다.");
+            }
+
+            if ((!Mathf.Approximately(style.lineHeight, -1f) && style.lineHeight <= 0f)
+                || float.IsNaN(style.lineHeight)
+                || float.IsInfinity(style.lineHeight))
+            {
+                AddError(result, path + ".lineHeight", "lineHeight는 -1 또는 0보다 큰 유한한 값이어야 한다.");
+            }
+
+            if (float.IsNaN(style.letterSpacing) || float.IsInfinity(style.letterSpacing))
+            {
+                AddError(result, path + ".letterSpacing", "letterSpacing은 유한한 값이어야 한다.");
+            }
+
+            if (!string.Equals(style.textOverflow, "Visible", StringComparison.Ordinal)
+                && !string.Equals(style.textOverflow, "Clip", StringComparison.Ordinal)
+                && !string.Equals(style.textOverflow, "Ellipsis", StringComparison.Ordinal))
+            {
+                AddError(result, path + ".textOverflow", $"지원하지 않는 text overflow '{style.textOverflow}'.");
             }
 
             if (!UdomBuilderUtility.TryParseAlignment(style.alignment, out _))

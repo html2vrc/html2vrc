@@ -781,6 +781,98 @@ namespace Html2Vrc.Tests
         }
 
         [Test]
+        public void CanonicalTextFlow_MapsMetricsWrappingOverflowAndWhitespace()
+        {
+            var json = LoadRepositoryFile(
+                "packages",
+                "udom",
+                "fixtures",
+                "valid",
+                "unity-text-flow.udom.json");
+            var validation = UdomValidator.Validate(json);
+
+            Assert.That(validation.IsValid, Is.True, validation.Format());
+            Assert.That(validation.Issues, Is.Empty, validation.Format());
+
+            var document = validation.Document;
+            var metricsNode = document.root.children[0];
+            var preservedNode = document.root.children[1];
+            var ellipsisNode = document.root.children[2];
+            var defaultsNode = document.root.children[3];
+            Assert.That(metricsNode.text, Is.EqualTo("Alpha Beta"));
+            Assert.That(metricsNode.style.fontSize, Is.EqualTo(32f));
+            Assert.That(metricsNode.style.lineHeight, Is.EqualTo(48f));
+            Assert.That(metricsNode.style.letterSpacing, Is.EqualTo(4f));
+            Assert.That(metricsNode.style.textWrap, Is.False);
+            Assert.That(metricsNode.style.textOverflow, Is.EqualTo("Clip"));
+            Assert.That(metricsNode.style.alignment, Is.EqualTo("TopJustified"));
+            Assert.That(preservedNode.text, Is.EqualTo("  First  \nSecond   line  "));
+            Assert.That(preservedNode.style.preserveWhitespace, Is.True);
+            Assert.That(preservedNode.style.textOverflow, Is.EqualTo("Visible"));
+            Assert.That(ellipsisNode.style.textOverflow, Is.EqualTo("Ellipsis"));
+            Assert.That(ellipsisNode.style.lineHeight, Is.EqualTo(-1f));
+            Assert.That(ellipsisNode.style.alignment, Is.EqualTo("BottomRight"));
+            Assert.That(defaultsNode.text, Is.EqualTo("Canonical defaults collapse"));
+            Assert.That(defaultsNode.style.fontSize, Is.EqualTo(16f));
+            Assert.That(defaultsNode.style.textColor, Is.EqualTo("#000000FF"));
+            Assert.That(defaultsNode.style.alignment, Is.EqualTo("TopLeft"));
+            Assert.That(defaultsNode.style.textWrap, Is.True);
+            Assert.That(defaultsNode.style.textOverflow, Is.EqualTo("Clip"));
+
+            var build = UdomBuilder.GenerateOrRegenerate(document);
+            var root = build.Root;
+            var metrics = UdomBuilder.FindNode(root, "text-metrics").GetComponent<TextMeshProUGUI>();
+            var preserved = UdomBuilder.FindNode(root, "text-preserved").GetComponent<TextMeshProUGUI>();
+            var ellipsis = UdomBuilder.FindNode(root, "text-ellipsis").GetComponent<TextMeshProUGUI>();
+            var defaults = UdomBuilder.FindNode(root, "text-defaults").GetComponent<TextMeshProUGUI>();
+            var originalMetrics = metrics.gameObject;
+
+            Assert.That(metrics.text, Is.EqualTo("Alpha Beta"));
+            Assert.That(metrics.characterSpacing, Is.EqualTo(12.5f).Within(0.001f));
+            Assert.That(metrics.enableWordWrapping, Is.False);
+            Assert.That(metrics.overflowMode, Is.EqualTo(TextOverflowModes.Masking));
+            Assert.That(metrics.alignment, Is.EqualTo(TextAlignmentOptions.TopJustified));
+            Assert.That(preserved.text, Is.EqualTo("  First  \nSecond   line  "));
+            Assert.That(preserved.enableWordWrapping, Is.True);
+            Assert.That(preserved.overflowMode, Is.EqualTo(TextOverflowModes.Overflow));
+            Assert.That(ellipsis.enableWordWrapping, Is.False);
+            Assert.That(ellipsis.overflowMode, Is.EqualTo(TextOverflowModes.Ellipsis));
+            Assert.That(ellipsis.alignment, Is.EqualTo(TextAlignmentOptions.BottomRight));
+            Assert.That(defaults.fontSize, Is.EqualTo(16f));
+            Assert.That(defaults.color, Is.EqualTo(Color.black).Using(ColorComparer.Instance));
+            Assert.That(defaults.alignment, Is.EqualTo(TextAlignmentOptions.TopLeft));
+            Assert.That(defaults.overflowMode, Is.EqualTo(TextOverflowModes.Masking));
+
+            Canvas.ForceUpdateCanvases();
+            preserved.ForceMeshUpdate();
+            Assert.That(preserved.textInfo.lineCount, Is.EqualTo(2));
+            var baselineDistance = Mathf.Abs(
+                preserved.textInfo.lineInfo[0].baseline
+                - preserved.textInfo.lineInfo[1].baseline);
+            Assert.That(baselineDistance, Is.EqualTo(45f).Within(0.01f));
+
+            metricsNode.style.lineHeight = -1f;
+            metricsNode.style.letterSpacing = 0f;
+            metricsNode.style.textWrap = true;
+            metricsNode.style.textOverflow = "Visible";
+            metricsNode.style.alignment = "BottomRight";
+            var regenerated = UdomBuilder.GenerateOrRegenerate(document, root);
+            Assert.That(regenerated.Created, Is.Zero);
+            Assert.That(UdomBuilder.FindNode(root, "text-metrics").gameObject, Is.SameAs(originalMetrics));
+            Assert.That(metrics.lineSpacing, Is.Zero);
+            Assert.That(metrics.characterSpacing, Is.Zero);
+            Assert.That(metrics.enableWordWrapping, Is.True);
+            Assert.That(metrics.overflowMode, Is.EqualTo(TextOverflowModes.Overflow));
+            Assert.That(metrics.alignment, Is.EqualTo(TextAlignmentOptions.BottomRight));
+
+            Object.DestroyImmediate(root.gameObject);
+
+            var invalid = UdomValidator.Validate(json.Replace("\"lineHeight\": 48", "\"lineHeight\": 0"));
+            Assert.That(invalid.IsValid, Is.False);
+            Assert.That(invalid.Format(), Does.Contain("lineHeight"));
+        }
+
+        [Test]
         public void CanonicalBorder_RendersAsymmetricRoundedContourAndRegeneratesStably()
         {
             var json = LoadRepositoryFile(

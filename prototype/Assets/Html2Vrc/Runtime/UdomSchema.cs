@@ -91,6 +91,11 @@ namespace Html2Vrc
         public bool[] shadowInsets = Array.Empty<bool>();
         public string textColor = "#FFFFFFFF";
         public float fontSize = 24f;
+        public float lineHeight = -1f;
+        public float letterSpacing;
+        public bool textWrap = true;
+        public string textOverflow = "Ellipsis";
+        public bool preserveWhitespace;
         public string alignment = "MiddleLeft";
         public string fontStyle = "Normal";
         public string childAlignment = "UpperLeft";

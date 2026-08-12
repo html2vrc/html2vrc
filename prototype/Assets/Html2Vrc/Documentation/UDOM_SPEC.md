@@ -44,6 +44,8 @@ Canonical `transform`은 `origin`과 배열 순서의 `translate`, `rotate`, `sc
 
 Canonical `paint.shadows`는 `shadowOffsets`, `shadowBlurs`, `shadowSpreads`, `shadowColors`, `shadowInsets` 배열로 outer·inset 순서와 값을 보존한다. 렌더러는 각 visible shadow를 `<node-id>::__shadow-<index>` 안정 ID의 별도 Image와 VRChat-safe SDF Material로 만들고 radius-aware blur와 spread를 그린다. Outer shadow는 shadow layout wrapper 안에서 노드 뒤에 겹치므로 시각적 확장이 형제 배치나 raycast 영역을 바꾸지 않으며, transform이 있으면 노드와 같은 operation wrapper를 상속한다. Inset shadow는 보통 노드의 `ignoreLayout` 첫 자식으로 background 위·일반 콘텐츠와 border 아래에 놓인다. TMP Graphic이 노드 자체에 있는 Text는 같은 layer 순서를 지키도록 shadow layout wrapper 안에서 inset Image를 Text 노드 바로 앞의 sibling으로 둔다. 두 경로 모두 원래 box radius SDF로 잘리고, 모든 shadow Image는 raycast를 끄며 Material과 GameObject를 재생성 사이에 안정적으로 재사용한다.
 
+Canonical text는 `lineHeight`, `letterSpacing`, `align: justify`, `verticalAlign`, `wrap`, `overflow`, `preserveWhitespace`를 내부 text metric과 flow 필드로 정규화한다. 숫자 line height는 TMP FontAsset의 face line height와 point size에서 필요한 추가 spacing을 계산해 baseline 간격을 design unit에 맞춘다. Letter spacing은 design unit을 TMP의 font-size-relative em 값으로 환산한다. `clip`은 TMP masking, `visible`은 overflow, `ellipsis`는 ellipsis 모드에 대응하며, whitespace 보존이 꺼져 있으면 연속 공백과 줄바꿈을 한 칸으로 축약한다. 생략된 canonical 기본값은 16px, 검정, top/start, wrap, clip이다.
+
 Resource URI는 canonical 명세대로 UDOM TextAsset이 있는 폴더를 기준으로 해석한다. `Assets/`로 시작하는 절대 Unity 에셋 경로도 지원한다. `..`로 정규화하더라도 결과가 `Assets/` 밖으로 나가면 참조하지 않고 경고를 남긴다.
 
 아직 지원하지 않는 canonical 기능은 묵시하지 않고 검증 오류나 명시적 폴백 경고로 반환한다. font resource는 프로젝트 기본 TMP font로 폴백하고 경고를 남긴다. Text 노드 자체의 linear/radial/conic gradient와 radius는 TMP 텍스트와 별도 박스 graphic이 필요하므로 첫 stop 색 또는 square corner와 경고를 사용한다. Embed의 gradient와 radius도 외부 오브젝트가 graphic을 소유하므로 첫 stop 또는 square corner로 진단한다. source asset 경로가 없는 raw JSON 검증에서는 상대 resource URI를 추측하지 않고 빈 Image와 경고를 사용한다. `bind`와 `on`의 symbolic ID는 임의 로직으로 실행하지 않고, 안전한 Unity/Udon binding manifest가 없다는 경고로 남는다. Button, Toggle, Slider, Text input과 Scroll의 canonical focus/blur도 같은 방식으로 보존·진단한다. Slider의 step은 정수 범위의 `1`일 때 Unity `wholeNumbers`로 적용하고 그 외의 step은 아직 경고와 연속 Slider 폴백을 사용한다. Text input은 빈 문자열을 포함한 value와 placeholder, multiline, readOnly, disabled를 native `TMP_InputField`로 적용한다.
@@ -141,9 +143,11 @@ Resource URI는 canonical 명세대로 UDOM TextAsset이 있는 폴더를 기준
 - `transformOrigin`, `transformOriginIsPercent`: canonical transform origin의 X/Y 값과 percentage 여부.
 - `transformOperationTypes`, `transformOperationValues`, `transformOperationValuesArePercent`: 배열 순서를 유지한 translate/rotate/scale과 operation당 X/Y 슬롯.
 - `shadowOffsets`, `shadowBlurs`, `shadowSpreads`, `shadowColors`, `shadowInsets`: canonical shadow 배열 순서를 보존하는 offset X/Y와 layer별 paint 값.
+- `lineHeight`, `letterSpacing`: canonical text의 design-unit baseline 간격과 글자 사이 간격. `lineHeight: -1`은 font의 normal metric을 뜻한다.
+- `textWrap`, `textOverflow`, `preserveWhitespace`: canonical wrap/nowrap, visible/clip/ellipsis와 whitespace 보존 여부.
 - `stretchChildrenWidth`, `stretchChildrenHeight`: canonical flex의 기본 `alignItems: stretch`를 Unity Layout Group의 cross-axis 제어로 보존하는 내부 플래그.
 - 색상: Unity HTML 색상 형식 `#RRGGBB` 또는 `#RRGGBBAA`.
-- `alignment`: `TopLeft`, `Top`, `TopRight`, `Left`, `Center`, `Right`, `BottomLeft`, `Bottom`, `BottomRight`, `MiddleLeft`, `MiddleRight`.
+- `alignment`: `TopLeft`, `Top`, `TopRight`, `TopJustified`, `Left`, `Center`, `Right`, `Justified`, `BottomLeft`, `Bottom`, `BottomRight`, `BottomJustified`, `MiddleLeft`, `MiddleRight`.
 - `flexibleWidth`, `flexibleHeight`: 레이아웃 안에서 남는 공간을 차지하는 정도.
 
 Panel은 배경 Image와 선택적 Vertical/Horizontal Layout Group을 만든다. Image의 배경색은 루트 Image에, Texture2D/RawImage 또는 Sprite/Image 콘텐츠는 마스크된 내부 자식에 배치한다. ScrollView의 `style.layout`은 스크롤 Content 배치를 결정한다. Canonical scroll의 axis는 ScrollRect의 horizontal/vertical 축으로, 왼쪽 위 기준 design-unit `initialOffset`은 Content의 `(-x, +y)` anchored position으로 변환한다.

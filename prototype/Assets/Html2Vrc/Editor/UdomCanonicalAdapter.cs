@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Text;
 
 namespace Html2Vrc.Editor
 {
@@ -342,7 +343,10 @@ namespace Html2Vrc.Editor
 
             if (string.Equals(canonicalType, "text", StringComparison.Ordinal))
             {
-                node.text = RequireText(value, "value", path + ".value");
+                var text = RequireText(value, "value", path + ".value");
+                node.text = node.style.preserveWhitespace
+                    ? text
+                    : CollapseCanonicalWhitespace(text);
                 if (IsNativeGradient(node.style.backgroundType))
                 {
                     var gradientType = node.style.backgroundType;
@@ -1021,6 +1025,10 @@ namespace Html2Vrc.Editor
         {
             var style = new UdomStyle();
             style.autoSize = new[] { true, true };
+            style.fontSize = 16f;
+            style.textColor = "#000000FF";
+            style.alignment = "TopLeft";
+            style.textOverflow = "Clip";
             if (fillParentByDefault && parentSize != null && parentSize.Length == 2)
             {
                 style.size = new[] { parentSize[0], parentSize[1] };
@@ -2388,11 +2396,73 @@ namespace Html2Vrc.Editor
                 "wrap",
                 "overflow",
                 "preserveWhitespace");
-            RejectPresent(value, path, "lineHeight", "line height is not supported yet");
-            RejectPresent(value, path, "letterSpacing", "letter spacing is not supported yet");
-            RequireDefaultString(value, "wrap", "wrap", path + ".wrap");
-            RequireDefaultString(value, "overflow", "ellipsis", path + ".overflow");
-            RejectPresent(value, path, "preserveWhitespace", "preserveWhitespace is not supported yet");
+            if (value.TryGetValue("lineHeight", out var lineHeightValue))
+            {
+                if (lineHeightValue is string lineHeightText)
+                {
+                    if (!string.Equals(lineHeightText, "normal", StringComparison.Ordinal))
+                    {
+                        throw new FormatException($"{path}.lineHeight: expected a positive number or 'normal'.");
+                    }
+
+                    style.lineHeight = -1f;
+                }
+                else
+                {
+                    style.lineHeight = RequireFloat(lineHeightValue, path + ".lineHeight");
+                    if (style.lineHeight <= 0f
+                        || float.IsNaN(style.lineHeight)
+                        || float.IsInfinity(style.lineHeight))
+                    {
+                        throw new FormatException($"{path}.lineHeight: line height must be finite and greater than zero.");
+                    }
+                }
+            }
+
+            if (value.TryGetValue("letterSpacing", out var letterSpacingValue))
+            {
+                style.letterSpacing = RequireFloat(letterSpacingValue, path + ".letterSpacing");
+                if (float.IsNaN(style.letterSpacing) || float.IsInfinity(style.letterSpacing))
+                {
+                    throw new FormatException($"{path}.letterSpacing: letter spacing must be finite.");
+                }
+            }
+
+            var wrap = GetString(value, "wrap") ?? "wrap";
+            if (string.Equals(wrap, "wrap", StringComparison.Ordinal))
+            {
+                style.textWrap = true;
+            }
+            else if (string.Equals(wrap, "nowrap", StringComparison.Ordinal))
+            {
+                style.textWrap = false;
+            }
+            else
+            {
+                throw new FormatException($"{path}.wrap: unsupported text wrap '{wrap}'.");
+            }
+
+            var overflow = GetString(value, "overflow") ?? "clip";
+            switch (overflow)
+            {
+                case "visible":
+                    style.textOverflow = "Visible";
+                    break;
+                case "clip":
+                    style.textOverflow = "Clip";
+                    break;
+                case "ellipsis":
+                    style.textOverflow = "Ellipsis";
+                    break;
+                default:
+                    throw new FormatException($"{path}.overflow: unsupported text overflow '{overflow}'.");
+            }
+
+            style.preserveWhitespace = GetBoolean(
+                value,
+                "preserveWhitespace",
+                false,
+                path + ".preserveWhitespace");
 
             if (value.TryGetValue("font", out var fontValue))
             {
@@ -2457,7 +2527,7 @@ namespace Html2Vrc.Editor
             }
 
             var horizontal = GetString(value, "align") ?? "start";
-            var vertical = GetString(value, "verticalAlign") ?? "middle";
+            var vertical = GetString(value, "verticalAlign") ?? "top";
             style.alignment = MapAlignment(horizontal, vertical, path);
         }
 
@@ -2476,7 +2546,8 @@ namespace Html2Vrc.Editor
                     horizontalSuffix = "Right";
                     break;
                 case "justify":
-                    throw new FormatException($"{path}.align: justified text is not supported yet.");
+                    horizontalSuffix = "Justified";
+                    break;
                 default:
                     throw new FormatException($"{path}.align: unsupported text alignment '{horizontal}'.");
             }
@@ -2486,7 +2557,14 @@ namespace Html2Vrc.Editor
                 case "top":
                     return "Top" + horizontalSuffix;
                 case "middle":
-                    return string.IsNullOrEmpty(horizontalSuffix) ? "Center" : "Middle" + horizontalSuffix;
+                    if (string.IsNullOrEmpty(horizontalSuffix))
+                    {
+                        return "Center";
+                    }
+
+                    return string.Equals(horizontalSuffix, "Justified", StringComparison.Ordinal)
+                        ? "Justified"
+                        : "Middle" + horizontalSuffix;
                 case "bottom":
                     return "Bottom" + horizontalSuffix;
                 default:
@@ -2638,6 +2716,30 @@ namespace Html2Vrc.Editor
         {
             return value as string
                    ?? throw new FormatException($"{path}: a string is required.");
+        }
+
+        private static string CollapseCanonicalWhitespace(string value)
+        {
+            var result = new StringBuilder(value != null ? value.Length : 0);
+            var pendingSpace = false;
+            for (var index = 0; value != null && index < value.Length; index++)
+            {
+                if (char.IsWhiteSpace(value[index]))
+                {
+                    pendingSpace = result.Length > 0;
+                    continue;
+                }
+
+                if (pendingSpace)
+                {
+                    result.Append(' ');
+                    pendingSpace = false;
+                }
+
+                result.Append(value[index]);
+            }
+
+            return result.ToString();
         }
 
         private static string GetString(Dictionary<string, object> value, string key)

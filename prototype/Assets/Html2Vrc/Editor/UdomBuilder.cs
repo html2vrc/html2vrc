@@ -51,12 +51,18 @@ namespace Html2Vrc.Editor
                 case "topright":
                     alignment = TextAlignmentOptions.TopRight;
                     return true;
+                case "topjustified":
+                    alignment = TextAlignmentOptions.TopJustified;
+                    return true;
                 case "left":
                 case "middleleft":
                     alignment = TextAlignmentOptions.Left;
                     return true;
                 case "center":
                     alignment = TextAlignmentOptions.Center;
+                    return true;
+                case "justified":
+                    alignment = TextAlignmentOptions.Justified;
                     return true;
                 case "right":
                 case "middleright":
@@ -70,6 +76,9 @@ namespace Html2Vrc.Editor
                     return true;
                 case "bottomright":
                     alignment = TextAlignmentOptions.BottomRight;
+                    return true;
+                case "bottomjustified":
+                    alignment = TextAlignmentOptions.BottomJustified;
                     return true;
                 default:
                     alignment = TextAlignmentOptions.Left;
@@ -1575,8 +1584,8 @@ namespace Html2Vrc.Editor
             text.fontSize = style.fontSize;
             text.color = UdomBuilderUtility.ParseColor(style.textColor, Color.white);
             text.raycastTarget = false;
-            text.enableWordWrapping = true;
-            text.overflowMode = TextOverflowModes.Ellipsis;
+            text.enableWordWrapping = style.textWrap;
+            text.overflowMode = GetTextOverflowMode(style.textOverflow);
             if (UdomBuilderUtility.TryParseAlignment(style.alignment, out var alignment))
             {
                 text.alignment = alignment;
@@ -1591,6 +1600,8 @@ namespace Html2Vrc.Editor
             {
                 text.font = font;
             }
+
+            ConfigureTextMetrics(text, style);
         }
 
         private static void ConfigureImage(
@@ -2051,6 +2062,40 @@ namespace Html2Vrc.Editor
             {
                 text.font = font;
             }
+
+            ConfigureTextMetrics(text, style);
+        }
+
+        private static void ConfigureTextMetrics(TextMeshProUGUI text, UdomStyle style)
+        {
+            var fontSize = Mathf.Max(0.0001f, style.fontSize);
+            text.characterSpacing = style.letterSpacing * 100f / fontSize;
+            if (style.lineHeight <= 0f || text.font == null)
+            {
+                text.lineSpacing = 0f;
+                return;
+            }
+
+            var face = text.font.faceInfo;
+            var pointSize = Mathf.Max(0.0001f, face.pointSize);
+            var nativeLineHeight = face.lineHeight * fontSize / pointSize * face.scale;
+            var emScale = fontSize * 0.01f;
+            text.lineSpacing = (style.lineHeight - nativeLineHeight) / emScale;
+        }
+
+        private static TextOverflowModes GetTextOverflowMode(string value)
+        {
+            if (string.Equals(value, "Visible", StringComparison.Ordinal))
+            {
+                return TextOverflowModes.Overflow;
+            }
+
+            if (string.Equals(value, "Clip", StringComparison.Ordinal))
+            {
+                return TextOverflowModes.Masking;
+            }
+
+            return TextOverflowModes.Ellipsis;
         }
 
         private static void ConfigureScrollView(
