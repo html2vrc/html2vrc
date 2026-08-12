@@ -60,6 +60,8 @@ Canonical `paint.radius`는 `[topLeft, topRight, bottomRight, bottomLeft]` desig
 
 Canonical `paint.border`는 `[left, top, right, bottom]` 폭·색 배열을 단일 `<node-id>::__border` Image와 VRChat-safe SDF Material로 렌더링한다. Outer contour는 정규화된 circular corner radius를 사용하고, inner contour는 각 edge 폭만큼 inset한 box와 corner별 X/Y radius로 계산하므로 비대칭 폭에서도 타원형 안쪽 곡선을 유지한다. 서로 다른 edge 색의 join은 outer corner와 inner corner를 잇는 폭 비율 경계로 선택한다. overlay는 `ignoreLayout`, raycast off이며 source TextAsset 기반 Material은 `Assets/Html2VrcGenerated/Borders` 아래 안정 경로로 재사용한다.
 
+제한형 HTML의 border shorthand와 edge별 width/style/color longhand는 source-order대로 위 `[left, top, right, bottom]` 배열로 합성한다. `solid`, `none`, hex color, transparent와 currentColor를 지원한다. 1~4값 및 모서리별 px `border-radius`는 `[topLeft, topRight, bottomRight, bottomLeft]` 절대 radius로 정규화되어 동일한 SDF border와 stencil mask를 사용한다. HTML width/height는 padding과 border를 포함하는 최종 Unity Rect 크기다.
+
 Canonical `transform`은 `origin`과 배열 순서의 `translate`, `rotate`, `scale`을 내부 `transformOrigin`, `transformOriginIsPercent`, `transformOperationTypes`, `transformOperationValues`, `transformOperationValuesArePercent` 배열로 정규화한다. 각 operation은 안정 ID의 RectTransform wrapper 하나로 생성해 비균일 scale과 rotate가 섞인 순서도 정확히 보존한다. percentage origin과 translate는 flex와 margin이 끝난 노드 자신의 최종 Layout Rect를 기준으로 갱신하고, transform wrapper 밖의 layout wrapper가 형제 배치 공간을 유지한다. 양의 회전은 화면 기준 시계 방향이다.
 
 제한형 HTML CSS transform은 함수 선언의 오른쪽부터 좌표에 적용되는 웹 합성 순서를 canonical array-order에 맞게 역전한다. `translate`, `translateX/Y`, `rotate`, `scale`, `scaleX/Y`를 공통 operation 배열로 축약하고, 방향 keyword·length·percentage origin을 canonical mixed-unit origin에 보존한다. `none` 전환은 안정 노드를 유지하면서 transform wrapper subtree만 정리한다.

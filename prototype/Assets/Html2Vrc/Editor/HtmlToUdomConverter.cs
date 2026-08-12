@@ -481,6 +481,10 @@ namespace Html2Vrc.Editor
             var heightAuto = false;
             var overflowX = "visible";
             var overflowY = "visible";
+            var borderWidths = new[] { 3f, 3f, 3f, 3f };
+            var borderColors = new[] { "currentcolor", "currentcolor", "currentcolor", "currentcolor" };
+            var borderStyles = new[] { "none", "none", "none", "none" };
+            var hasBorderDeclaration = false;
             foreach (var declaration in declarations)
             {
                 switch (declaration.Key)
@@ -694,6 +698,147 @@ namespace Html2Vrc.Editor
                     case "background-color":
                         SetColor(declaration.Value, path, declaration.Key, result, value => style.backgroundColor = value);
                         break;
+                    case "border":
+                        hasBorderDeclaration = true;
+                        SetBorderShorthand(
+                            declaration.Value,
+                            -1,
+                            path,
+                            declaration.Key,
+                            result,
+                            borderWidths,
+                            borderColors,
+                            borderStyles);
+                        break;
+                    case "border-top":
+                        hasBorderDeclaration = true;
+                        SetBorderShorthand(
+                            declaration.Value,
+                            1,
+                            path,
+                            declaration.Key,
+                            result,
+                            borderWidths,
+                            borderColors,
+                            borderStyles);
+                        break;
+                    case "border-right":
+                        hasBorderDeclaration = true;
+                        SetBorderShorthand(
+                            declaration.Value,
+                            2,
+                            path,
+                            declaration.Key,
+                            result,
+                            borderWidths,
+                            borderColors,
+                            borderStyles);
+                        break;
+                    case "border-bottom":
+                        hasBorderDeclaration = true;
+                        SetBorderShorthand(
+                            declaration.Value,
+                            3,
+                            path,
+                            declaration.Key,
+                            result,
+                            borderWidths,
+                            borderColors,
+                            borderStyles);
+                        break;
+                    case "border-left":
+                        hasBorderDeclaration = true;
+                        SetBorderShorthand(
+                            declaration.Value,
+                            0,
+                            path,
+                            declaration.Key,
+                            result,
+                            borderWidths,
+                            borderColors,
+                            borderStyles);
+                        break;
+                    case "border-width":
+                        hasBorderDeclaration = true;
+                        SetBorderWidths(
+                            declaration.Value,
+                            path,
+                            declaration.Key,
+                            result,
+                            borderWidths);
+                        break;
+                    case "border-color":
+                        hasBorderDeclaration = true;
+                        SetBorderColors(
+                            declaration.Value,
+                            path,
+                            declaration.Key,
+                            result,
+                            borderColors);
+                        break;
+                    case "border-style":
+                        hasBorderDeclaration = true;
+                        SetBorderStyles(
+                            declaration.Value,
+                            path,
+                            declaration.Key,
+                            result,
+                            borderStyles);
+                        break;
+                    case "border-top-width":
+                    case "border-right-width":
+                    case "border-bottom-width":
+                    case "border-left-width":
+                        hasBorderDeclaration = true;
+                        SetBorderEdgeWidth(
+                            declaration.Value,
+                            BorderEdgeIndex(declaration.Key),
+                            path,
+                            declaration.Key,
+                            result,
+                            borderWidths);
+                        break;
+                    case "border-top-color":
+                    case "border-right-color":
+                    case "border-bottom-color":
+                    case "border-left-color":
+                        hasBorderDeclaration = true;
+                        SetBorderEdgeColor(
+                            declaration.Value,
+                            BorderEdgeIndex(declaration.Key),
+                            path,
+                            declaration.Key,
+                            result,
+                            borderColors);
+                        break;
+                    case "border-top-style":
+                    case "border-right-style":
+                    case "border-bottom-style":
+                    case "border-left-style":
+                        hasBorderDeclaration = true;
+                        SetBorderEdgeStyle(
+                            declaration.Value,
+                            BorderEdgeIndex(declaration.Key),
+                            path,
+                            declaration.Key,
+                            result,
+                            borderStyles);
+                        break;
+                    case "border-radius":
+                        SetBorderRadius(declaration.Value, path, declaration.Key, result, style);
+                        break;
+                    case "border-top-left-radius":
+                        SetBorderCornerRadius(declaration.Value, 0, path, declaration.Key, result, style);
+                        break;
+                    case "border-top-right-radius":
+                        SetBorderCornerRadius(declaration.Value, 1, path, declaration.Key, result, style);
+                        break;
+                    case "border-bottom-right-radius":
+                        SetBorderCornerRadius(declaration.Value, 2, path, declaration.Key, result, style);
+                        break;
+                    case "border-bottom-left-radius":
+                        SetBorderCornerRadius(declaration.Value, 3, path, declaration.Key, result, style);
+                        break;
                     case "color":
                         SetColor(declaration.Value, path, declaration.Key, result, value => style.textColor = value);
                         break;
@@ -760,6 +905,11 @@ namespace Html2Vrc.Editor
                         AddError(result, path + "/@style", $"지원하지 않는 CSS 속성 '{declaration.Key}'.");
                         break;
                 }
+            }
+
+            if (hasBorderDeclaration)
+            {
+                ApplyBorder(style, borderWidths, borderColors, borderStyles);
             }
 
             ConfigureOverflow(style, overflowX, overflowY, path, result);
@@ -859,6 +1009,431 @@ namespace Html2Vrc.Editor
                 path,
                 result);
             UdomCanonicalAdapter.FinalizeCanonicalBoxSize(style);
+        }
+
+        private static void SetBorderShorthand(
+            string source,
+            int edge,
+            string path,
+            string property,
+            HtmlToUdomResult result,
+            float[] widths,
+            string[] colors,
+            string[] styles)
+        {
+            var parts = source.Split(
+                new[] { ' ', '\t', '\r', '\n' },
+                StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length < 1 || parts.Length > 3)
+            {
+                AddError(
+                    result,
+                    path + "/@style",
+                    $"{property}는 width, solid|none, color를 각각 최대 한 번만 지원한다.");
+                return;
+            }
+
+            var width = 3f;
+            var color = "currentcolor";
+            var style = "none";
+            var hasWidth = false;
+            var hasColor = false;
+            var hasStyle = false;
+            for (var index = 0; index < parts.Length; index++)
+            {
+                var part = parts[index];
+                if (TryParseBorderWidth(part, out var parsedWidth))
+                {
+                    if (hasWidth)
+                    {
+                        AddError(result, path + "/@style", $"{property}에 border width가 두 번 지정됐다.");
+                        return;
+                    }
+
+                    width = parsedWidth;
+                    hasWidth = true;
+                    continue;
+                }
+
+                if (TryNormalizeBorderStyle(part, out var parsedStyle))
+                {
+                    if (hasStyle)
+                    {
+                        AddError(result, path + "/@style", $"{property}에 border style이 두 번 지정됐다.");
+                        return;
+                    }
+
+                    style = parsedStyle;
+                    hasStyle = true;
+                    continue;
+                }
+
+                if (TryNormalizeBorderColor(part, out var parsedColor))
+                {
+                    if (hasColor)
+                    {
+                        AddError(result, path + "/@style", $"{property}에 border color가 두 번 지정됐다.");
+                        return;
+                    }
+
+                    color = parsedColor;
+                    hasColor = true;
+                    continue;
+                }
+
+                AddError(
+                    result,
+                    path + "/@style",
+                    $"{property} 값 '{part}'은 지원하지 않는다. px width, solid|none, hex color만 사용할 수 있다.");
+                return;
+            }
+
+            if (edge >= 0)
+            {
+                widths[edge] = width;
+                colors[edge] = color;
+                styles[edge] = style;
+                return;
+            }
+
+            for (var index = 0; index < 4; index++)
+            {
+                widths[index] = width;
+                colors[index] = color;
+                styles[index] = style;
+            }
+        }
+
+        private static void SetBorderWidths(
+            string source,
+            string path,
+            string property,
+            HtmlToUdomResult result,
+            float[] target)
+        {
+            var parts = SplitCssBoxValues(source);
+            if (parts.Length < 1 || parts.Length > 4)
+            {
+                AddError(result, path + "/@style", $"{property}는 1~4개의 0 이상 px 값만 지원한다.");
+                return;
+            }
+
+            var values = new float[parts.Length];
+            for (var index = 0; index < parts.Length; index++)
+            {
+                if (!TryParseBorderWidth(parts[index], out values[index]))
+                {
+                    AddError(result, path + "/@style", $"{property}는 1~4개의 0 이상 px 값만 지원한다.");
+                    return;
+                }
+            }
+
+            ApplyCssBoxValues(values, target);
+        }
+
+        private static void SetBorderColors(
+            string source,
+            string path,
+            string property,
+            HtmlToUdomResult result,
+            string[] target)
+        {
+            var parts = SplitCssBoxValues(source);
+            if (parts.Length < 1 || parts.Length > 4)
+            {
+                AddError(result, path + "/@style", $"{property}는 1~4개의 hex color만 지원한다.");
+                return;
+            }
+
+            var values = new string[parts.Length];
+            for (var index = 0; index < parts.Length; index++)
+            {
+                if (!TryNormalizeBorderColor(parts[index], out values[index]))
+                {
+                    AddError(
+                        result,
+                        path + "/@style",
+                        $"{property}는 1~4개의 hex color, transparent 또는 currentColor만 지원한다.");
+                    return;
+                }
+            }
+
+            ApplyCssBoxValues(values, target);
+        }
+
+        private static void SetBorderStyles(
+            string source,
+            string path,
+            string property,
+            HtmlToUdomResult result,
+            string[] target)
+        {
+            var parts = SplitCssBoxValues(source);
+            if (parts.Length < 1 || parts.Length > 4)
+            {
+                AddError(result, path + "/@style", $"{property}는 1~4개의 solid 또는 none 값만 지원한다.");
+                return;
+            }
+
+            var values = new string[parts.Length];
+            for (var index = 0; index < parts.Length; index++)
+            {
+                if (!TryNormalizeBorderStyle(parts[index], out values[index]))
+                {
+                    AddError(result, path + "/@style", $"{property}는 1~4개의 solid 또는 none 값만 지원한다.");
+                    return;
+                }
+            }
+
+            ApplyCssBoxValues(values, target);
+        }
+
+        private static void SetBorderEdgeWidth(
+            string source,
+            int edge,
+            string path,
+            string property,
+            HtmlToUdomResult result,
+            float[] target)
+        {
+            if (!TryParseBorderWidth(source, out var value))
+            {
+                AddError(result, path + "/@style", $"{property}는 0 이상의 px 값만 지원한다.");
+                return;
+            }
+
+            target[edge] = value;
+        }
+
+        private static void SetBorderEdgeColor(
+            string source,
+            int edge,
+            string path,
+            string property,
+            HtmlToUdomResult result,
+            string[] target)
+        {
+            if (!TryNormalizeBorderColor(source, out var value))
+            {
+                AddError(
+                    result,
+                    path + "/@style",
+                    $"{property}는 hex color, transparent 또는 currentColor만 지원한다.");
+                return;
+            }
+
+            target[edge] = value;
+        }
+
+        private static void SetBorderEdgeStyle(
+            string source,
+            int edge,
+            string path,
+            string property,
+            HtmlToUdomResult result,
+            string[] target)
+        {
+            if (!TryNormalizeBorderStyle(source, out var value))
+            {
+                AddError(result, path + "/@style", $"{property}는 solid 또는 none만 지원한다.");
+                return;
+            }
+
+            target[edge] = value;
+        }
+
+        private static void ApplyBorder(
+            UdomStyle style,
+            float[] widths,
+            string[] colors,
+            string[] styles)
+        {
+            style.borderWidth = new float[4];
+            style.borderColor = new string[4];
+            for (var index = 0; index < 4; index++)
+            {
+                style.borderWidth[index] = styles[index] == "solid" ? widths[index] : 0f;
+                style.borderColor[index] = colors[index] == "currentcolor"
+                    ? style.textColor
+                    : colors[index];
+            }
+        }
+
+        private static bool TryParseBorderWidth(string source, out float value)
+        {
+            var normalized = source.Trim();
+            if (normalized.EndsWith("px", StringComparison.OrdinalIgnoreCase))
+            {
+                normalized = normalized.Substring(0, normalized.Length - 2).Trim();
+            }
+
+            return TryParseNumber(normalized, out value) && value >= 0f;
+        }
+
+        private static bool TryNormalizeBorderColor(string source, out string value)
+        {
+            var normalized = source.Trim();
+            if (string.Equals(normalized, "transparent", StringComparison.OrdinalIgnoreCase))
+            {
+                value = "#00000000";
+                return true;
+            }
+
+            if (string.Equals(normalized, "currentcolor", StringComparison.OrdinalIgnoreCase))
+            {
+                value = "currentcolor";
+                return true;
+            }
+
+            if (normalized.StartsWith("#", StringComparison.Ordinal)
+                && ColorUtility.TryParseHtmlString(normalized, out _))
+            {
+                value = normalized;
+                return true;
+            }
+
+            value = null;
+            return false;
+        }
+
+        private static bool TryNormalizeBorderStyle(string source, out string value)
+        {
+            value = source.Trim().ToLowerInvariant();
+            return value == "solid" || value == "none";
+        }
+
+        private static string[] SplitCssBoxValues(string source)
+        {
+            return source.Split(
+                new[] { ' ', '\t', '\r', '\n' },
+                StringSplitOptions.RemoveEmptyEntries);
+        }
+
+        private static void ApplyCssBoxValues(float[] source, float[] target)
+        {
+            target[1] = source[0];
+            target[2] = source.Length == 1 ? source[0] : source[1];
+            target[3] = source.Length <= 2 ? source[0] : source[2];
+            target[0] = source.Length == 1
+                ? source[0]
+                : source.Length == 4
+                    ? source[3]
+                    : source[1];
+        }
+
+        private static void ApplyCssBoxValues(string[] source, string[] target)
+        {
+            target[1] = source[0];
+            target[2] = source.Length == 1 ? source[0] : source[1];
+            target[3] = source.Length <= 2 ? source[0] : source[2];
+            target[0] = source.Length == 1
+                ? source[0]
+                : source.Length == 4
+                    ? source[3]
+                    : source[1];
+        }
+
+        private static int BorderEdgeIndex(string property)
+        {
+            if (property.StartsWith("border-left-", StringComparison.Ordinal))
+            {
+                return 0;
+            }
+
+            if (property.StartsWith("border-top-", StringComparison.Ordinal))
+            {
+                return 1;
+            }
+
+            if (property.StartsWith("border-right-", StringComparison.Ordinal))
+            {
+                return 2;
+            }
+
+            return 3;
+        }
+
+        private static void SetBorderRadius(
+            string source,
+            string path,
+            string property,
+            HtmlToUdomResult result,
+            UdomStyle style)
+        {
+            var parts = SplitCssBoxValues(source);
+            if (parts.Length < 1 || parts.Length > 4)
+            {
+                AddError(result, path + "/@style", $"{property}는 1~4개의 0 이상 px 값만 지원한다.");
+                return;
+            }
+
+            var values = new float[parts.Length];
+            for (var index = 0; index < parts.Length; index++)
+            {
+                if (!TryParseBorderRadius(parts[index], out values[index]))
+                {
+                    AddError(
+                        result,
+                        path + "/@style",
+                        $"{property}는 1~4개의 0 이상 px 원형 radius만 지원한다. percentage와 '/' 타원형 radius는 지원하지 않는다.");
+                    return;
+                }
+            }
+
+            style.cornerRadius = new[]
+            {
+                values[0],
+                values.Length == 1 ? values[0] : values[1],
+                values.Length == 1
+                    ? values[0]
+                    : values.Length == 2
+                        ? values[0]
+                        : values[2],
+                values.Length == 1
+                    ? values[0]
+                    : values.Length == 4
+                        ? values[3]
+                        : values[1]
+            };
+            style.cornerRadiusPercent = new[] { -1f, -1f, -1f, -1f };
+        }
+
+        private static void SetBorderCornerRadius(
+            string source,
+            int corner,
+            string path,
+            string property,
+            HtmlToUdomResult result,
+            UdomStyle style)
+        {
+            if (!TryParseBorderRadius(source, out var value))
+            {
+                AddError(
+                    result,
+                    path + "/@style",
+                    $"{property}는 하나의 0 이상 px 원형 radius만 지원한다.");
+                return;
+            }
+
+            style.cornerRadius[corner] = value;
+            style.cornerRadiusPercent[corner] = -1f;
+        }
+
+        private static bool TryParseBorderRadius(string source, out float value)
+        {
+            var normalized = source.Trim();
+            if (normalized.IndexOf('%') >= 0 || normalized.IndexOf('/') >= 0)
+            {
+                value = 0f;
+                return false;
+            }
+
+            if (normalized.EndsWith("px", StringComparison.OrdinalIgnoreCase))
+            {
+                normalized = normalized.Substring(0, normalized.Length - 2).Trim();
+            }
+
+            return TryParseNumber(normalized, out value) && value >= 0f;
         }
 
         private static void SetObjectFit(

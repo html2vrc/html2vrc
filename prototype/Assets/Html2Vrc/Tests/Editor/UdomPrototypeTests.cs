@@ -3073,6 +3073,119 @@ namespace Html2Vrc.Tests
         }
 
         [Test]
+        public void HtmlConverter_BordersAndRadiiUseCanonicalPaint()
+        {
+            const string html = @"
+              <main id=""html-border-root"" data-canvas-size=""760 360""
+                style=""width: 760px; height: 360px; display: flex; align-items: flex-start; padding: 40px; gap: 24px"">
+                <section id=""html-border-box""
+                  style=""width: 320px; height: 180px; background-color: #203050FF; color: #ABCDEFff;
+                    border: 8px solid currentColor;
+                    border-width: 4px 8px 12px 16px;
+                    border-color: #112233FF #223344FF #334455FF #445566FF;
+                    border-style: solid none solid solid;
+                    border-left: 6px solid #556677FF;
+                    border-radius: 40px 30px 20px 10px;
+                    border-top-right-radius: 24px"">
+                  <p id=""html-border-label"" style=""width: 200px; height: 48px"">Clipped child</p>
+                </section>
+                <section id=""html-current-color-border""
+                  style=""width: 240px; height: 120px; color: #89ABCDEF; border: solid""></section>
+              </main>";
+
+            var conversion = HtmlToUdomConverter.Convert(html);
+
+            Assert.That(conversion.IsValid, Is.True, conversion.Format());
+            var panelNode = conversion.Document.root.children[0];
+            var currentColorNode = conversion.Document.root.children[1];
+            Assert.That(panelNode.style.borderWidth, Is.EqualTo(new[] { 6f, 4f, 0f, 12f }));
+            Assert.That(
+                panelNode.style.borderColor,
+                Is.EqualTo(new[] { "#556677FF", "#112233FF", "#223344FF", "#334455FF" }));
+            Assert.That(panelNode.style.cornerRadius, Is.EqualTo(new[] { 40f, 24f, 20f, 10f }));
+            Assert.That(panelNode.style.cornerRadiusPercent, Is.EqualTo(new[] { -1f, -1f, -1f, -1f }));
+            Assert.That(currentColorNode.style.borderWidth, Is.EqualTo(new[] { 3f, 3f, 3f, 3f }));
+            Assert.That(
+                currentColorNode.style.borderColor,
+                Is.EqualTo(new[] { "#89ABCDEF", "#89ABCDEF", "#89ABCDEF", "#89ABCDEF" }));
+
+            var normalized = UdomValidator.Validate(conversion.Json);
+            Assert.That(normalized.IsValid, Is.True, normalized.Format());
+            Assert.That(normalized.Document.root.children[0].style.borderWidth, Is.EqualTo(panelNode.style.borderWidth));
+            Assert.That(normalized.Document.root.children[0].style.cornerRadius, Is.EqualTo(panelNode.style.cornerRadius));
+
+            var build = UdomBuilder.GenerateOrRegenerate(conversion.Document);
+            var root = build.Root;
+            var panel = UdomBuilder.FindNode(root, "html-border-box");
+            var border = UdomBuilder.FindNode(root, "html-border-box::__border");
+            var panelImage = panel.GetComponent<Image>();
+            var borderImage = border.GetComponent<Image>();
+            Assert.That(panel.GetComponent<Mask>(), Is.Not.Null);
+            Assert.That(panel.GetComponent<RectMask2D>(), Is.Null);
+            Assert.That(panelImage.material.shader.name, Is.EqualTo(UdomRoundedCornerAssetUtility.ShaderName));
+            Assert.That(border.GetComponent<LayoutElement>().ignoreLayout, Is.True);
+            Assert.That(borderImage.raycastTarget, Is.False);
+            Assert.That(borderImage.material.shader.name, Is.EqualTo(UdomBorderAssetUtility.ShaderName));
+            Assert.That(
+                borderImage.material.GetVector("_BorderWidths"),
+                Is.EqualTo(new Vector4(6f, 4f, 0f, 12f))
+                    .Using(Vector4ComparerWithEqualsOperator.Instance));
+            Assert.That(
+                borderImage.material.GetVector("_OuterRadii"),
+                Is.EqualTo(new Vector4(40f, 24f, 20f, 10f))
+                    .Using(Vector4ComparerWithEqualsOperator.Instance));
+            Assert.That(
+                borderImage.material.GetColor("_BorderLeftColor"),
+                Is.EqualTo((Color)new Color32(0x55, 0x66, 0x77, 0xFF)).Using(ColorComparer.Instance));
+            Assert.That(
+                borderImage.material.GetColor("_BorderTopColor"),
+                Is.EqualTo((Color)new Color32(0x11, 0x22, 0x33, 0xFF)).Using(ColorComparer.Instance));
+
+            var originalPanel = panel.gameObject;
+            var changed = HtmlToUdomConverter.Convert(
+                html.Replace(
+                        "border-radius: 40px 30px 20px 10px",
+                        "border-radius: 0px")
+                    .Replace(
+                        "border-top-right-radius: 24px",
+                        "border-top-right-radius: 0px")
+                    .Replace(
+                        "border-style: solid none solid solid",
+                        "border-style: none")
+                    .Replace(
+                        "border-left: 6px solid #556677FF",
+                        "border-left: none"));
+            Assert.That(changed.IsValid, Is.True, changed.Format());
+            UdomBuilder.GenerateOrRegenerate(changed.Document, root);
+            panel = UdomBuilder.FindNode(root, "html-border-box");
+            Assert.That(panel.gameObject, Is.SameAs(originalPanel));
+            Assert.That(UdomBuilder.FindNode(root, "html-border-box::__border"), Is.Null);
+            Assert.That(panel.GetComponent<Mask>(), Is.Null);
+            Assert.That(panel.GetComponent<Image>().material.shader.name, Is.Not.EqualTo(UdomRoundedCornerAssetUtility.ShaderName));
+            Object.DestroyImmediate(root.gameObject);
+
+            var dashed = HtmlToUdomConverter.Convert(
+                html.Replace("border-left: 6px solid", "border-left: 6px dashed"));
+            Assert.That(dashed.IsValid, Is.False);
+            Assert.That(dashed.Format(), Does.Contain("dashed"));
+
+            var percentageRadius = HtmlToUdomConverter.Convert(
+                html.Replace("border-radius: 40px 30px 20px 10px", "border-radius: 50%"));
+            Assert.That(percentageRadius.IsValid, Is.False);
+            Assert.That(percentageRadius.Format(), Does.Contain("percentage"));
+
+            var ellipticalRadius = HtmlToUdomConverter.Convert(
+                html.Replace("border-radius: 40px 30px 20px 10px", "border-radius: 40px / 20px"));
+            Assert.That(ellipticalRadius.IsValid, Is.False);
+            Assert.That(ellipticalRadius.Format(), Does.Contain("타원형"));
+
+            var negativeWidth = HtmlToUdomConverter.Convert(
+                html.Replace("border-left: 6px solid", "border-left: -1px solid"));
+            Assert.That(negativeWidth.IsValid, Is.False);
+            Assert.That(negativeWidth.Format(), Does.Contain("-1px"));
+        }
+
+        [Test]
         public void HtmlConverter_FlexCssUsesCanonicalSizingAlignmentAndStableHierarchy()
         {
             const string html = @"

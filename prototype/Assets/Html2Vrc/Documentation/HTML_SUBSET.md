@@ -53,6 +53,11 @@
 - `row-gap`, `column-gap`: 숫자 또는 `px`
 - `padding`, `margin`: CSS의 1~4개 값
 - `background-color`, `color`: `#RRGGBB` 또는 `#RRGGBBAA`
+- `border`: 0 이상 숫자·`px` width, `solid | none`, hex color·`transparent | currentColor`의 shorthand
+- `border-width`, `border-style`, `border-color`: CSS 순서의 1~4개 값
+- `border-top|right|bottom|left` 및 각 edge의 `-width`, `-style`, `-color` longhand
+- `border-radius`: CSS 모서리 순서의 1~4개 0 이상 숫자 또는 `px`
+- `border-top-left|top-right|bottom-right|bottom-left-radius`: 단일 원형 radius
 - `font-size`
 - `text-align: left | center | right`
 - `object-fit: fill | contain | cover | none`: `<img>` 콘텐츠의 크기 맞춤
@@ -69,7 +74,9 @@ CSS transform 함수는 웹 규칙대로 선언의 오른쪽부터 좌표에 적
 
 `<img src>`는 Unity `Assets/` 안의 일반 Texture2D와 Sprite를 자동 구분한다. `object-position` 한 값은 CSS처럼 다른 축을 가운데로 두며, 두 값은 `bottom right`처럼 세로·가로 순서로 써도 각 축에 맞춰 정규화한다. Percentage는 이미지 박스에서 남는 공간을 기준으로 계산하므로 `cover`에서 음수가 되는 잘린 영역도 같은 규칙으로 정렬된다.
 
-CSS 전체 호환은 목표가 아니다. `flex-basis`, transform, object-position 이외의 percentage 길이, 양축이 모두 auto이거나 반대 고정 축·aspect-ratio가 없는 크기 auto, `aspect-ratio: auto`, `calc`, flex shorthand, transform의 matrix·skew·perspective와 3~4값 origin, `object-fit: scale-down`, object-position의 3~4값 edge offset, `align-content: space-evenly`, `overflow: auto | scroll`, visible/hidden이 섞인 축별 overflow, Grid, 선택자, 외부 스타일시트, 애니메이션과 지원 목록 밖의 속성은 오류로 표시한다.
+Border shorthand와 longhand는 inline 선언의 source-order대로 합성한다. 생략된 shorthand width는 CSS `medium`에 대응하는 3 design unit, 생략된 color는 최종 `color`, 생략된 style은 `none`이다. 결과는 canonical의 단일 SDF border overlay와 rounded stencil mask를 사용한다. HTML subset의 `width`·`height`는 Unity의 최종 Rect 크기이므로 padding과 border를 포함하는 `border-box` 의미다.
+
+CSS 전체 호환은 목표가 아니다. `flex-basis`, transform, object-position 이외의 percentage 길이, 양축이 모두 auto이거나 반대 고정 축·aspect-ratio가 없는 크기 auto, `aspect-ratio: auto`, `calc`, flex shorthand, transform의 matrix·skew·perspective와 3~4값 origin, dashed/dotted/double border, percentage border width, percentage 및 `/` 타원형 radius, `object-fit: scale-down`, object-position의 3~4값 edge offset, `align-content: space-evenly`, `overflow: auto | scroll`, visible/hidden이 섞인 축별 overflow, Grid, 선택자, 외부 스타일시트, 애니메이션과 지원 목록 밖의 속성은 오류로 표시한다.
 
 ## 안전한 버튼 동작
 
