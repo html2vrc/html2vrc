@@ -57,6 +57,8 @@ namespace Html2Vrc.Tests
                 UdomRoundedCornerAssetUtility.DeleteGeneratedAssets(sample, "conic-panel");
                 UdomRoundedCornerAssetUtility.DeleteGeneratedAssets(sample, "radius-panel");
                 UdomRoundedCornerAssetUtility.DeleteGeneratedAssets(sample, "shadow-panel");
+                UdomRoundedCornerAssetUtility.DeleteGeneratedAssets(sample, "border-panel");
+                UdomBorderAssetUtility.DeleteGeneratedAssets(sample, "border-panel");
                 UdomShadowAssetUtility.DeleteGeneratedAssets(sample, "shadow-panel::__shadow-0");
                 UdomShadowAssetUtility.DeleteGeneratedAssets(sample, "shadow-panel::__shadow-1");
                 UdomShadowAssetUtility.DeleteGeneratedAssets(sample, "shadow-panel::__shadow-2");
@@ -711,7 +713,7 @@ namespace Html2Vrc.Tests
         }
 
         [Test]
-        public void CanonicalBorder_GeneratesPerEdgeImagesAndRegeneratesStably()
+        public void CanonicalBorder_RendersAsymmetricRoundedContourAndRegeneratesStably()
         {
             var json = LoadRepositoryFile(
                 "packages",
@@ -728,68 +730,114 @@ namespace Html2Vrc.Tests
             Assert.That(
                 panelNode.style.borderColor,
                 Is.EqualTo(new[] { "#FFD84DFF", "#FF4D4DFF", "#4DFF88FF", "#4D88FFFF" }));
+            Assert.That(panelNode.style.cornerRadius, Is.EqualTo(new[] { 0f, 32f, 48f, 20f }));
+            Assert.That(panelNode.style.cornerRadiusPercent, Is.EqualTo(new[] { 25f, -1f, -1f, -1f }));
 
-            var build = UdomBuilder.GenerateOrRegenerate(validation.Document);
+            var build = UdomBuilder.GenerateOrRegenerate(validation.Document, null, sample);
             var root = build.Root;
             var panel = UdomBuilder.FindNode(root, "border-panel");
             var label = UdomBuilder.FindNode(root, "border-label");
             var border = UdomBuilder.FindNode(root, "border-panel::__border");
-            var top = AssertBorderEdge(
-                root,
-                "border-panel::__border-top",
-                "#FF4D4DFF",
-                new Vector2(0f, 1f),
-                Vector2.one,
-                new Vector2(0f, -8f),
-                Vector2.zero);
-            var right = AssertBorderEdge(
-                root,
-                "border-panel::__border-right",
-                "#4DFF88FF",
-                new Vector2(1f, 0f),
-                Vector2.one,
-                new Vector2(-12f, 16f),
-                new Vector2(0f, -8f));
-            var bottom = AssertBorderEdge(
-                root,
-                "border-panel::__border-bottom",
-                "#4D88FFFF",
-                Vector2.zero,
-                new Vector2(1f, 0f),
-                Vector2.zero,
-                new Vector2(0f, 16f));
-            var left = AssertBorderEdge(
-                root,
-                "border-panel::__border-left",
-                "#FFD84DFF",
-                Vector2.zero,
-                new Vector2(0f, 1f),
-                new Vector2(0f, 16f),
-                new Vector2(20f, -8f));
+            var panelRect = panel.GetComponent<RectTransform>();
+            var borderRect = border.GetComponent<RectTransform>();
+            var borderImage = border.GetComponent<Image>();
+            var borderMaterial = borderImage.material;
+            var borderMaterialPath = AssetDatabase.GetAssetPath(borderMaterial);
+            var borderMaterialGuid = AssetDatabase.AssetPathToGUID(borderMaterialPath);
 
             Assert.That(panel.GetComponent<VerticalLayoutGroup>(), Is.Not.Null);
+            Assert.That(panel.GetComponent<Mask>(), Is.Not.Null);
+            Assert.That(panelRect.rect.size, Is.EqualTo(new Vector2(480f, 180f)));
             Assert.That(border.GetComponent<LayoutElement>().ignoreLayout, Is.True);
             Assert.That(border.transform.GetSiblingIndex(), Is.GreaterThan(label.transform.GetSiblingIndex()));
-            Assert.That(top.transform.parent, Is.SameAs(border.transform));
-            Assert.That(right.transform.parent, Is.SameAs(border.transform));
-            Assert.That(bottom.transform.parent, Is.SameAs(border.transform));
-            Assert.That(left.transform.parent, Is.SameAs(border.transform));
+            Assert.That(borderRect.rect.size, Is.EqualTo(new Vector2(480f, 180f)));
+            Assert.That(borderImage.raycastTarget, Is.False);
+            Assert.That(borderImage.color, Is.EqualTo(Color.white).Using(ColorComparer.Instance));
+            Assert.That(borderMaterial.shader.name, Is.EqualTo(UdomBorderAssetUtility.ShaderName));
+            Assert.That(borderMaterialPath, Does.StartWith("Assets/Html2VrcGenerated/Borders/"));
+            Assert.That(borderMaterial.GetVector("_RectSize"),
+                Is.EqualTo(new Vector4(480f, 180f, 0f, 0f))
+                    .Using(Vector4ComparerWithEqualsOperator.Instance));
+            Assert.That(borderMaterial.GetVector("_OuterRadii"),
+                Is.EqualTo(new Vector4(45f, 32f, 48f, 20f))
+                    .Using(Vector4ComparerWithEqualsOperator.Instance));
+            Assert.That(borderMaterial.GetVector("_InnerSize"),
+                Is.EqualTo(new Vector4(448f, 156f, 0f, 0f))
+                    .Using(Vector4ComparerWithEqualsOperator.Instance));
+            Assert.That(borderMaterial.GetVector("_InnerCenter"),
+                Is.EqualTo(new Vector4(4f, 4f, 0f, 0f))
+                    .Using(Vector4ComparerWithEqualsOperator.Instance));
+            Assert.That(borderMaterial.GetVector("_InnerRadiiX"),
+                Is.EqualTo(new Vector4(25f, 20f, 36f, 0f))
+                    .Using(Vector4ComparerWithEqualsOperator.Instance));
+            Assert.That(borderMaterial.GetVector("_InnerRadiiY"),
+                Is.EqualTo(new Vector4(37f, 24f, 32f, 4f))
+                    .Using(Vector4ComparerWithEqualsOperator.Instance));
+            Assert.That(borderMaterial.GetVector("_BorderWidths"),
+                Is.EqualTo(new Vector4(20f, 8f, 12f, 16f))
+                    .Using(Vector4ComparerWithEqualsOperator.Instance));
+            Assert.That(borderMaterial.GetColor("_BorderLeftColor"),
+                Is.EqualTo((Color)new Color32(0xFF, 0xD8, 0x4D, 0xFF)).Using(ColorComparer.Instance));
+            Assert.That(borderMaterial.GetColor("_BorderTopColor"),
+                Is.EqualTo((Color)new Color32(0xFF, 0x4D, 0x4D, 0xFF)).Using(ColorComparer.Instance));
+            Assert.That(UdomBuilder.FindNode(root, "border-panel::__border-top"), Is.Null);
+            Assert.That(UdomBuilder.FindNode(root, "border-panel::__border-right"), Is.Null);
+            Assert.That(UdomBuilder.FindNode(root, "border-panel::__border-bottom"), Is.Null);
+            Assert.That(UdomBuilder.FindNode(root, "border-panel::__border-left"), Is.Null);
+
+#if UDONSHARP
+            var validationClone = Object.Instantiate(panel.gameObject);
+            try
+            {
+                WorldValidation.RemoveIllegalComponents(
+                    new List<GameObject> { validationClone },
+                    WorldValidation.WhiteListConfiguration.VRCSDK3);
+                var images = validationClone.GetComponentsInChildren<Image>(true);
+                Assert.That(images.Length, Is.EqualTo(2));
+                Assert.That(
+                    images.Count(image => image.material.shader.name == UdomBorderAssetUtility.ShaderName),
+                    Is.EqualTo(1));
+            }
+            finally
+            {
+                Object.DestroyImmediate(validationClone);
+            }
+#endif
 
             panelNode.style.borderWidth[1] = 10f;
             panelNode.style.borderWidth[2] = 0f;
             panelNode.style.borderColor[0] = "#00000000";
-            UdomBuilder.GenerateOrRegenerate(validation.Document, root);
+            UdomBuilder.GenerateOrRegenerate(validation.Document, root, sample);
 
-            Assert.That(UdomBuilder.FindNode(root, "border-panel::__border-top"), Is.SameAs(top));
-            Assert.That(
-                UdomBuilder.FindNode(root, "border-panel::__border-top").GetComponent<RectTransform>().offsetMin.y,
-                Is.EqualTo(-10f).Within(0.001f));
-            Assert.That(UdomBuilder.FindNode(root, "border-panel::__border-bottom"), Is.SameAs(bottom));
-            Assert.That(UdomBuilder.FindNode(root, "border-panel::__border-right"), Is.Null);
-            Assert.That(UdomBuilder.FindNode(root, "border-panel::__border-left"), Is.Null);
+            Assert.That(UdomBuilder.FindNode(root, "border-panel::__border"), Is.SameAs(border));
+            Assert.That(borderImage.material, Is.SameAs(borderMaterial));
+            Assert.That(AssetDatabase.GetAssetPath(borderImage.material), Is.EqualTo(borderMaterialPath));
+            Assert.That(AssetDatabase.AssetPathToGUID(borderMaterialPath), Is.EqualTo(borderMaterialGuid));
+            Assert.That(borderMaterial.GetVector("_BorderWidths"),
+                Is.EqualTo(new Vector4(20f, 10f, 0f, 16f))
+                    .Using(Vector4ComparerWithEqualsOperator.Instance));
+            Assert.That(borderMaterial.GetVector("_InnerSize"),
+                Is.EqualTo(new Vector4(460f, 154f, 0f, 0f))
+                    .Using(Vector4ComparerWithEqualsOperator.Instance));
+            Assert.That(borderMaterial.GetVector("_InnerCenter"),
+                Is.EqualTo(new Vector4(10f, 3f, 0f, 0f))
+                    .Using(Vector4ComparerWithEqualsOperator.Instance));
+            Assert.That(borderMaterial.GetVector("_InnerRadiiX"),
+                Is.EqualTo(new Vector4(25f, 32f, 48f, 0f))
+                    .Using(Vector4ComparerWithEqualsOperator.Instance));
+            Assert.That(borderMaterial.GetVector("_InnerRadiiY"),
+                Is.EqualTo(new Vector4(35f, 22f, 32f, 4f))
+                    .Using(Vector4ComparerWithEqualsOperator.Instance));
+            Assert.That(borderMaterial.GetColor("_BorderLeftColor").a, Is.EqualTo(0f).Within(0.001f));
+
+            panelNode.style.borderWidth = new[] { 300f, 100f, 300f, 100f };
+            panelNode.style.borderColor[0] = "#FFD84DFF";
+            UdomBuilder.GenerateOrRegenerate(validation.Document, root, sample);
+            Assert.That(UdomBuilder.FindNode(root, "border-panel::__border"), Is.SameAs(border));
+            Assert.That(borderMaterial.GetFloat("_HasInner"), Is.EqualTo(0f).Within(0.001f));
 
             panelNode.style.borderWidth = new[] { 0f, 0f, 0f, 0f };
-            UdomBuilder.GenerateOrRegenerate(validation.Document, root);
+            UdomBuilder.GenerateOrRegenerate(validation.Document, root, sample);
             Assert.That(UdomBuilder.FindNode(root, "border-panel::__border"), Is.Null);
             Assert.That(UdomBuilder.FindNode(root, "border-panel::__border-top"), Is.Null);
             Assert.That(UdomBuilder.FindNode(root, "border-panel::__border-bottom"), Is.Null);
@@ -2071,34 +2119,6 @@ namespace Html2Vrc.Tests
             Assert.That(rect.sizeDelta.y, Is.EqualTo(expectedSize.y).Within(0.001f));
             Assert.That(rect.anchoredPosition.x, Is.EqualTo(expectedPosition.x).Within(0.001f));
             Assert.That(rect.anchoredPosition.y, Is.EqualTo(expectedPosition.y).Within(0.001f));
-        }
-
-        private static UdomGeneratedNode AssertBorderEdge(
-            UdomGeneratedRoot root,
-            string stableId,
-            string expectedColor,
-            Vector2 expectedAnchorMin,
-            Vector2 expectedAnchorMax,
-            Vector2 expectedOffsetMin,
-            Vector2 expectedOffsetMax)
-        {
-            var edge = UdomBuilder.FindNode(root, stableId);
-            var rect = edge.GetComponent<RectTransform>();
-            var image = edge.GetComponent<Image>();
-
-            Assert.That(image, Is.Not.Null);
-            Assert.That(
-                image.color,
-                Is.EqualTo(UdomBuilderUtility.ParseColor(expectedColor, Color.clear)).Using(ColorComparer.Instance));
-            Assert.That(image.raycastTarget, Is.False);
-            Assert.That(edge.GetComponent<LayoutElement>(), Is.Null);
-            Assert.That(rect.anchorMin, Is.EqualTo(expectedAnchorMin));
-            Assert.That(rect.anchorMax, Is.EqualTo(expectedAnchorMax));
-            Assert.That(rect.offsetMin.x, Is.EqualTo(expectedOffsetMin.x).Within(0.001f));
-            Assert.That(rect.offsetMin.y, Is.EqualTo(expectedOffsetMin.y).Within(0.001f));
-            Assert.That(rect.offsetMax.x, Is.EqualTo(expectedOffsetMax.x).Within(0.001f));
-            Assert.That(rect.offsetMax.y, Is.EqualTo(expectedOffsetMax.y).Within(0.001f));
-            return edge;
         }
 
         private static void InvokeGeneratedActionInEditMode(Button button)

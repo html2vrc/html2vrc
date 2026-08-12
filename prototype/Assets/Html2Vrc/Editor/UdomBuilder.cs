@@ -108,10 +108,6 @@ namespace Html2Vrc.Editor
         private const string SliderHandleSuffix = "::__slider-handle";
         private const string ImageContentSuffix = "::__image-content";
         private const string BorderSuffix = "::__border";
-        private const string BorderTopSuffix = "::__border-top";
-        private const string BorderRightSuffix = "::__border-right";
-        private const string BorderBottomSuffix = "::__border-bottom";
-        private const string BorderLeftSuffix = "::__border-left";
         private const string InputViewportSuffix = "::__input-viewport";
         private const string InputTextSuffix = "::__input-text";
         private const string InputPlaceholderSuffix = "::__input-placeholder";
@@ -1446,6 +1442,22 @@ namespace Html2Vrc.Editor
                 }
             }
 
+            var borderMarker = FindNode(context.Root, node.id + BorderSuffix);
+            if (borderMarker != null)
+            {
+                var borderImage = borderMarker.GetComponent<Image>();
+                var borderMaterial = borderImage != null ? borderImage.material : null;
+                var borderShaderName = borderMaterial != null && borderMaterial.shader != null
+                    ? borderMaterial.shader.name
+                    : string.Empty;
+                if (UdomBorderAssetUtility.IsShader(borderShaderName))
+                {
+                    var borderSize = borderMarker.GetComponent<RectTransform>().rect.size;
+                    UdomBorderAssetUtility.ApplyProperties(borderMaterial, style, borderSize);
+                    SavePaintMaterial(borderMaterial);
+                }
+            }
+
             var children = node.children ?? Array.Empty<UdomNode>();
             for (var index = 0; index < children.Length; index++)
             {
@@ -1468,18 +1480,7 @@ namespace Html2Vrc.Editor
             UdomStyle style,
             BuildContext context)
         {
-            var widths = GetEdges(style.borderWidth);
-            var colors = new[]
-            {
-                GetBorderColor(style, 0),
-                GetBorderColor(style, 1),
-                GetBorderColor(style, 2),
-                GetBorderColor(style, 3)
-            };
-            if ((widths.x <= 0f || colors[0].a <= 0f)
-                && (widths.y <= 0f || colors[1].a <= 0f)
-                && (widths.z <= 0f || colors[2].a <= 0f)
-                && (widths.w <= 0f || colors[3].a <= 0f))
+            if (!UdomBorderAssetUtility.HasVisibleBorder(style))
             {
                 return;
             }
@@ -1494,107 +1495,20 @@ namespace Html2Vrc.Editor
             border.transform.SetAsLastSibling();
             ConfigureStretch(border.GetComponent<RectTransform>());
 
-            ConfigureBorderEdge(
-                border.transform,
-                node.id + BorderTopSuffix,
-                "BorderTop",
-                "Border Top",
-                widths.y,
-                colors[1],
-                new Vector2(0f, 1f),
-                new Vector2(1f, 1f),
-                new Vector2(0f, -widths.y),
-                Vector2.zero,
-                context);
-            ConfigureBorderEdge(
-                border.transform,
-                node.id + BorderRightSuffix,
-                "BorderRight",
-                "Border Right",
-                widths.z,
-                colors[2],
-                new Vector2(1f, 0f),
-                Vector2.one,
-                new Vector2(-widths.z, widths.w),
-                new Vector2(0f, -widths.y),
-                context);
-            ConfigureBorderEdge(
-                border.transform,
-                node.id + BorderBottomSuffix,
-                "BorderBottom",
-                "Border Bottom",
-                widths.w,
-                colors[3],
-                Vector2.zero,
-                new Vector2(1f, 0f),
-                Vector2.zero,
-                new Vector2(0f, widths.w),
-                context);
-            ConfigureBorderEdge(
-                border.transform,
-                node.id + BorderLeftSuffix,
-                "BorderLeft",
-                "Border Left",
-                widths.x,
-                colors[0],
-                Vector2.zero,
-                new Vector2(0f, 1f),
-                new Vector2(0f, widths.w),
-                new Vector2(widths.x, -widths.y),
-                context);
-        }
-
-        private static Color GetBorderColor(UdomStyle style, int index)
-        {
-            return style.borderColor != null
-                   && index >= 0
-                   && index < style.borderColor.Length
-                ? UdomBuilderUtility.ParseColor(style.borderColor[index], Color.clear)
-                : Color.clear;
-        }
-
-        private static void ConfigureBorderEdge(
-            Transform parent,
-            string stableId,
-            string sourceType,
-            string displayName,
-            float width,
-            Color color,
-            Vector2 anchorMin,
-            Vector2 anchorMax,
-            Vector2 offsetMin,
-            Vector2 offsetMax,
-            BuildContext context)
-        {
-            if (width <= 0f || color.a <= 0f)
+            var boxSize = target.GetComponent<RectTransform>().rect.size;
+            if (boxSize.x <= 0f || boxSize.y <= 0f)
             {
-                return;
+                boxSize = GetVector2(style.size, new Vector2(100f, 100f));
             }
 
-            var edge = UpsertGeneratedObject(stableId, sourceType, true, parent, context);
-            context.DesiredIds.Add(stableId);
-            edge.name = displayName;
-            edge.transform.SetAsLastSibling();
-
-            var rect = edge.GetComponent<RectTransform>();
-            Undo.RecordObject(rect, "Configure UDOM border edge");
-            rect.anchorMin = anchorMin;
-            rect.anchorMax = anchorMax;
-            rect.pivot = new Vector2(0.5f, 0.5f);
-            rect.offsetMin = offsetMin;
-            rect.offsetMax = offsetMax;
-            rect.localScale = Vector3.one;
-            rect.localRotation = Quaternion.identity;
-
-            RemoveIfPresent<LayoutElement>(edge);
-
-            var image = GetOrAdd<Image>(edge);
+            var image = GetOrAdd<Image>(border);
             Undo.RecordObject(image, "Configure UDOM border image");
-            image.color = color;
-            image.sprite = null;
-            image.material = null;
-            image.type = Image.Type.Simple;
-            image.raycastTarget = false;
+            UdomBorderAssetUtility.Configure(
+                image,
+                style,
+                boxSize,
+                context.SourceAsset,
+                node.id);
         }
 
         private static void ConfigureLayout(GameObject target, UdomStyle style)

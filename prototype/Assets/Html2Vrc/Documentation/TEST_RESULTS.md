@@ -25,7 +25,7 @@
 - React exporter가 Toggle, Slider, TextInput, Scroll과 Embed를 canonical 속성·binding·event로 출력하고, 같은 fixture를 Unity가 네이티브 컨트롤로 생성하는 것을 확인했다. 빈 문자열과 0/false 값, Button/Toggle의 focus·blur, 연결 상태에 반응하는 Embed fallbackLabel도 포함한다.
 - canonical paint.visible과 opacity를 중첩 CanvasGroup으로 적용하고, hidden 노드의 Layout 공간 보존, opacity 0 컨트롤의 입력 유지, 생성기 CanvasGroup 정리와 기존 사용자 CanvasGroup 설정 복원을 확인했다.
 - canonical image의 fill/contain/cover/none 크기 계산, percentage·numeric·auto 위치, RectMask2D clipping, Texture2D 로딩과 안정 내부 콘텐츠 재생성을 확인했다.
-- canonical per-edge solid border의 비대칭 폭·색 정규화, 레이아웃 비간섭 overlay 생성, anchor/offset, draw order, 안정 재생성과 edge·overlay 정리를 확인했다.
+- canonical per-edge solid border의 비대칭 폭·색과 percentage radius를 단일 SDF overlay로 생성했다. flex 최종 Rect, circular outer·elliptical inner contour, diagonal color join 입력, Material GUID와 GameObject 안정 재사용, 닫힌 inner hole, overlay 제거 및 VRChat 허용 컴포넌트 보존을 확인했다.
 - canonical linear-gradient의 임의 각도와 다중 stop을 1025×1 LUT Texture와 UI Material로 생성하고, 에셋 경로·재사용·단색 전환 정리와 VRChat 허용 컴포넌트 검사 뒤 Image/Shader 보존을 확인했다.
 - canonical radial-gradient의 center/radius mixed unit 보존, 최종 Layout Rect 기반 타원 계산, 다중 stop LUT, radius SDF 합성, linear 전환 시 Material/Texture GUID 재사용과 VRChat 허용 컴포넌트 검사를 확인했다.
 - canonical conic-gradient의 위쪽 0°·시계 방향 순회, start angle과 mixed unit center 보존, 다중 stop LUT, radius SDF 합성, radial 전환 시 GUID 재사용과 VRChat 허용 컴포넌트 검사를 확인했다.
@@ -90,7 +90,7 @@ HTML2VRC 전용 Unity Test Framework 테스트 29개를 실행한다. 검증 범
 20. React control fixture의 Toggle, Slider, TextInput, Scroll, Embed 네이티브 생성과 빈 값 보존, focus/blur 진단, 동적 Embed fallback 표시
 21. canonical paint visible/opacity의 자식 합성, hidden Layout 보존, opacity 0 입력 유지, 생성기·사용자 CanvasGroup 재생성 수명주기
 22. canonical image의 fill/contain/cover/none 원본 비율·크기 계산, percentage·numeric·auto 위치, clipping과 안정 내부 콘텐츠 재생성
-23. canonical per-edge solid border의 폭·색 보존, 레이아웃 비간섭 overlay, anchor/offset, draw order와 edge·overlay 재생성 수명주기
+23. canonical per-edge solid border의 비대칭 폭·색, circular outer·elliptical inner SDF contour, flex 최종 Rect, 안정 Material·overlay 재생성과 VRChat 허용 컴포넌트 검사
 24. canonical linear-gradient의 다중 stop LUT·각도 축, 영속 Material/Texture 안정 재사용, 단색 전환과 VRChat 허용 컴포넌트 검사
 25. canonical per-corner radius의 SDF Material, 인접 반지름 정규화, gradient 합성, stencil Mask 자식 clipping과 VRChat 허용 컴포넌트 검사
 26. canonical radial-gradient의 mixed unit center/radius 타원, 최종 Rect 계산, rounded Mask 합성, linear 전환 재사용과 VRChat 허용 컴포넌트 검사

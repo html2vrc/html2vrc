@@ -580,7 +580,7 @@ AI는 특정 Unity 라이브러리 API보다 HTML, CSS, React와 일반적인 Un
 - radial gradient (VRChat-safe elliptical LUT Material 구현)
 - conic gradient (VRChat-safe clockwise LUT Material 구현)
 - per-corner border radius (VRChat-safe SDF Material + stencil Mask 구현)
-- per-edge border (outer radius clip 구현, 정확한 inner border contour는 후속)
+- per-edge border (비대칭 폭·색, outer circular radius와 inner elliptical contour SDF 구현)
 - Mask와 ScrollView 조합
 
 ### 4단계: 장식과 폴백

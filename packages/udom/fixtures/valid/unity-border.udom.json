@@ -23,8 +23,7 @@
           "left": 40
         },
         "flex": {
-          "direction": "column",
-          "alignItems": "center"
+          "direction": "column"
         }
       }
     },
@@ -74,6 +73,12 @@
                 "width": 20,
                 "color": "#FFD84DFF"
               }
+            },
+            "radius": {
+              "topLeft": "25%",
+              "topRight": 32,
+              "bottomRight": 48,
+              "bottomLeft": 20
             }
           }
         },
