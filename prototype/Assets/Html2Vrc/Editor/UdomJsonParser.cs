@@ -89,8 +89,31 @@ namespace Html2Vrc.Editor
                 type = GetString(value, "type"),
                 name = GetString(value, "name"),
                 text = GetString(value, "text"),
-                sprite = GetString(value, "sprite")
+                sprite = GetString(value, "sprite"),
+                texture = GetString(value, "texture")
             };
+
+            if (value.TryGetValue("imageFit", out _))
+            {
+                node.imageFit = GetString(value, "imageFit");
+            }
+
+            if (value.TryGetValue("imagePositionX", out _))
+            {
+                node.imagePositionX = GetString(value, "imagePositionX");
+            }
+
+            if (value.TryGetValue("imagePositionY", out _))
+            {
+                node.imagePositionY = GetString(value, "imagePositionY");
+            }
+
+            if (value.TryGetValue("imageIntrinsicSize", out var imageIntrinsicSize))
+            {
+                node.imageIntrinsicSize = GetFloatArray(
+                    imageIntrinsicSize,
+                    path + ".imageIntrinsicSize");
+            }
 
             if (value.TryGetValue("style", out var styleValue))
             {

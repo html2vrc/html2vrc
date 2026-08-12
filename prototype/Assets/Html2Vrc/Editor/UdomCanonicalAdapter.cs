@@ -553,25 +553,28 @@ namespace Html2Vrc.Editor
                         node.style.size[1] = resource.Height;
                     }
 
-                    if (!mappedStyle.HasBackground)
+                    node.imageIntrinsicSize = new[] { resource.Width, resource.Height };
+                    node.imageFit = GetString(properties, "fit") ?? "contain";
+                    if (!string.Equals(node.imageFit, "fill", StringComparison.Ordinal)
+                        && !string.Equals(node.imageFit, "contain", StringComparison.Ordinal)
+                        && !string.Equals(node.imageFit, "cover", StringComparison.Ordinal)
+                        && !string.Equals(node.imageFit, "none", StringComparison.Ordinal))
                     {
-                        node.style.backgroundColor = "#FFFFFFFF";
+                        throw new FormatException(
+                            $"{path}.properties.fit: expected 'fill', 'contain', 'cover', or 'none'.");
                     }
 
-                    var imageFit = GetString(properties, "fit") ?? "fill";
-                    if (!string.Equals(imageFit, "contain", StringComparison.Ordinal)
-                        && !string.Equals(imageFit, "fill", StringComparison.Ordinal))
+                    if (properties.TryGetValue("position", out var imagePositionValue))
                     {
-                        warnings.Add(new UdomParseWarning(
-                            path + ".properties.fit",
-                            $"Canonical image fit '{imageFit}' is approximated by the Unity Image preserve-aspect behavior."));
-                    }
-
-                    if (properties.ContainsKey("position"))
-                    {
-                        warnings.Add(new UdomParseWarning(
-                            path + ".properties.position",
-                            "Canonical image positioning is not applied by the Unity Image fallback."));
+                        var imagePositionPath = path + ".properties.position";
+                        var imagePosition = RequireObject(imagePositionValue, imagePositionPath);
+                        EnsureOnlyKeys(imagePosition, imagePositionPath, "x", "y");
+                        node.imagePositionX = NormalizeImagePosition(
+                            RequireValue(imagePosition, "x", imagePositionPath),
+                            imagePositionPath + ".x");
+                        node.imagePositionY = NormalizeImagePosition(
+                            RequireValue(imagePosition, "y", imagePositionPath),
+                            imagePositionPath + ".y");
                     }
 
                     break;
@@ -1604,6 +1607,44 @@ namespace Html2Vrc.Editor
 
             result = reference * percentage / 100f;
             return true;
+        }
+
+        private static string NormalizeImagePosition(object value, string path)
+        {
+            if (value is double number)
+            {
+                var result = (float)number;
+                if (float.IsNaN(result) || float.IsInfinity(result))
+                {
+                    throw new FormatException($"{path}: image position must be finite.");
+                }
+
+                return result.ToString("0.########", CultureInfo.InvariantCulture);
+            }
+
+            if (!(value is string text))
+            {
+                throw new FormatException($"{path}: image position must be a number, percentage, or 'auto'.");
+            }
+
+            if (string.Equals(text, "auto", StringComparison.Ordinal))
+            {
+                return text;
+            }
+
+            if (!text.EndsWith("%", StringComparison.Ordinal)
+                || !float.TryParse(
+                    text.Substring(0, text.Length - 1),
+                    NumberStyles.Float,
+                    CultureInfo.InvariantCulture,
+                    out var percentage)
+                || float.IsNaN(percentage)
+                || float.IsInfinity(percentage))
+            {
+                throw new FormatException($"{path}: invalid image position '{text}'.");
+            }
+
+            return percentage.ToString("0.########", CultureInfo.InvariantCulture) + "%";
         }
 
         private static object RequireValue(Dictionary<string, object> value, string key, string path)

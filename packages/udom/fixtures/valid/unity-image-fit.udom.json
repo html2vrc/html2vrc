@@ -1,0 +1,112 @@
+{
+  "asset": {
+    "version": "0.1",
+    "generator": "@html2vrc/udom Unity image fit fixture"
+  },
+  "viewport": {
+    "width": 900,
+    "height": 300
+  },
+  "resources": [
+    {
+      "id": "image.emoji",
+      "type": "image",
+      "uri": "Assets/TextMesh Pro/Sprites/EmojiOne.png",
+      "mimeType": "image/png",
+      "width": 512,
+      "height": 512
+    }
+  ],
+  "root": {
+    "type": "element",
+    "id": "image-fit-root",
+    "name": "view",
+    "style": {
+      "layout": {
+        "mode": "flex",
+        "width": "100%",
+        "height": "100%",
+        "padding": {
+          "top": 24,
+          "right": 24,
+          "bottom": 24,
+          "left": 24
+        },
+        "flex": {
+          "direction": "row",
+          "columnGap": 16,
+          "alignItems": "center"
+        }
+      }
+    },
+    "children": [
+      {
+        "type": "element",
+        "id": "image-fill",
+        "name": "image",
+        "properties": {
+          "resource": "image.emoji",
+          "fit": "fill"
+        },
+        "style": {
+          "layout": {
+            "width": 200,
+            "height": 100
+          }
+        }
+      },
+      {
+        "type": "element",
+        "id": "image-contain",
+        "name": "image",
+        "properties": {
+          "resource": "image.emoji"
+        },
+        "style": {
+          "layout": {
+            "width": 200,
+            "height": 100
+          }
+        }
+      },
+      {
+        "type": "element",
+        "id": "image-cover",
+        "name": "image",
+        "properties": {
+          "resource": "image.emoji",
+          "fit": "cover",
+          "position": {
+            "x": "25%",
+            "y": "75%"
+          }
+        },
+        "style": {
+          "layout": {
+            "width": 200,
+            "height": 100
+          }
+        }
+      },
+      {
+        "type": "element",
+        "id": "image-none",
+        "name": "image",
+        "properties": {
+          "resource": "image.emoji",
+          "fit": "none",
+          "position": {
+            "x": 10,
+            "y": "25%"
+          }
+        },
+        "style": {
+          "layout": {
+            "width": 200,
+            "height": 100
+          }
+        }
+      }
+    ]
+  }
+}

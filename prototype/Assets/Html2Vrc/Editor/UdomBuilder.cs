@@ -101,6 +101,7 @@ namespace Html2Vrc.Editor
         private const string ToggleCheckmarkSuffix = "::__toggle-checkmark";
         private const string SliderFillSuffix = "::__slider-fill";
         private const string SliderHandleSuffix = "::__slider-handle";
+        private const string ImageContentSuffix = "::__image-content";
         private const string InputViewportSuffix = "::__input-viewport";
         private const string InputTextSuffix = "::__input-text";
         private const string InputPlaceholderSuffix = "::__input-placeholder";
@@ -488,7 +489,7 @@ namespace Html2Vrc.Editor
                     ConfigureText(nodeObject, node, style, context.Font);
                     break;
                 case "image":
-                    ConfigureImage(nodeObject, node, style);
+                    ConfigureImage(nodeObject, node, style, context);
                     break;
                 case "button":
                     ConfigureButton(nodeObject, node, style, documentPanel, context.Root);
@@ -783,30 +784,165 @@ namespace Html2Vrc.Editor
             }
         }
 
-        private static void ConfigureImage(GameObject target, UdomNode node, UdomStyle style)
+        private static void ConfigureImage(
+            GameObject target,
+            UdomNode node,
+            UdomStyle style,
+            BuildContext context)
         {
-            var color = UdomBuilderUtility.ParseColor(style.backgroundColor, Color.white);
+            RemoveIfPresent<RawImage>(target);
+            var background = GetOrAdd<Image>(target);
+            Undo.RecordObject(background, "Configure UDOM Image background");
+            background.color = UdomBuilderUtility.ParseColor(style.backgroundColor, Color.clear);
+            background.sprite = null;
+            background.preserveAspect = false;
+            background.raycastTarget = false;
+            GetOrAdd<RectMask2D>(target);
+
+            var contentId = node.id + ImageContentSuffix;
+            var content = UpsertGeneratedObject(
+                contentId,
+                "ImageContent",
+                true,
+                target.transform,
+                context);
+            context.DesiredIds.Add(contentId);
+            content.name = "Image Content";
+            content.transform.SetSiblingIndex(0);
+            RemoveIfPresent<LayoutElement>(content);
+
+            var intrinsicSize = GetImageIntrinsicSize(node);
             if (!string.IsNullOrWhiteSpace(node.texture))
             {
-                RemoveIfPresent<Image>(target);
-                var rawImage = GetOrAdd<RawImage>(target);
+                RemoveIfPresent<Image>(content);
+                var rawImage = GetOrAdd<RawImage>(content);
                 Undo.RecordObject(rawImage, "Configure UDOM RawImage");
-                rawImage.color = color;
+                rawImage.color = Color.white;
                 rawImage.texture = AssetDatabase.LoadAssetAtPath<Texture2D>(node.texture);
                 rawImage.uvRect = new Rect(0f, 0f, 1f, 1f);
                 rawImage.raycastTarget = false;
-                return;
+                if ((intrinsicSize.x <= 0f || intrinsicSize.y <= 0f) && rawImage.texture != null)
+                {
+                    intrinsicSize = new Vector2(rawImage.texture.width, rawImage.texture.height);
+                }
+            }
+            else
+            {
+                RemoveIfPresent<RawImage>(content);
+                var image = GetOrAdd<Image>(content);
+                Undo.RecordObject(image, "Configure UDOM Image content");
+                image.color = Color.white;
+                image.sprite = LoadSprite(node.sprite);
+                image.preserveAspect = false;
+                image.raycastTarget = false;
+                if ((intrinsicSize.x <= 0f || intrinsicSize.y <= 0f) && image.sprite != null)
+                {
+                    intrinsicSize = image.sprite.rect.size;
+                }
             }
 
-            RemoveIfPresent<RawImage>(target);
-            var image = GetOrAdd<Image>(target);
-            Undo.RecordObject(image, "Configure UDOM Image");
-            image.color = color;
-            image.sprite = string.IsNullOrWhiteSpace(node.sprite)
-                ? null
-                : AssetDatabase.LoadAssetAtPath<Sprite>(node.sprite);
-            image.preserveAspect = image.sprite != null;
-            image.raycastTarget = false;
+            ConfigureImageContentRect(
+                content.GetComponent<RectTransform>(),
+                target.GetComponent<RectTransform>().rect.size,
+                intrinsicSize,
+                node.imageFit,
+                node.imagePositionX,
+                node.imagePositionY);
+        }
+
+        private static Vector2 GetImageIntrinsicSize(UdomNode node)
+        {
+            var declared = GetVector2(node.imageIntrinsicSize, Vector2.zero);
+            if (declared.x > 0f && declared.y > 0f)
+            {
+                return declared;
+            }
+
+            return Vector2.zero;
+        }
+
+        private static Sprite LoadSprite(string path)
+        {
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                return null;
+            }
+
+            var sprite = AssetDatabase.LoadAssetAtPath<Sprite>(path);
+            if (sprite != null)
+            {
+                return sprite;
+            }
+
+            return AssetDatabase.LoadAllAssetsAtPath(path).OfType<Sprite>().FirstOrDefault();
+        }
+
+        private static void ConfigureImageContentRect(
+            RectTransform rect,
+            Vector2 boxSize,
+            Vector2 intrinsicSize,
+            string fit,
+            string positionX,
+            string positionY)
+        {
+            boxSize.x = Mathf.Max(0f, boxSize.x);
+            boxSize.y = Mathf.Max(0f, boxSize.y);
+            var hasIntrinsicSize = intrinsicSize.x > 0f && intrinsicSize.y > 0f;
+            var contentSize = boxSize;
+            if (hasIntrinsicSize && string.Equals(fit, "contain", StringComparison.OrdinalIgnoreCase))
+            {
+                var scale = Mathf.Min(boxSize.x / intrinsicSize.x, boxSize.y / intrinsicSize.y);
+                contentSize = intrinsicSize * scale;
+            }
+            else if (hasIntrinsicSize && string.Equals(fit, "cover", StringComparison.OrdinalIgnoreCase))
+            {
+                var scale = Mathf.Max(boxSize.x / intrinsicSize.x, boxSize.y / intrinsicSize.y);
+                contentSize = intrinsicSize * scale;
+            }
+            else if (hasIntrinsicSize && string.Equals(fit, "none", StringComparison.OrdinalIgnoreCase))
+            {
+                contentSize = intrinsicSize;
+            }
+
+            var available = boxSize - contentSize;
+            var offset = new Vector2(
+                ResolveImagePosition(positionX, available.x),
+                ResolveImagePosition(positionY, available.y));
+            Undo.RecordObject(rect, "Configure UDOM Image content rect");
+            rect.anchorMin = new Vector2(0f, 1f);
+            rect.anchorMax = new Vector2(0f, 1f);
+            rect.pivot = new Vector2(0f, 1f);
+            rect.anchoredPosition = new Vector2(offset.x, -offset.y);
+            rect.sizeDelta = contentSize;
+            rect.localScale = Vector3.one;
+            rect.localRotation = Quaternion.identity;
+        }
+
+        private static float ResolveImagePosition(string value, float available)
+        {
+            if (string.IsNullOrWhiteSpace(value)
+                || string.Equals(value, "auto", StringComparison.OrdinalIgnoreCase))
+            {
+                return available * 0.5f;
+            }
+
+            if (value.EndsWith("%", StringComparison.Ordinal)
+                && float.TryParse(
+                    value.Substring(0, value.Length - 1),
+                    System.Globalization.NumberStyles.Float,
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    out var percentage))
+            {
+                return available * percentage / 100f;
+            }
+
+            return float.TryParse(
+                value,
+                System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture,
+                out var offset)
+                ? offset
+                : available * 0.5f;
         }
 
         private static void ConfigureButton(

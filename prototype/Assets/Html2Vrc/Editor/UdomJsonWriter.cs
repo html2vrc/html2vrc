@@ -62,6 +62,14 @@ namespace Html2Vrc.Editor
             writer.OptionalStringProperty("name", node.name);
             writer.OptionalStringProperty("text", node.text);
             writer.OptionalStringProperty("sprite", node.sprite);
+            writer.OptionalStringProperty("texture", node.texture);
+            if (string.Equals(node.type, "Image", StringComparison.OrdinalIgnoreCase))
+            {
+                writer.StringProperty("imageFit", node.imageFit);
+                writer.StringProperty("imagePositionX", node.imagePositionX);
+                writer.StringProperty("imagePositionY", node.imagePositionY);
+                writer.FloatArrayProperty("imageIntrinsicSize", node.imageIntrinsicSize);
+            }
             writer.PropertyName("style");
             WriteStyle(writer, node.style);
 

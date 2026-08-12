@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Text;
 using System.Text.RegularExpressions;
 using UnityEditor;
@@ -81,7 +82,8 @@ namespace Html2Vrc.Editor
         {
             "schemaVersion", "id", "name", "canvas", "root",
             "renderMode", "size", "scale", "viewportPixelRatio", "viewportFit",
-            "type", "text", "sprite", "texture", "interactable", "toggleValue",
+            "type", "text", "sprite", "texture", "imageFit", "imagePositionX", "imagePositionY",
+            "imageIntrinsicSize", "interactable", "toggleValue",
             "sliderValue", "sliderMin", "sliderMax", "sliderStep",
             "textInputValue", "textInputPlaceholder", "textInputMultiline", "textInputReadOnly",
             "scrollAxisExplicit", "scrollHorizontal", "scrollVertical", "scrollInitialOffset",
@@ -238,6 +240,27 @@ namespace Html2Vrc.Editor
                 {
                     AddError(result, path + ".sliderStep", "Slider step cannot be negative.");
                 }
+            }
+
+            if (string.Equals(node.type, "Image", StringComparison.OrdinalIgnoreCase))
+            {
+                if (!string.Equals(node.imageFit, "fill", StringComparison.OrdinalIgnoreCase)
+                    && !string.Equals(node.imageFit, "contain", StringComparison.OrdinalIgnoreCase)
+                    && !string.Equals(node.imageFit, "cover", StringComparison.OrdinalIgnoreCase)
+                    && !string.Equals(node.imageFit, "none", StringComparison.OrdinalIgnoreCase))
+                {
+                    AddError(result, path + ".imageFit", $"지원하지 않는 image fit '{node.imageFit}'.");
+                }
+
+                ValidateImagePosition(node.imagePositionX, path + ".imagePositionX", result);
+                ValidateImagePosition(node.imagePositionY, path + ".imagePositionY", result);
+                ValidateVector(
+                    node.imageIntrinsicSize,
+                    2,
+                    path + ".imageIntrinsicSize",
+                    result,
+                    requirePositive: false,
+                    requireNonNegative: true);
             }
 
             if (string.Equals(node.type, "ScrollView", StringComparison.OrdinalIgnoreCase))
@@ -404,6 +427,36 @@ namespace Html2Vrc.Editor
                 {
                     AddError(result, "$", $"지원하지 않는 JSON 속성 '{key}'.");
                 }
+            }
+        }
+
+        private static void ValidateImagePosition(
+            string value,
+            string path,
+            UdomValidationResult result)
+        {
+            if (string.Equals(value, "auto", StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                AddError(result, path, "image position은 숫자, percentage 또는 'auto'여야 한다.");
+                return;
+            }
+
+            var numeric = value;
+            if (value.EndsWith("%", StringComparison.Ordinal))
+            {
+                numeric = value.Substring(0, value.Length - 1);
+            }
+
+            if (!float.TryParse(numeric, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsed)
+                || float.IsNaN(parsed)
+                || float.IsInfinity(parsed))
+            {
+                AddError(result, path, $"유효하지 않은 image position '{value}'.");
             }
         }
 

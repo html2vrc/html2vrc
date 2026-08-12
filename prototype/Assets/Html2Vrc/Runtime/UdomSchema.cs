@@ -31,6 +31,10 @@ namespace Html2Vrc
         public string text;
         public string sprite;
         public string texture;
+        public string imageFit = "fill";
+        public string imagePositionX = "50%";
+        public string imagePositionY = "50%";
+        public float[] imageIntrinsicSize = { 0f, 0f };
         public bool interactable = true;
         public bool toggleValue;
         public float sliderValue;

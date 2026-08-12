@@ -22,6 +22,8 @@ Unity Importer는 이 문서의 기존 형식과 함께 `packages/udom` JSON Sch
 
 Canonical 길이의 숫자와 부모 크기 기준 백분율, 기본 flex 방향과 간격, cross-axis 정렬, padding/margin, 단일 색상 배경, 기본 텍스트 스타일과 font weight를 변환한다. `styleRefs`는 배열 순서대로 깊은 병합한 뒤 노드의 inline `style`로 마지막 덮어쓴다. canonical `image` resource는 Texture2D/RawImage, `sprite` resource는 Sprite/Image로 생성한다.
 
+Canonical image의 `fit`은 `fill`, `contain`, `cover`, `none`을 모두 지원하며 생략 시 `contain`이다. resource에 선언된 width/height를 원본 크기로 사용하고, 없으면 로드한 Texture2D 또는 Sprite 크기를 사용한다. 이미지 콘텐츠는 `<node-id>::__image-content` 안정 ID의 내부 자식에 배치하고 부모 Image 노드의 RectMask2D로 자른다. `position.x/y`의 백분율은 `(박스 크기 - 콘텐츠 크기) × 백분율`, 숫자는 왼쪽·위 기준 design-unit 오프셋, `auto`는 남는 공간의 가운데로 해석한다.
+
 Canonical viewport 크기는 디자인 좌표계를 유지한다. UDOM Importer의 선택적 Renderer 목표 Canvas 크기가 다르면 `contain`은 작은 축 비율, `cover`는 큰 축 비율, `stretch`는 축별 비율, `none`은 1:1 scale을 적용한다. `cover`와 넘칠 수 있는 `none`은 생성기 소유의 안정적인 viewport wrapper에서 클리핑한다. 목표 크기 override를 끄면 Canvas는 디자인 viewport 크기로 돌아간다.
 
 Canonical `paint.visible`과 0~1 `paint.opacity`는 CanvasGroup으로 노드와 자식 결과 전체에 적용한다. `visible: false`는 GameObject를 비활성화하지 않아 Flex/Layout 공간을 유지하지만 interactable과 raycast는 차단한다. `opacity: 0`은 시각적으로만 투명하므로 canonical 의미대로 입력 상태는 유지한다. 사용자가 이미 추가한 CanvasGroup은 원래 alpha와 입력 설정을 캡처해 canonical opacity를 곱하고, 해당 스타일이 사라지면 원래 설정으로 복원한다.
@@ -72,6 +74,10 @@ Resource URI는 canonical 명세대로 UDOM TextAsset이 있는 폴더를 기준
 | `name` | Unity Hierarchy 표시 이름 |
 | `text` | Text 노드의 내용 |
 | `sprite` | `Assets/`로 시작하는 Sprite 에셋 경로 |
+| `texture` | `Assets/`로 시작하는 Texture2D 에셋 경로 |
+| `imageFit` | Image의 `fill`, `contain`, `cover`, `none` 배치 방식 |
+| `imagePositionX`, `imagePositionY` | Image 콘텐츠의 숫자·백분율·`auto` 위치 |
+| `imageIntrinsicSize` | Image resource의 원본 `[width, height]` |
 | `style` | 위치, 크기, 색상, 레이아웃 |
 | `binding` | Button의 안전한 동작 |
 | `embed` | 외부 GameObject 슬롯 |
@@ -109,7 +115,7 @@ Resource URI는 canonical 명세대로 UDOM TextAsset이 있는 폴더를 기준
 - `alignment`: `TopLeft`, `Top`, `TopRight`, `Left`, `Center`, `Right`, `BottomLeft`, `Bottom`, `BottomRight`, `MiddleLeft`, `MiddleRight`.
 - `flexibleWidth`, `flexibleHeight`: 레이아웃 안에서 남는 공간을 차지하는 정도.
 
-Panel은 배경 Image와 선택적 Vertical/Horizontal Layout Group을 만든다. Image는 Sprite가 없으면 단색 블록으로 동작한다. ScrollView의 `style.layout`은 스크롤 Content 배치를 결정한다. Canonical scroll의 axis는 ScrollRect의 horizontal/vertical 축으로, 왼쪽 위 기준 design-unit `initialOffset`은 Content의 `(-x, +y)` anchored position으로 변환한다.
+Panel은 배경 Image와 선택적 Vertical/Horizontal Layout Group을 만든다. Image의 배경색은 루트 Image에, Texture2D/RawImage 또는 Sprite/Image 콘텐츠는 마스크된 내부 자식에 배치한다. ScrollView의 `style.layout`은 스크롤 Content 배치를 결정한다. Canonical scroll의 axis는 ScrollRect의 horizontal/vertical 축으로, 왼쪽 위 기준 design-unit `initialOffset`은 Content의 `(-x, +y)` anchored position으로 변환한다.
 
 ## 안전한 Binding
 

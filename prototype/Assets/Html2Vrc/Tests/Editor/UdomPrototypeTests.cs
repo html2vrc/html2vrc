@@ -81,13 +81,15 @@ namespace Html2Vrc.Tests
             var build = UdomBuilder.GenerateOrRegenerate(document);
             var root = build.Root;
             var title = UdomBuilder.FindNode(root, "title").GetComponent<TextMeshProUGUI>();
-            var logo = UdomBuilder.FindNode(root, "logo").GetComponent<Image>();
+            var logoRoot = UdomBuilder.FindNode(root, "logo");
+            var logo = UdomBuilder.FindNode(root, "logo::__image-content").GetComponent<Image>();
             var continueButton = UdomBuilder.FindNode(root, "continue").GetComponent<Button>();
             var continueLabel = UdomBuilder.FindNode(root, "continue-label").GetComponent<TextMeshProUGUI>();
 
             Assert.That(title, Is.Not.Null);
             Assert.That(title.text, Is.EqualTo("Hello VRChat"));
             Assert.That(title.fontSize, Is.EqualTo(48f));
+            Assert.That(logoRoot.GetComponent<RectMask2D>(), Is.Not.Null);
             Assert.That(logo, Is.Not.Null);
             Assert.That(logo.color, Is.EqualTo(Color.white).Using(ColorComparer.Instance));
             Assert.That(continueButton, Is.Not.Null);
@@ -236,7 +238,9 @@ namespace Html2Vrc.Tests
 
             var build = UdomBuilder.GenerateOrRegenerate(document);
             var title = UdomBuilder.FindNode(build.Root, "settings-title").GetComponent<TextMeshProUGUI>();
-            var profileImage = UdomBuilder.FindNode(build.Root, "profile-image").GetComponent<Image>();
+            var profileImage = UdomBuilder.FindNode(
+                build.Root,
+                "profile-image::__image-content").GetComponent<Image>();
             var toggle = UdomBuilder.FindNode(build.Root, "music-toggle").GetComponent<Toggle>();
             var checkmark = UdomBuilder.FindNode(build.Root, "music-toggle::__toggle-checkmark");
             Assert.That(title.text, Is.EqualTo("Settings"));
@@ -267,7 +271,9 @@ namespace Html2Vrc.Tests
                 validation.Document,
                 null,
                 source);
-            var image = UdomBuilder.FindNode(build.Root, "relative-resource-image").GetComponent<RawImage>();
+            var image = UdomBuilder.FindNode(
+                build.Root,
+                "relative-resource-image::__image-content").GetComponent<RawImage>();
             Assert.That(image.texture, Is.Not.Null);
 
             var escapingJson = source.text.Replace(
@@ -602,6 +608,51 @@ namespace Html2Vrc.Tests
             Assert.That(UdomBuilder.FindNode(root, "paint-root").GetComponent<UdomPaintState>(), Is.Null);
             Assert.That(UdomBuilder.FindNode(root, "hidden-panel").GetComponent<UdomPaintState>(), Is.Null);
             Assert.That(UdomBuilder.FindNode(root, "transparent-toggle").GetComponent<UdomPaintState>(), Is.Null);
+        }
+
+        [Test]
+        public void CanonicalImageFit_MapsAllModesAndObjectPosition()
+        {
+            var json = LoadRepositoryFile(
+                "packages",
+                "udom",
+                "fixtures",
+                "valid",
+                "unity-image-fit.udom.json");
+            var validation = UdomValidator.Validate(json);
+
+            Assert.That(validation.IsValid, Is.True, validation.Format());
+            Assert.That(validation.Issues, Is.Empty, validation.Format());
+            var document = validation.Document;
+            var fillNode = document.root.children.Single(node => node.id == "image-fill");
+            var containNode = document.root.children.Single(node => node.id == "image-contain");
+            var coverNode = document.root.children.Single(node => node.id == "image-cover");
+            var noneNode = document.root.children.Single(node => node.id == "image-none");
+            Assert.That(fillNode.imageFit, Is.EqualTo("fill"));
+            Assert.That(containNode.imageFit, Is.EqualTo("contain"));
+            Assert.That(coverNode.imagePositionX, Is.EqualTo("25%"));
+            Assert.That(coverNode.imagePositionY, Is.EqualTo("75%"));
+            Assert.That(noneNode.imagePositionX, Is.EqualTo("10"));
+            Assert.That(noneNode.imagePositionY, Is.EqualTo("25%"));
+            Assert.That(fillNode.imageIntrinsicSize, Is.EqualTo(new[] { 512f, 512f }));
+
+            var build = UdomBuilder.GenerateOrRegenerate(document);
+            var root = build.Root;
+            AssertImageContent(root, "image-fill", new Vector2(200f, 100f), Vector2.zero);
+            AssertImageContent(root, "image-contain", new Vector2(100f, 100f), new Vector2(50f, 0f));
+            AssertImageContent(root, "image-cover", new Vector2(200f, 200f), new Vector2(0f, 75f));
+            AssertImageContent(root, "image-none", new Vector2(512f, 512f), new Vector2(10f, 103f));
+
+            var originalCoverContent = UdomBuilder.FindNode(root, "image-cover::__image-content");
+            coverNode.imageFit = "contain";
+            coverNode.imagePositionX = "100%";
+            coverNode.imagePositionY = "auto";
+            UdomBuilder.GenerateOrRegenerate(document, root);
+
+            Assert.That(
+                UdomBuilder.FindNode(root, "image-cover::__image-content"),
+                Is.SameAs(originalCoverContent));
+            AssertImageContent(root, "image-cover", new Vector2(100f, 100f), new Vector2(100f, 0f));
         }
 
         [Test]
@@ -945,6 +996,26 @@ namespace Html2Vrc.Tests
             Assert.That(panel.activeSelf, Is.False, "Close button must disable the panel during Play Mode.");
 
             yield return new ExitPlayMode();
+        }
+
+        private static void AssertImageContent(
+            UdomGeneratedRoot root,
+            string nodeId,
+            Vector2 expectedSize,
+            Vector2 expectedPosition)
+        {
+            var imageRoot = UdomBuilder.FindNode(root, nodeId);
+            var content = UdomBuilder.FindNode(root, nodeId + "::__image-content");
+            var rect = content.GetComponent<RectTransform>();
+            var rawImage = content.GetComponent<RawImage>();
+
+            Assert.That(imageRoot.GetComponent<RectMask2D>(), Is.Not.Null);
+            Assert.That(rawImage, Is.Not.Null);
+            Assert.That(rawImage.texture, Is.Not.Null);
+            Assert.That(rect.sizeDelta.x, Is.EqualTo(expectedSize.x).Within(0.001f));
+            Assert.That(rect.sizeDelta.y, Is.EqualTo(expectedSize.y).Within(0.001f));
+            Assert.That(rect.anchoredPosition.x, Is.EqualTo(expectedPosition.x).Within(0.001f));
+            Assert.That(rect.anchoredPosition.y, Is.EqualTo(expectedPosition.y).Within(0.001f));
         }
 
         private static void InvokeGeneratedActionInEditMode(Button button)
