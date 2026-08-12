@@ -136,6 +136,8 @@ Canonical text의 `lineHeight`, `letterSpacing`, justify 정렬, wrap/nowrap, vi
 
 제한형 HTML의 `font-weight`, `font-style`, `line-height`, `letter-spacing`, `white-space`, `text-overflow`와 justify/start/end `text-align`도 같은 TMP text 경로를 사용합니다. Font weight는 `normal`, `bold`, 1~1000 정수를 받고 600 이상을 Bold로 정규화하며 italic과 조합할 수 있습니다. `<strong>/<b>`, `<em>/<i>`, `<small>`, `<span>`의 inline `style`에는 `color`, `font-size`, `font-weight`, `font-style`을 사용할 수 있고 중첩된 상속과 `inherit`·`currentColor` override를 effective 구조화 text run으로 보존합니다. TMP 태그처럼 보이는 일반 텍스트와 잘못된 run 색상은 실행하지 않습니다. Unitless·percentage line-height는 최종 font-size로 계산하고, `pre` 계열 공백과 `<br>`의 원래 순서를 보존합니다. Button과 목록의 파생 라벨에도 동일한 글꼴·run·metric·wrapping 설정이 전달됩니다.
 
+제한형 HTML의 `<input type="checkbox|range|text">`와 `<textarea>`는 각각 native Toggle, Slider, TMP_InputField로 변환됩니다. Checkbox·Button의 boolean 속성, range의 min/max/value와 정확히 보존 가능한 `step="1|any"`, text value·placeholder·readonly·disabled, textarea 초기 줄바꿈을 지원합니다. 내부 JSON round-trip도 Button·Toggle·Slider·TextInput·Scroll의 상태를 모두 보존하며, 컨트롤 타입을 바꿔 재생성해도 안정 GameObject를 재사용하고 이전 내부 자식을 정리합니다.
+
 Canonical font resource가 Unity `Assets/` 안의 기존 TMP Font Asset을 가리키면 그대로 사용합니다. TTF 또는 OTF 원본을 가리키면 source GUID 기반 안정 경로의 dynamic TMP Font Asset을 `Assets/Html2VrcGenerated/Fonts`에 생성해 Text와 TextInput에서 재사용합니다. 경로가 없거나 지원하지 않는 형식이면 진단을 남기고 TMP Settings의 기본 font로 폴백합니다.
 
 Canonical image의 `fit`은 `fill`, `contain`, `cover`, `none`을 지원합니다. 이미지 콘텐츠는 안정 ID를 가진 내부 자식에 배치되고 원본 비율·크기와 `position.x/y`에 따라 정렬되며, 노드 영역을 넘는 부분은 마스크로 잘립니다. 백분율 위치는 남는 공간에 대한 비율, 숫자는 왼쪽·위 기준 design-unit 오프셋, `auto`는 가운데 정렬로 해석합니다.
@@ -312,7 +314,7 @@ VRChat 패키지는 VPM manifest에 고정되어 있습니다. UDOM 파서와 Un
 4. `Generate / Regenerate`를 누릅니다.
 5. 생성 루트의 `External References`에서 `world-light` 슬롯을 연결합니다.
 
-지원 범위는 `div`, 제목과 문단, `img`, `button`, 목록, ScrollView, Embed와 일부 인라인 CSS입니다. 제한형 CSS flex는 reverse 방향, wrap, justify/align, 축별 gap, 항목별 order·align-self·grow/shrink/basis를 canonical UDOM과 같은 계산기로 처리하며, `display: none`, visibility/opacity/z-index, top-left absolute 배치, 양축 hidden overflow, 이미지 object-fit/object-position, solid border/radius, 다중 box-shadow와 linear/radial/conic-gradient도 지원합니다. `script`, `onclick`, 외부 CSS와 임의 JavaScript는 실행하지 않고 오류로 표시합니다. 자세한 계약은 `Assets/Html2Vrc/Documentation/HTML_SUBSET.md`에 있습니다.
+지원 범위는 `div`, 제목과 문단, `img`, `button`, checkbox/range/text input, `textarea`, 목록, ScrollView, Embed와 일부 인라인 CSS입니다. 제한형 CSS flex는 reverse 방향, wrap, justify/align, 축별 gap, 항목별 order·align-self·grow/shrink/basis를 canonical UDOM과 같은 계산기로 처리하며, `display: none`, visibility/opacity/z-index, top-left absolute 배치, 양축 hidden overflow, 이미지 object-fit/object-position, solid border/radius, 다중 box-shadow와 linear/radial/conic-gradient도 지원합니다. `script`, `onclick`, 외부 CSS와 임의 JavaScript는 실행하지 않고 오류로 표시합니다. 자세한 계약은 `Assets/Html2Vrc/Documentation/HTML_SUBSET.md`에 있습니다.
 
 HTML 입력부터 독립된 샘플 Scene까지 한 번에 확인하려면 `Tools > HTML2VRC > Build HTML World Settings Scene`을 실행합니다. 결과는 `Assets/Html2Vrc/Samples/WorldSettingsHtmlSample.unity`에 저장됩니다. VRChat에서 바로 확인하려면 `Tools > HTML2VRC > VRChat > Build & Test HTML Sample World`를 실행합니다.
 

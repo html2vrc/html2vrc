@@ -208,7 +208,18 @@ namespace Html2Vrc.Editor
 
             if (!TryGetNodeType(element, out var type))
             {
-                AddError(result, path, $"지원하지 않는 HTML 요소 <{element.Tag}>.");
+                if (string.Equals(element.Tag, "input", StringComparison.OrdinalIgnoreCase))
+                {
+                    AddError(
+                        result,
+                        path + "/@type",
+                        $"지원하지 않는 input type '{FirstNonEmpty(element.Get("type"), "text")}'. checkbox, range, text만 사용할 수 있다.");
+                }
+                else
+                {
+                    AddError(result, path, $"지원하지 않는 HTML 요소 <{element.Tag}>.");
+                }
+
                 return null;
             }
 
@@ -261,6 +272,18 @@ namespace Html2Vrc.Editor
             {
                 ValidateTextChildren(element, path, result);
                 ConfigureButton(element, node, path, result, whiteSpaceMode);
+            }
+            else if (string.Equals(type, "Toggle", StringComparison.Ordinal))
+            {
+                ConfigureHtmlCheckbox(element, node, path, result);
+            }
+            else if (string.Equals(type, "Slider", StringComparison.Ordinal))
+            {
+                ConfigureHtmlRange(element, node, path, result);
+            }
+            else if (string.Equals(type, "TextInput", StringComparison.Ordinal))
+            {
+                ConfigureHtmlTextInput(element, node, path, result);
             }
             else if (string.Equals(type, "Embed", StringComparison.Ordinal))
             {
@@ -321,12 +344,24 @@ namespace Html2Vrc.Editor
             HtmlToUdomResult result,
             string whiteSpaceMode)
         {
+            ValidateElementAttributes(
+                element,
+                path,
+                result,
+                "id",
+                "disabled",
+                "data-action",
+                "data-target-slot",
+                "style",
+                "data-name",
+                "aria-label");
             var action = element.Get("data-action");
             if (string.IsNullOrWhiteSpace(action))
             {
                 AddWarning(result, path, "버튼에 data-action이 없어 눌러도 동작하지 않는다.");
             }
 
+            node.interactable = !element.Has("disabled");
             node.binding = new UdomBinding
             {
                 action = action,
@@ -339,6 +374,223 @@ namespace Html2Vrc.Editor
                     GetTextContent(element, whiteSpaceMode, node.style, path, result),
                     "-label")
             };
+        }
+
+        private static void ConfigureHtmlCheckbox(
+            HtmlElement element,
+            UdomNode node,
+            string path,
+            HtmlToUdomResult result)
+        {
+            ValidateElementAttributes(
+                element,
+                path,
+                result,
+                "id",
+                "type",
+                "checked",
+                "disabled",
+                "style",
+                "data-name",
+                "aria-label");
+            node.toggleValue = element.Has("checked");
+            node.interactable = !element.Has("disabled");
+        }
+
+        private static void ConfigureHtmlRange(
+            HtmlElement element,
+            UdomNode node,
+            string path,
+            HtmlToUdomResult result)
+        {
+            ValidateElementAttributes(
+                element,
+                path,
+                result,
+                "id",
+                "type",
+                "min",
+                "max",
+                "value",
+                "step",
+                "disabled",
+                "style",
+                "data-name",
+                "aria-label");
+
+            TryGetFiniteAttribute(element, "min", 0f, path, result, out var minimum);
+            TryGetFiniteAttribute(element, "max", 100f, path, result, out var maximum);
+            var hasValidRange = maximum > minimum;
+            if (!hasValidRange)
+            {
+                AddError(result, path + "/@max", "range input의 max는 min보다 커야 한다.");
+            }
+
+            var step = 1f;
+            var stepSource = element.Get("step");
+            if (string.Equals(stepSource, "any", StringComparison.OrdinalIgnoreCase))
+            {
+                step = 0f;
+            }
+            else if (stepSource != null
+                     && (!TryParseNumber(stepSource, out step)
+                         || Math.Abs(step - 1f) > 0.0001f))
+            {
+                AddError(
+                    result,
+                    path + "/@step",
+                    "range input의 step은 네이티브 Slider가 정확히 보존하는 1 또는 any만 지원한다.");
+                step = 1f;
+            }
+
+            if (step > 0f && (!IsIntegral(minimum) || !IsIntegral(maximum)))
+            {
+                AddError(
+                    result,
+                    path + "/@step",
+                    "step 1 range input의 min과 max는 정수여야 한다. 연속 범위에는 step=\"any\"를 사용한다.");
+            }
+
+            float value;
+            if (element.Get("value") == null)
+            {
+                value = minimum + (maximum - minimum) * 0.5f;
+                if (step > 0f)
+                {
+                    value = minimum + (float)Math.Floor(value - minimum + 0.5f);
+                    value = Math.Min(maximum, Math.Max(minimum, value));
+                }
+            }
+            else
+            {
+                TryGetFiniteAttribute(element, "value", minimum, path, result, out value);
+            }
+
+            if (hasValidRange && (value < minimum || value > maximum))
+            {
+                AddError(result, path + "/@value", "range input의 value는 min과 max 사이여야 한다.");
+            }
+            else if (step > 0f
+                     && Math.Abs((value - minimum) - Math.Round(value - minimum)) > 0.0001f)
+            {
+                AddError(result, path + "/@value", "step 1 range input의 value는 min에서 정수 단계만큼 떨어져야 한다.");
+            }
+
+            node.sliderMin = minimum;
+            node.sliderMax = maximum;
+            node.sliderValue = value;
+            node.sliderStep = step;
+            node.interactable = !element.Has("disabled");
+        }
+
+        private static void ConfigureHtmlTextInput(
+            HtmlElement element,
+            UdomNode node,
+            string path,
+            HtmlToUdomResult result)
+        {
+            var multiline = string.Equals(element.Tag, "textarea", StringComparison.OrdinalIgnoreCase);
+            if (multiline)
+            {
+                ValidateElementAttributes(
+                    element,
+                    path,
+                    result,
+                    "id",
+                    "placeholder",
+                    "readonly",
+                    "disabled",
+                    "style",
+                    "data-name",
+                    "aria-label");
+                if (element.Children.Count > 0)
+                {
+                    AddError(result, path, "textarea 내부에는 텍스트만 사용할 수 있다.");
+                }
+
+                node.textInputValue = NormalizeTextAreaValue(element.Text.ToString());
+            }
+            else
+            {
+                ValidateElementAttributes(
+                    element,
+                    path,
+                    result,
+                    "id",
+                    "type",
+                    "value",
+                    "placeholder",
+                    "readonly",
+                    "disabled",
+                    "style",
+                    "data-name",
+                    "aria-label");
+                node.textInputValue = element.Get("value") ?? string.Empty;
+            }
+
+            node.textInputPlaceholder = element.Get("placeholder") ?? string.Empty;
+            node.textInputMultiline = multiline;
+            node.textInputReadOnly = element.Has("readonly");
+            node.interactable = !element.Has("disabled");
+        }
+
+        private static void ValidateElementAttributes(
+            HtmlElement element,
+            string path,
+            HtmlToUdomResult result,
+            params string[] allowed)
+        {
+            var allowedSet = new HashSet<string>(allowed, StringComparer.OrdinalIgnoreCase);
+            foreach (var attribute in element.Attributes.Keys)
+            {
+                if (!allowedSet.Contains(attribute))
+                {
+                    AddError(
+                        result,
+                        path + "/@" + attribute,
+                        $"<{element.Tag}>의 '{attribute}' 속성은 지원하지 않는다.");
+                }
+            }
+        }
+
+        private static bool TryGetFiniteAttribute(
+            HtmlElement element,
+            string attribute,
+            float fallback,
+            string path,
+            HtmlToUdomResult result,
+            out float value)
+        {
+            var source = element.Get(attribute);
+            if (source == null)
+            {
+                value = fallback;
+                return true;
+            }
+
+            if (!TryParseNumber(source, out value))
+            {
+                AddError(result, path + "/@" + attribute, $"{attribute}는 유한한 숫자여야 한다.");
+                value = fallback;
+                return false;
+            }
+
+            return true;
+        }
+
+        private static bool IsIntegral(float value)
+        {
+            return Math.Abs(value - Math.Round(value)) <= 0.0001f;
+        }
+
+        private static string NormalizeTextAreaValue(string source)
+        {
+            var normalized = (source ?? string.Empty)
+                .Replace("\r\n", "\n")
+                .Replace('\r', '\n');
+            return normalized.StartsWith("\n", StringComparison.Ordinal)
+                ? normalized.Substring(1)
+                : normalized;
         }
 
         private static UdomNode CreateDerivedTextNode(
@@ -405,6 +657,32 @@ namespace Html2Vrc.Editor
                 return true;
             }
 
+            if (string.Equals(element.Tag, "input", StringComparison.OrdinalIgnoreCase))
+            {
+                switch ((element.Get("type") ?? "text").Trim().ToLowerInvariant())
+                {
+                    case "":
+                    case "text":
+                        type = "TextInput";
+                        return true;
+                    case "checkbox":
+                        type = "Toggle";
+                        return true;
+                    case "range":
+                        type = "Slider";
+                        return true;
+                    default:
+                        type = null;
+                        return false;
+                }
+            }
+
+            if (string.Equals(element.Tag, "textarea", StringComparison.OrdinalIgnoreCase))
+            {
+                type = "TextInput";
+                return true;
+            }
+
             if (string.Equals(element.Tag, "ul", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(element.Tag, "ol", StringComparison.OrdinalIgnoreCase))
             {
@@ -460,6 +738,23 @@ namespace Html2Vrc.Editor
                     style.backgroundColor = "#3A465CFF";
                     style.textColor = "#FFFFFFFF";
                     style.fontSize = 24f;
+                    break;
+                case "Toggle":
+                    style.size = new[] { 88f, 48f };
+                    style.backgroundColor = "#4A4A58FF";
+                    break;
+                case "Slider":
+                    style.size = new[] { 320f, 40f };
+                    style.backgroundColor = "#4A4A58FF";
+                    break;
+                case "TextInput":
+                    style.size = string.Equals(element.Tag, "textarea", StringComparison.OrdinalIgnoreCase)
+                        ? new[] { 360f, 128f }
+                        : new[] { 360f, 56f };
+                    style.backgroundColor = "#252733FF";
+                    style.textColor = "#FFFFFFFF";
+                    style.fontSize = 24f;
+                    style.alignment = "MiddleLeft";
                     break;
                 case "ScrollView":
                     style.size = new[] { 1000f, 300f };
@@ -4700,6 +4995,11 @@ namespace Html2Vrc.Editor
             public string Get(string key)
             {
                 return Attributes.TryGetValue(key, out var value) ? value : null;
+            }
+
+            public bool Has(string key)
+            {
+                return Attributes.ContainsKey(key);
             }
         }
 

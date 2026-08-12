@@ -78,6 +78,38 @@ namespace Html2Vrc.Editor
                 writer.StringProperty("imagePositionY", node.imagePositionY);
                 writer.FloatArrayProperty("imageIntrinsicSize", node.imageIntrinsicSize);
             }
+            if (string.Equals(node.type, "Button", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(node.type, "Toggle", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(node.type, "Slider", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(node.type, "TextInput", StringComparison.OrdinalIgnoreCase))
+            {
+                writer.BoolProperty("interactable", node.interactable);
+            }
+            if (string.Equals(node.type, "Toggle", StringComparison.OrdinalIgnoreCase))
+            {
+                writer.BoolProperty("toggleValue", node.toggleValue);
+            }
+            if (string.Equals(node.type, "Slider", StringComparison.OrdinalIgnoreCase))
+            {
+                writer.FloatProperty("sliderValue", node.sliderValue);
+                writer.FloatProperty("sliderMin", node.sliderMin);
+                writer.FloatProperty("sliderMax", node.sliderMax);
+                writer.FloatProperty("sliderStep", node.sliderStep);
+            }
+            if (string.Equals(node.type, "TextInput", StringComparison.OrdinalIgnoreCase))
+            {
+                writer.StringProperty("textInputValue", node.textInputValue ?? string.Empty);
+                writer.StringProperty("textInputPlaceholder", node.textInputPlaceholder ?? string.Empty);
+                writer.BoolProperty("textInputMultiline", node.textInputMultiline);
+                writer.BoolProperty("textInputReadOnly", node.textInputReadOnly);
+            }
+            if (string.Equals(node.type, "ScrollView", StringComparison.OrdinalIgnoreCase))
+            {
+                writer.BoolProperty("scrollAxisExplicit", node.scrollAxisExplicit);
+                writer.BoolProperty("scrollHorizontal", node.scrollHorizontal);
+                writer.BoolProperty("scrollVertical", node.scrollVertical);
+                writer.FloatArrayProperty("scrollInitialOffset", node.scrollInitialOffset);
+            }
             writer.PropertyName("style");
             WriteStyle(writer, node.style);
 

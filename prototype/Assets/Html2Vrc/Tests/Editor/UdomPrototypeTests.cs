@@ -141,6 +141,29 @@ namespace Html2Vrc.Tests
             Assert.That(validation.Format(), Does.Contain("Symbolic event 'profile.saveName'"));
             Assert.That(validation.Format(), Does.Contain("Symbolic binding 'gallery.offset'"));
 
+            var normalized = UdomValidator.Validate(UdomJsonWriter.Write(validation.Document));
+            Assert.That(normalized.IsValid, Is.True, normalized.Format());
+            var normalizedToggle = normalized.Document.root.children.Single(node => node.id == "music");
+            var normalizedSlider = normalized.Document.root.children.Single(node => node.id == "volume");
+            var normalizedInput = normalized.Document.root.children.Single(node => node.id == "profile-name");
+            var normalizedScroll = normalized.Document.root.children.Single(node => node.id == "gallery");
+            Assert.That(normalizedToggle.toggleValue, Is.False);
+            Assert.That(normalizedToggle.interactable, Is.True);
+            Assert.That(normalizedSlider.sliderMin, Is.Zero);
+            Assert.That(normalizedSlider.sliderMax, Is.EqualTo(100f));
+            Assert.That(normalizedSlider.sliderValue, Is.Zero);
+            Assert.That(normalizedSlider.sliderStep, Is.Zero);
+            Assert.That(normalizedSlider.interactable, Is.True);
+            Assert.That(normalizedInput.textInputValue, Is.Empty);
+            Assert.That(normalizedInput.textInputPlaceholder, Is.EqualTo("Name"));
+            Assert.That(normalizedInput.textInputMultiline, Is.False);
+            Assert.That(normalizedInput.textInputReadOnly, Is.False);
+            Assert.That(normalizedInput.interactable, Is.True);
+            Assert.That(normalizedScroll.scrollAxisExplicit, Is.True);
+            Assert.That(normalizedScroll.scrollHorizontal, Is.True);
+            Assert.That(normalizedScroll.scrollVertical, Is.True);
+            Assert.That(normalizedScroll.scrollInitialOffset, Is.EqualTo(new[] { 12f, 24f }));
+
             var build = UdomBuilder.GenerateOrRegenerate(validation.Document, null, sample);
             var root = build.Root;
             var toggle = UdomBuilder.FindNode(root, "music").GetComponent<Toggle>();
@@ -4381,6 +4404,235 @@ Second   line&#32;&#32;</p>
                 html.Replace("font-size: 50%", "font-size: 0"));
             Assert.That(invalidInlineSize.IsValid, Is.False);
             Assert.That(invalidInlineSize.Format(), Does.Contain("font-size"));
+        }
+
+        [Test]
+        public void HtmlConverter_FormControlsUseNativeUnityControlsAndStableRegeneration()
+        {
+            const string html = @"
+              <main id=""html-form-root"" data-canvas-size=""760 520""
+                style=""width: 760px; height: 520px; display: flex; flex-direction: column; align-items: flex-start; padding: 20px; gap: 12px"">
+                <input id=""html-form-enabled"" type=""checkbox"" checked=""false"" disabled=""false""
+                  aria-label=""Enabled"" style=""width: 88px; height: 48px; background-color: #334455FF"">
+                <input id=""html-form-level"" type=""range"" min=""-2"" max=""8"" value=""4"" step=""1""
+                  style=""width: 340px; height: 40px"">
+                <input id=""html-form-continuous"" type=""range"" min=""0.5"" max=""2.5"" value=""1.25"" step=""any""
+                  style=""width: 340px; height: 40px"">
+                <input id=""html-form-name"" type=""text"" value=""Nupamo &amp; Co""
+                  placeholder=""Display name"" readonly style=""width: 420px; height: 56px; font-size: 22px; color: #AABBCCFF"">
+                <textarea id=""html-form-notes"" placeholder=""Notes""
+                  style=""width: 420px; height: 112px; font-size: 20px"">
+Line 1&#10;Line 2</textarea>
+                <button id=""html-form-submit"" data-action=""ClosePanel"" disabled
+                  style=""width: 240px; height: 64px"">Submit</button>
+              </main>";
+
+            var conversion = HtmlToUdomConverter.Convert(html);
+
+            Assert.That(conversion.IsValid, Is.True, conversion.Format());
+            var enabledNode = conversion.Document.root.children[0];
+            var levelNode = conversion.Document.root.children[1];
+            var continuousNode = conversion.Document.root.children[2];
+            var nameNode = conversion.Document.root.children[3];
+            var notesNode = conversion.Document.root.children[4];
+            var submitNode = conversion.Document.root.children[5];
+            Assert.That(enabledNode.type, Is.EqualTo("Toggle"));
+            Assert.That(enabledNode.toggleValue, Is.True);
+            Assert.That(enabledNode.interactable, Is.False);
+            Assert.That(enabledNode.name, Is.EqualTo("Enabled"));
+            Assert.That(levelNode.type, Is.EqualTo("Slider"));
+            Assert.That(levelNode.sliderMin, Is.EqualTo(-2f));
+            Assert.That(levelNode.sliderMax, Is.EqualTo(8f));
+            Assert.That(levelNode.sliderValue, Is.EqualTo(4f));
+            Assert.That(levelNode.sliderStep, Is.EqualTo(1f));
+            Assert.That(continuousNode.sliderMin, Is.EqualTo(0.5f));
+            Assert.That(continuousNode.sliderMax, Is.EqualTo(2.5f));
+            Assert.That(continuousNode.sliderValue, Is.EqualTo(1.25f));
+            Assert.That(continuousNode.sliderStep, Is.Zero);
+            Assert.That(nameNode.type, Is.EqualTo("TextInput"));
+            Assert.That(nameNode.textInputValue, Is.EqualTo("Nupamo & Co"));
+            Assert.That(nameNode.textInputPlaceholder, Is.EqualTo("Display name"));
+            Assert.That(nameNode.textInputMultiline, Is.False);
+            Assert.That(nameNode.textInputReadOnly, Is.True);
+            Assert.That(nameNode.interactable, Is.True);
+            Assert.That(notesNode.type, Is.EqualTo("TextInput"));
+            Assert.That(notesNode.textInputValue, Is.EqualTo("Line 1\nLine 2"));
+            Assert.That(notesNode.textInputPlaceholder, Is.EqualTo("Notes"));
+            Assert.That(notesNode.textInputMultiline, Is.True);
+            Assert.That(notesNode.textInputReadOnly, Is.False);
+            Assert.That(submitNode.type, Is.EqualTo("Button"));
+            Assert.That(submitNode.interactable, Is.False);
+
+            var normalized = UdomValidator.Validate(conversion.Json);
+            Assert.That(normalized.IsValid, Is.True, normalized.Format());
+            Assert.That(normalized.Document.root.children[0].toggleValue, Is.True);
+            Assert.That(normalized.Document.root.children[1].sliderValue, Is.EqualTo(4f));
+            Assert.That(normalized.Document.root.children[3].textInputValue, Is.EqualTo("Nupamo & Co"));
+            Assert.That(normalized.Document.root.children[4].textInputValue, Is.EqualTo("Line 1\nLine 2"));
+            Assert.That(normalized.Document.root.children[5].interactable, Is.False);
+
+            var build = UdomBuilder.GenerateOrRegenerate(normalized.Document);
+            var root = build.Root;
+            var enabled = UdomBuilder.FindNode(root, "html-form-enabled").GetComponent<Toggle>();
+            var level = UdomBuilder.FindNode(root, "html-form-level").GetComponent<Slider>();
+            var continuous = UdomBuilder.FindNode(root, "html-form-continuous").GetComponent<Slider>();
+            var name = UdomBuilder.FindNode(root, "html-form-name").GetComponent<TMP_InputField>();
+            var notes = UdomBuilder.FindNode(root, "html-form-notes").GetComponent<TMP_InputField>();
+            var submit = UdomBuilder.FindNode(root, "html-form-submit").GetComponent<Button>();
+            var originalEnabled = enabled.gameObject;
+            var originalLevel = level.gameObject;
+            var originalContinuous = continuous.gameObject;
+            var originalName = name.gameObject;
+            var originalNotes = notes.gameObject;
+            var originalSubmit = submit.gameObject;
+            var originalCheckmark = UdomBuilder.FindNode(root, "html-form-enabled::__toggle-checkmark");
+            var originalLevelFill = UdomBuilder.FindNode(root, "html-form-level::__slider-fill");
+            var originalLevelHandle = UdomBuilder.FindNode(root, "html-form-level::__slider-handle");
+            Assert.That(enabled.isOn, Is.True);
+            Assert.That(enabled.interactable, Is.False);
+            Assert.That(enabled.targetGraphic.color, Is.EqualTo((Color)new Color32(0x33, 0x44, 0x55, 0xFF)).Using(ColorComparer.Instance));
+            Assert.That(level.minValue, Is.EqualTo(-2f));
+            Assert.That(level.maxValue, Is.EqualTo(8f));
+            Assert.That(level.value, Is.EqualTo(4f));
+            Assert.That(level.wholeNumbers, Is.True);
+            level.value = 5.4f;
+            Assert.That(level.value, Is.EqualTo(5f));
+            Assert.That(continuous.minValue, Is.EqualTo(0.5f));
+            Assert.That(continuous.maxValue, Is.EqualTo(2.5f));
+            Assert.That(continuous.value, Is.EqualTo(1.25f));
+            Assert.That(continuous.wholeNumbers, Is.False);
+            continuous.value = 1.75f;
+            Assert.That(continuous.value, Is.EqualTo(1.75f).Within(0.0001f));
+            Assert.That(name.text, Is.EqualTo("Nupamo & Co"));
+            Assert.That(name.placeholder.GetComponent<TextMeshProUGUI>().text, Is.EqualTo("Display name"));
+            Assert.That(name.lineType, Is.EqualTo(TMP_InputField.LineType.SingleLine));
+            Assert.That(name.readOnly, Is.True);
+            Assert.That(name.interactable, Is.True);
+            Assert.That(name.textComponent.fontSize, Is.EqualTo(22f));
+            Assert.That(
+                name.textComponent.color,
+                Is.EqualTo((Color)new Color32(0xAA, 0xBB, 0xCC, 0xFF)).Using(ColorComparer.Instance));
+            Assert.That(notes.text, Is.EqualTo("Line 1\nLine 2"));
+            Assert.That(notes.lineType, Is.EqualTo(TMP_InputField.LineType.MultiLineNewline));
+            Assert.That(notes.readOnly, Is.False);
+            Assert.That(submit.interactable, Is.False);
+
+            const string updatedHtml = @"
+              <main id=""html-form-root"" data-canvas-size=""760 520""
+                style=""width: 760px; height: 520px; display: flex; flex-direction: column; align-items: flex-start; padding: 20px; gap: 12px"">
+                <input id=""html-form-enabled"" type=""checkbox"" aria-label=""Enabled""
+                  style=""width: 88px; height: 48px; background-color: #556677FF"">
+                <input id=""html-form-level"" type=""range"" min=""0"" max=""20"" value=""10"" step=""any""
+                  style=""width: 340px; height: 40px"">
+                <input id=""html-form-continuous"" type=""text"" value=""Converted"" placeholder=""Now text""
+                  style=""width: 340px; height: 56px"">
+                <input id=""html-form-name"" value=""Updated"" placeholder=""Display name"" disabled
+                  style=""width: 420px; height: 56px; font-size: 22px; color: #AABBCCFF"">
+                <textarea id=""html-form-notes"" placeholder=""Updated notes""
+                  style=""width: 420px; height: 112px; font-size: 20px"">Changed</textarea>
+                <button id=""html-form-submit"" data-action=""ClosePanel""
+                  style=""width: 240px; height: 64px"">Submit</button>
+              </main>";
+            var updated = HtmlToUdomConverter.Convert(updatedHtml);
+            Assert.That(updated.IsValid, Is.True, updated.Format());
+            UdomBuilder.GenerateOrRegenerate(updated.Document, root);
+            enabled = UdomBuilder.FindNode(root, "html-form-enabled").GetComponent<Toggle>();
+            level = UdomBuilder.FindNode(root, "html-form-level").GetComponent<Slider>();
+            name = UdomBuilder.FindNode(root, "html-form-name").GetComponent<TMP_InputField>();
+            notes = UdomBuilder.FindNode(root, "html-form-notes").GetComponent<TMP_InputField>();
+            submit = UdomBuilder.FindNode(root, "html-form-submit").GetComponent<Button>();
+            var converted = UdomBuilder.FindNode(root, "html-form-continuous").GetComponent<TMP_InputField>();
+            Assert.That(enabled.gameObject, Is.SameAs(originalEnabled));
+            Assert.That(level.gameObject, Is.SameAs(originalLevel));
+            Assert.That(converted.gameObject, Is.SameAs(originalContinuous));
+            Assert.That(name.gameObject, Is.SameAs(originalName));
+            Assert.That(notes.gameObject, Is.SameAs(originalNotes));
+            Assert.That(submit.gameObject, Is.SameAs(originalSubmit));
+            Assert.That(UdomBuilder.FindNode(root, "html-form-enabled::__toggle-checkmark"), Is.SameAs(originalCheckmark));
+            Assert.That(UdomBuilder.FindNode(root, "html-form-level::__slider-fill"), Is.SameAs(originalLevelFill));
+            Assert.That(UdomBuilder.FindNode(root, "html-form-level::__slider-handle"), Is.SameAs(originalLevelHandle));
+            Assert.That(enabled.isOn, Is.False);
+            Assert.That(enabled.interactable, Is.True);
+            Assert.That(level.minValue, Is.Zero);
+            Assert.That(level.maxValue, Is.EqualTo(20f));
+            Assert.That(level.value, Is.EqualTo(10f));
+            Assert.That(level.wholeNumbers, Is.False);
+            Assert.That(converted.text, Is.EqualTo("Converted"));
+            Assert.That(converted.placeholder.GetComponent<TextMeshProUGUI>().text, Is.EqualTo("Now text"));
+            Assert.That(converted.gameObject.GetComponent<Slider>(), Is.Null);
+            Assert.That(UdomBuilder.FindNode(root, "html-form-continuous::__slider-fill"), Is.Null);
+            Assert.That(UdomBuilder.FindNode(root, "html-form-continuous::__slider-handle"), Is.Null);
+            Assert.That(name.text, Is.EqualTo("Updated"));
+            Assert.That(name.readOnly, Is.False);
+            Assert.That(name.interactable, Is.False);
+            Assert.That(notes.text, Is.EqualTo("Changed"));
+            Assert.That(notes.placeholder.GetComponent<TextMeshProUGUI>().text, Is.EqualTo("Updated notes"));
+            Assert.That(submit.interactable, Is.True);
+            Object.DestroyImmediate(root.gameObject);
+
+            var defaultText = HtmlToUdomConverter.Convert(
+                "<input id=\"default-text-input\" value=\"Default\">");
+            Assert.That(defaultText.IsValid, Is.True, defaultText.Format());
+            Assert.That(defaultText.Document.root.type, Is.EqualTo("TextInput"));
+            Assert.That(defaultText.Document.root.textInputValue, Is.EqualTo("Default"));
+
+            var defaultRange = HtmlToUdomConverter.Convert(
+                "<input id=\"default-range-input\" type=\"range\">");
+            Assert.That(defaultRange.IsValid, Is.True, defaultRange.Format());
+            Assert.That(defaultRange.Document.root.sliderMin, Is.Zero);
+            Assert.That(defaultRange.Document.root.sliderMax, Is.EqualTo(100f));
+            Assert.That(defaultRange.Document.root.sliderValue, Is.EqualTo(50f));
+            Assert.That(defaultRange.Document.root.sliderStep, Is.EqualTo(1f));
+
+            var unsupportedType = HtmlToUdomConverter.Convert(
+                "<input id=\"unsupported-input\" type=\"number\">");
+            Assert.That(unsupportedType.IsValid, Is.False);
+            Assert.That(unsupportedType.Format(), Does.Contain("input type"));
+
+            var unsupportedStep = HtmlToUdomConverter.Convert(
+                "<input id=\"unsupported-step\" type=\"range\" min=\"0\" max=\"10\" value=\"5\" step=\"0.5\">");
+            Assert.That(unsupportedStep.IsValid, Is.False);
+            Assert.That(unsupportedStep.Format(), Does.Contain("step"));
+
+            var fractionalStepRange = HtmlToUdomConverter.Convert(
+                "<input id=\"fractional-step\" type=\"range\" min=\"0.5\" max=\"2.5\" step=\"1\">");
+            Assert.That(fractionalStepRange.IsValid, Is.False);
+            Assert.That(fractionalStepRange.Format(), Does.Contain("정수"));
+
+            var invalidRange = HtmlToUdomConverter.Convert(
+                "<input id=\"invalid-range\" type=\"range\" min=\"10\" max=\"5\" value=\"7\">");
+            Assert.That(invalidRange.IsValid, Is.False);
+            Assert.That(invalidRange.Format(), Does.Contain("max"));
+
+            var outOfRange = HtmlToUdomConverter.Convert(
+                "<input id=\"out-of-range\" type=\"range\" min=\"0\" max=\"10\" value=\"11\">");
+            Assert.That(outOfRange.IsValid, Is.False);
+            Assert.That(outOfRange.Format(), Does.Contain("value"));
+
+            var offStep = HtmlToUdomConverter.Convert(
+                "<input id=\"off-step\" type=\"range\" min=\"0\" max=\"10\" value=\"1.5\">");
+            Assert.That(offStep.IsValid, Is.False);
+            Assert.That(offStep.Format(), Does.Contain("정수 단계"));
+
+            var nonFiniteRange = HtmlToUdomConverter.Convert(
+                "<input id=\"non-finite-range\" type=\"range\" min=\"NaN\" max=\"10\">");
+            Assert.That(nonFiniteRange.IsValid, Is.False);
+            Assert.That(nonFiniteRange.Format(), Does.Contain("유한한 숫자"));
+
+            var unsupportedAttribute = HtmlToUdomConverter.Convert(
+                "<input id=\"required-input\" type=\"text\" required>");
+            Assert.That(unsupportedAttribute.IsValid, Is.False);
+            Assert.That(unsupportedAttribute.Format(), Does.Contain("required"));
+
+            var checkboxValue = HtmlToUdomConverter.Convert(
+                "<input id=\"checkbox-value\" type=\"checkbox\" value=\"yes\">");
+            Assert.That(checkboxValue.IsValid, Is.False);
+            Assert.That(checkboxValue.Format(), Does.Contain("value"));
+
+            var nestedTextarea = HtmlToUdomConverter.Convert(
+                "<textarea id=\"nested-textarea\"><strong>bad</strong></textarea>");
+            Assert.That(nestedTextarea.IsValid, Is.False);
+            Assert.That(nestedTextarea.Format(), Does.Contain("텍스트만"));
         }
 
         [Test]

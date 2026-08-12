@@ -22,6 +22,8 @@ Unity Importer는 이 문서의 기존 형식과 함께 `packages/udom` JSON Sch
 
 Canonical 길이의 숫자와 부모 크기 기준 백분율, 기본 flex 방향과 간격, cross-axis 정렬, padding/margin, 단일 색상과 선형 gradient 배경, 기본 텍스트 스타일과 font weight를 변환한다. `styleRefs`는 배열 순서대로 깊은 병합한 뒤 노드의 inline `style`로 마지막 덮어쓴다. canonical `image` resource는 Texture2D/RawImage, `sprite` resource는 Sprite/Image로 생성한다.
 
+내부 JSON writer/parser는 interactive 상태를 손실 없이 왕복한다. Button·Toggle·Slider·TextInput의 `interactable`, Toggle 값, Slider value/min/max/step, TextInput value/placeholder/multiline/readOnly와 Scroll 축·초기 offset을 node type별로 직렬화한다. 따라서 canonical adapter, HTML converter와 저장된 내부 JSON이 같은 native control 생성 결과를 낸다.
+
 Canonical flex의 `row-reverse`, `column-reverse`와 정수 `flexItem.order`는 source children 배열을 바꾸지 않고 내부 `reverseChildren`, `flexOrder`로 보존한다. Unity 생성 시에만 `(order, 원본 자식 인덱스)`로 안정 정렬한 뒤 reverse main axis를 적용하므로 같은 order는 트리 순서를 유지한다. 실제 형제는 직접 노드 또는 margin·transform·shadow layout wrapper 단위로 재배치되며 안정 ID와 GameObject를 재생성 사이에 유지한다.
 
 Canonical flex의 `justify` 여섯 값은 내부 `justifyContent`와 main-axis를 포함한 `childAlignment`로 보존한다. `start`, `center`, `end`는 고정 gap을 유지한 채 물리 anchor를 선택한다. `space-between`은 남은 공간을 자식 사이에, `space-around`는 자식 수로, `space-evenly`는 자식 수+1로 나누어 기존 gap에 더한다. Around/evenly는 center anchor가 양끝의 절반 gap 또는 한 gap을 만들도록 하므로 별도 spacer GameObject가 필요 없다. Reverse 방향에서는 main-start와 main-end의 물리 anchor를 뒤집고 기존 안정 형제 재배치 규칙을 그대로 사용한다. Grow가 남은 공간을 모두 소비하거나 overflow가 있으면 분배 gap을 추가하지 않는다.
@@ -82,6 +84,8 @@ Canonical text는 `lineHeight`, `letterSpacing`, `align: justify`, `verticalAlig
 
 제한형 HTML의 `font-weight` normal·bold·1~1000 정수, `font-style` normal·italic, `line-height` normal·unitless·percentage·px, `letter-spacing` normal·signed px, `white-space` normal·nowrap·pre·pre-wrap·pre-line, `text-overflow` clip·ellipsis와 `text-align` start·end·justify를 위 내부 필드로 정규화한다. Weight 600 이상은 Bold이고 italic과 결합하면 validator와 TMP builder가 공유하는 `BoldItalic`이 된다. `<strong>/<b>`, `<em>/<i>`, `<small>`, `<span>`은 중첩할 수 있고, inline `color`, `font-size`, `font-weight`, `font-style`을 semantic 기본값 뒤에 상속·override한다. Converter가 만든 run은 각 구간의 최종 `fontStyle`, 선택적 strict-hex `textColor`, 부모 기준 `fontScale`을 기록한다. 모든 run에 effective fontStyle이 있으면 Builder는 Text의 전역 style을 Normal로 두어 자식의 `normal`도 부모 Bold/Italic을 정확히 끌 수 있다. `fontStyle`이 전혀 없는 이전 run은 additive `bold`·`italic`과 부모 style을 계속 합성한다. Run 평문 합계는 노드 `text`와 일치해야 한다. Builder는 run이 있을 때만 검증된 태그를 만들고 모든 run 평문을 TMP no-parse 구간으로 분리하며, strict hex가 아닌 run color도 태그로 만들지 않으므로 HTML entity나 직접 모델 입력으로 만든 임의 TMP 태그는 실행되지 않는다. Canonical UDOM 0.1에는 rich text 표현이 없으므로 canonical text adapter는 `textRuns`를 만들지 않고 TMP rich text도 끈다. Line-height 상대값은 inline source-order와 무관하게 최종 font size에서 계산하고, direction을 지원하지 않는 subset의 start·end는 LTR left·right로 고정한다. Converter의 ordered mixed-content 목록은 인라인 태그 사이 텍스트와 `<br>` 위치를 보존하며, white-space 모드에 따라 원문 보존·줄별 축약·일반 축약을 선택한다. Button과 `li`의 안정 파생 Text에도 부모 font style·text-flow와 run을 복사하고, 스타일 기본값으로 돌아가도 같은 GameObject를 재사용한다.
 
+제한형 HTML의 checkbox/range/text input과 textarea는 각각 내부 Toggle/Slider/TextInput 필드로 정규화한다. HTML boolean attribute는 존재 여부로 checked·readOnly·disabled를 결정하고, range 기본값은 0~100·중간값·step 1이다. Unity Slider가 그대로 강제할 수 있는 정수 step 1 또는 연속 `any`만 허용하며 다른 step은 조용히 근사하지 않는다. Text input attribute와 textarea plain-text 초기값은 entity decoding 및 줄바꿈 정규화 뒤 빈 문자열까지 보존한다. Button도 disabled를 `interactable`로 보존한다. 같은 안정 ID에서 control type이 바뀌면 생성기는 GameObject를 재사용하면서 이전 managed component와 내부 checkmark/fill/handle/input subtree를 정리한다.
+
 Canonical font resource URI가 기존 `.asset` TMP Font Asset을 가리키면 이를 Text와 TextInput의 text·placeholder에 직접 연결한다. `.ttf` 또는 `.otf` Unity Font를 가리키면 source GUID와 이름으로 `Assets/Html2VrcGenerated/Fonts` 아래의 dynamic TMP Font Asset을 한 번 생성해 문서와 노드 사이에서 공유한다. 동일 source는 재생성해도 같은 asset GUID를 유지한다. 누락되었거나 지원하지 않는 font 형식은 명시적 경고와 함께 TMP Settings의 기본 font로 폴백하며, 생성된 custom font가 기본 후보로 선택되지는 않는다.
 
 Resource URI는 canonical 명세대로 UDOM TextAsset이 있는 폴더를 기준으로 해석한다. `Assets/`로 시작하는 절대 Unity 에셋 경로도 지원한다. `..`로 정규화하더라도 결과가 `Assets/` 밖으로 나가면 참조하지 않고 경고를 남긴다.
@@ -130,6 +134,12 @@ Resource URI는 canonical 명세대로 UDOM TextAsset이 있는 폴더를 기준
 | `name` | Unity Hierarchy 표시 이름 |
 | `text` | Text 노드의 내용 |
 | `textRuns` | HTML 입력용 선택적 구조화 run 배열. 새 run은 `text`, effective `fontStyle`, 선택적 strict-hex `textColor`, 0 초과 100 이하 `fontScale`을 가지며 합친 평문은 `text`와 같아야 함. `fontStyle` 없는 기존 additive `bold`·`italic` run도 호환 |
+| `interactable` | Button, Toggle, Slider, TextInput의 입력 가능 상태 |
+| `toggleValue` | Toggle의 체크 상태 |
+| `sliderValue`, `sliderMin`, `sliderMax`, `sliderStep` | Slider의 현재 값, 범위와 단계. step 0은 연속 값 |
+| `textInputValue`, `textInputPlaceholder` | TextInput의 현재 텍스트와 placeholder. 빈 문자열도 보존 |
+| `textInputMultiline`, `textInputReadOnly` | TextInput의 여러 줄·읽기 전용 상태 |
+| `scrollAxisExplicit`, `scrollHorizontal`, `scrollVertical`, `scrollInitialOffset` | ScrollView의 명시적 축과 `[x, y]` 초기 design-unit offset |
 | `sprite` | `Assets/`로 시작하는 Sprite 에셋 경로 |
 | `texture` | `Assets/`로 시작하는 Texture2D 에셋 경로 |
 | `imageFit` | Image의 `fill`, `contain`, `cover`, `none` 배치 방식 |

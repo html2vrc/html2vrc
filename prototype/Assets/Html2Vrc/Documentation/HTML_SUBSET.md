@@ -10,12 +10,26 @@
 | `h1`, `h2`, `h3`, `p`, `span` | `Text` |
 | `img` | `Image` |
 | `button` | `Button` |
+| `input type="checkbox"` | `Toggle` |
+| `input type="range"` | `Slider` |
+| `input type="text"` 또는 type 생략 | `TextInput` / `TMP_InputField` |
+| `textarea` | multiline `TextInput` / `TMP_InputField` |
 | `ul`, `ol` | 세로 `Panel` |
 | `ul data-scroll="true"` | `ScrollView` |
 | `li` | 배경을 가진 `Panel`과 Text |
 | `embed` 또는 `data-embed-slot` | `Embed` |
 
 모든 UI 요소에는 `id`가 필요하다. 이 값이 UDOM 안정 ID가 되므로 HTML을 수정하고 다시 생성해도 같은 Unity GameObject를 갱신할 수 있다. Button과 `li`의 내부 Text에는 `{id}-label`이라는 결정적인 ID가 붙는다.
+
+## 폼 컨트롤
+
+- `button`: 기존 `data-action`, `data-target-slot`과 `disabled`를 지원한다.
+- `input type="checkbox"`: `checked`, `disabled`를 지원한다.
+- `input type="range"`: 유한한 숫자 `min`, `max`, `value`, `step`과 `disabled`를 지원한다. 기본값은 `0`, `100`, 중간값, `1`이다. Native Slider가 정확히 보존할 수 있도록 step은 정수 min/max/value의 `1` 또는 연속 값의 `any`만 허용한다.
+- `input type="text"`: `value`, `placeholder`, `readonly`, `disabled`를 지원한다. `type`을 생략해도 text다.
+- `textarea`: 요소 안의 plain text를 초기값으로 사용하고 `placeholder`, `readonly`, `disabled`를 지원한다. 여는 태그 바로 다음의 첫 줄바꿈은 HTML 규칙대로 제거한다.
+
+`checked`, `readonly`, `disabled`는 HTML boolean attribute이므로 `disabled="false"`처럼 써도 속성이 존재하면 true다. 지원 목록 밖의 input type, form attribute, textarea 내부 요소는 무시하지 않고 오류로 반환한다. 컨트롤 type이 바뀌어도 같은 `id`의 Unity GameObject를 재사용하고, 이전 type의 생성 컴포넌트와 내부 자식만 교체한다.
 
 ## 문서와 Canvas 설정
 

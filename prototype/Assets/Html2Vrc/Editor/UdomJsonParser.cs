@@ -115,6 +115,88 @@ namespace Html2Vrc.Editor
                     path + ".imageIntrinsicSize");
             }
 
+            if (value.TryGetValue("interactable", out var interactable))
+            {
+                node.interactable = GetBoolean(interactable, path + ".interactable");
+            }
+
+            if (value.TryGetValue("toggleValue", out var toggleValue))
+            {
+                node.toggleValue = GetBoolean(toggleValue, path + ".toggleValue");
+            }
+
+            if (value.TryGetValue("sliderValue", out var sliderValue))
+            {
+                node.sliderValue = GetFloat(sliderValue, path + ".sliderValue");
+            }
+
+            if (value.TryGetValue("sliderMin", out var sliderMin))
+            {
+                node.sliderMin = GetFloat(sliderMin, path + ".sliderMin");
+            }
+
+            if (value.TryGetValue("sliderMax", out var sliderMax))
+            {
+                node.sliderMax = GetFloat(sliderMax, path + ".sliderMax");
+            }
+
+            if (value.TryGetValue("sliderStep", out var sliderStep))
+            {
+                node.sliderStep = GetFloat(sliderStep, path + ".sliderStep");
+            }
+
+            if (value.TryGetValue("textInputValue", out _))
+            {
+                node.textInputValue = GetString(value, "textInputValue");
+            }
+
+            if (value.TryGetValue("textInputPlaceholder", out _))
+            {
+                node.textInputPlaceholder = GetString(value, "textInputPlaceholder");
+            }
+
+            if (value.TryGetValue("textInputMultiline", out var textInputMultiline))
+            {
+                node.textInputMultiline = GetBoolean(
+                    textInputMultiline,
+                    path + ".textInputMultiline");
+            }
+
+            if (value.TryGetValue("textInputReadOnly", out var textInputReadOnly))
+            {
+                node.textInputReadOnly = GetBoolean(
+                    textInputReadOnly,
+                    path + ".textInputReadOnly");
+            }
+
+            if (value.TryGetValue("scrollAxisExplicit", out var scrollAxisExplicit))
+            {
+                node.scrollAxisExplicit = GetBoolean(
+                    scrollAxisExplicit,
+                    path + ".scrollAxisExplicit");
+            }
+
+            if (value.TryGetValue("scrollHorizontal", out var scrollHorizontal))
+            {
+                node.scrollHorizontal = GetBoolean(
+                    scrollHorizontal,
+                    path + ".scrollHorizontal");
+            }
+
+            if (value.TryGetValue("scrollVertical", out var scrollVertical))
+            {
+                node.scrollVertical = GetBoolean(
+                    scrollVertical,
+                    path + ".scrollVertical");
+            }
+
+            if (value.TryGetValue("scrollInitialOffset", out var scrollInitialOffset))
+            {
+                node.scrollInitialOffset = GetFloatArray(
+                    scrollInitialOffset,
+                    path + ".scrollInitialOffset");
+            }
+
             if (value.TryGetValue("style", out var styleValue))
             {
                 node.style = MapStyle(RequireObject(styleValue, path + ".style"), path + ".style");
