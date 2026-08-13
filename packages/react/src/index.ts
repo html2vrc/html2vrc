@@ -10,6 +10,7 @@ export {
   View
 } from "./primitives.js";
 export { renderToUDOM, UdomRenderError } from "./renderer.js";
+export { renderPreviewToHTML, UdomPreviewError } from "./preview.js";
 export type {
   ButtonProps,
   CommonPrimitiveProps,
@@ -40,3 +41,4 @@ export type {
   UdomViewport,
   ViewProps
 } from "./types.js";
+export type { UdomPreviewOptions } from "./preview.js";

@@ -1,19 +1,32 @@
 {
   "name": "@html2vrc/react",
   "version": "0.1.0",
-  "description": "Static React primitives and exporter for UDOM",
+  "description": "React primitives, UDOM exporter, and browser preview for HTML2VRC",
   "type": "module",
   "files": [
+    "bin",
     "dist"
   ],
+  "bin": {
+    "udom-preview": "bin/udom-preview.mjs"
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./preview": {
+      "types": "./dist/preview.d.ts",
+      "import": "./dist/preview.js"
+    },
+    "./preview-server": {
+      "types": "./dist/preview-server.d.ts",
+      "import": "./dist/preview-server.js"
     }
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
+    "preview": "npm run build && node ./bin/udom-preview.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "node --import tsx --test test/*.test.tsx",
     "check": "npm run typecheck && npm test && npm run build",

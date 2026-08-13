@@ -94,6 +94,8 @@ UDOM 안에는 임의의 JavaScript를 저장하지 않습니다. 웹 로직은 
 
 Unity Importer는 `packages/udom`의 canonical UDOM 0.1과 기존 Unity 프로토타입 JSON 프로필을 모두 자동 감지합니다. `@html2vrc/react`의 기본·컨트롤 fixture와 공식 UDOM settings fixture는 별도 변환 스크립트 없이 동일한 Unity 생성 경로로 들어갑니다. React exporter와 Unity importer 모두 view, text, image, button, toggle, slider, text-input, scroll과 embed를 연결했습니다. 지원하지 않는 canonical 표현은 묵시하지 않고 검증 오류나 손실 내용이 들어 있는 안전한 폴백 경고로 반환합니다.
 
+`@html2vrc/react`는 같은 canonical UDOM을 결정적인 독립형 HTML로 렌더링합니다. 로컬 preview CLI는 UDOM 파일과 상대 asset을 제공하고 둘 중 하나가 바뀌면 브라우저를 자동으로 새로고침합니다. Binding과 event ID는 미리보기에서 실행하지 않고 진단용 metadata로만 노출합니다. React state를 보존하는 source HMR은 다음 단계입니다.
+
 Canonical resource URI는 UDOM TextAsset 폴더를 기준으로 안전하게 해석합니다. image resource는 Texture2D/RawImage, sprite resource는 Sprite/Image로 매핑하며, 정규화된 경로가 Unity `Assets/` 밖으로 나가면 참조를 거부합니다.
 
 Canonical scroll은 `vertical`, `horizontal`, `both` 축을 native ScrollRect로 생성하고, 왼쪽 위 기준 design-unit `initialOffset`을 Unity 콘텐츠 좌표로 변환합니다.
@@ -198,7 +200,7 @@ HTML2VRC의 명세, 저작 도구와 Unity 프로토타입은 한 저장소에�
 | 경로 | 역할 |
 | --- | --- |
 | [`packages/udom`](packages/udom) | UDOM 0.1 명세, JSON Schema, fixture와 reference validator |
-| [`packages/react`](packages/react) | 제한된 React primitive와 정적 React-to-UDOM exporter |
+| [`packages/react`](packages/react) | 제한된 React primitive, React-to-UDOM exporter와 브라우저 preview CLI |
 | [`packages/renderer`](packages/renderer) | 결정론적 UDOM-to-Unity renderer 설계 문서 |
 | [`prototype`](prototype) | Unity 및 VRChat 수직 프로토타입 |
 
