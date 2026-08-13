@@ -64,7 +64,7 @@
 
 자동 검증 결과:
 
-- `npm run check`: UDOM conformance 39/39, React 5/5, TypeScript typecheck와 build 통과
+- `npm run check`: UDOM conformance 39/39, React 16/16, TypeScript typecheck와 build 통과
 - Unity EditMode `Html2Vrc.Tests.UdomPrototypeTests`: **59/59 통과, 실패 0**
 - Unity 종료 코드 0, C# 컴파일 오류 0
 - Windows CRLF에서 기존 HTML 재생성 테스트가 문자열을 교체하지 못하던 문제도 함께 수정했다.

@@ -333,6 +333,7 @@ VRChat용 로컬 월드 번들을 만들려면 `Tools > HTML2VRC > VRChat > Buil
 
 ### 문서와 코드
 
+- 프로젝트 마감 보고서: `PROJECT_CLOSEOUT_REPORT.md`
 - 최소 규격: `Assets/Html2Vrc/Documentation/UDOM_SPEC.md`
 - HTML 입력 범위: `Assets/Html2Vrc/Documentation/HTML_SUBSET.md`
 - 샘플 HTML: `Assets/Html2Vrc/Samples/WorldSettings.html`
