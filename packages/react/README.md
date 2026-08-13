@@ -29,6 +29,7 @@
 - UDOM conformance 자동 검증
 - canonical UDOM 브라우저 미리보기
 - UDOM 문서와 상대 asset 변경 시 live reload
+- default-export UDOM을 만드는 JS·TS·JSX·TSX source live reload
 
 아직 지원하지 않음:
 
@@ -42,6 +43,7 @@
 ## 사용
 
 ```tsx
+import * as React from "react";
 import {
   Button,
   Image,
@@ -114,15 +116,44 @@ npm run preview -- ./path/to/screen.udom.json
 npm run preview -- ./path/to/screen.udom.json --port 5173 --title "Settings"
 ```
 
-기본 주소는 `http://127.0.0.1:4173/`이다. 외부 접근을 의도한 경우에만 `--host`를 지정한다. CLI는 UDOM과 asset live reload를 제공하지만 React component를 다시 실행하거나 component state를 보존하는 HMR은 아직 제공하지 않는다.
+React source를 직접 미리 보려면 module이 canonical UDOM을 default export하면 된다. `.js`, `.jsx`, `.ts`, `.tsx`를 지원하며 같은 폴더 아래의 import dependency가 바뀌어도 격리된 새 프로세스에서 module을 다시 실행한다.
+
+```tsx
+import * as React from "react";
+import {
+  Text,
+  View,
+  renderToUDOM
+} from "@html2vrc/react";
+
+export default renderToUDOM(
+  <View id="screen">
+    <Text id="title">Hello VRChat</Text>
+  </View>,
+  { viewport: { width: 1200, height: 720 } }
+);
+```
+
+```bash
+npm run preview -- ./screen.tsx
+```
+
+기본 주소는 `http://127.0.0.1:4173/`이다. 외부 접근을 의도한 경우에만 `--host`를 지정한다. source 평가는 기본 10초 뒤 중단되며 `--source-timeout`으로 조정할 수 있다. JS·TS module은 로컬 코드를 실제로 실행하므로 신뢰하는 source만 연다. 컴파일이나 UDOM 검증이 실패하면 오류 화면을 유지하고 다음 저장 때 자동 복구한다.
+
+이 흐름은 source와 dependency를 다시 실행하는 live reload다. React component state를 보존하는 HMR, 임의의 function component와 Hook 지원은 아직 제공하지 않는다.
 
 서버를 다른 도구 안에서 제어하려면 Node 전용 subpath를 사용한다.
 
 ```ts
-import { startPreviewServer } from "@html2vrc/react/preview-server";
+import {
+  loadPreviewDocument,
+  startPreviewServer
+} from "@html2vrc/react/preview-server";
+
+const document = await loadPreviewDocument("./screen.tsx");
 
 const preview = await startPreviewServer({
-  file: "./screen.udom.json",
+  file: "./screen.tsx",
   port: 0
 });
 console.log(preview.url);

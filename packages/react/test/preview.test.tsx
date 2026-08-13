@@ -4,11 +4,13 @@ import { get, type ClientRequest } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 import {
   UdomPreviewError,
   renderPreviewToHTML
 } from "../src/index.js";
 import {
+  loadPreviewDocument,
   previewEventsPath,
   startPreviewServer
 } from "../src/preview-server.js";
@@ -20,6 +22,7 @@ const basic = JSON.parse(
 const controls = JSON.parse(
   await readFile(new URL("./fixtures/controls.udom.json", import.meta.url), "utf8")
 ) as UdomDocument;
+const testDirectory = fileURLToPath(new URL(".", import.meta.url));
 
 test("renders canonical UDOM as deterministic standalone HTML", () => {
   const first = renderPreviewToHTML(basic, { title: "Preview <one>" });
@@ -366,6 +369,109 @@ test("serves previews and relative assets and reloads on file changes", { timeou
   } finally {
     reload?.request.destroy();
     await preview.close();
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+function sourceModule(entryUrl: string): string {
+  return `import * as React from "react";
+import { Text, View, renderToUDOM } from ${JSON.stringify(entryUrl)};
+import { label } from "./label.ts";
+
+export default renderToUDOM(
+  <View id="source-root" style={{ layout: { mode: "flex" } }}>
+    <Text id="source-label">{label}</Text>
+  </View>,
+  { viewport: { width: 640, height: 360 } }
+);
+`;
+}
+
+test("loads TSX modules that default-export canonical UDOM", { timeout: 10_000 }, async () => {
+  const directory = await mkdtemp(join(testDirectory, ".preview-source-load-"));
+  const sourceFile = join(directory, "screen.tsx");
+  const dependencyFile = join(directory, "label.ts");
+  const entryUrl = new URL("../src/index.ts", import.meta.url).href;
+  await writeFile(dependencyFile, 'export const label = "From TSX";\n', "utf8");
+  await writeFile(sourceFile, sourceModule(entryUrl), "utf8");
+
+  try {
+    const document = await loadPreviewDocument(sourceFile);
+    assert.equal(document.viewport.width, 640);
+    assert.equal(document.root.id, "source-root");
+    assert.equal(document.root.type, "element");
+    if (document.root.type === "element") {
+      assert.equal(document.root.children?.[0]?.type, "text");
+      if (document.root.children?.[0]?.type === "text") {
+        assert.equal(document.root.children[0].value, "From TSX");
+      }
+    }
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("reloads TSX dependencies and recovers from source errors", { timeout: 20_000 }, async () => {
+  const directory = await mkdtemp(join(testDirectory, ".preview-source-server-"));
+  const sourceFile = join(directory, "screen.tsx");
+  const dependencyFile = join(directory, "label.ts");
+  const entryUrl = new URL("../src/index.ts", import.meta.url).href;
+  const validSource = sourceModule(entryUrl);
+  await writeFile(dependencyFile, 'export const label = "First source";\n', "utf8");
+  await writeFile(sourceFile, validSource, "utf8");
+
+  const preview = await startPreviewServer({ file: sourceFile, port: 0 });
+  let reload: ReloadConnection | undefined;
+  try {
+    const firstPage = await fetch(preview.url);
+    assert.equal(firstPage.status, 200);
+    assert.match(await firstPage.text(), /First source/u);
+
+    reload = connectToReload(preview.url);
+    await within(reload.ready);
+    await writeFile(dependencyFile, 'export const label = "Updated dependency";\n', "utf8");
+    await within(reload.reloaded, 5_000);
+    reload.request.destroy();
+    reload = undefined;
+    const updatedPage = await fetch(preview.url);
+    assert.equal(updatedPage.status, 200);
+    assert.match(await updatedPage.text(), /Updated dependency/u);
+
+    reload = connectToReload(preview.url);
+    await within(reload.ready);
+    await writeFile(sourceFile, "export default (", "utf8");
+    await within(reload.reloaded, 5_000);
+    reload.request.destroy();
+    reload = undefined;
+    const errorPage = await fetch(preview.url);
+    assert.equal(errorPage.status, 422);
+    assert.match(await errorPage.text(), /Preview could not be rendered/u);
+
+    reload = connectToReload(preview.url);
+    await within(reload.ready);
+    await writeFile(sourceFile, validSource, "utf8");
+    await within(reload.reloaded, 5_000);
+    const recoveredPage = await fetch(preview.url);
+    assert.equal(recoveredPage.status, 200);
+    assert.match(await recoveredPage.text(), /Updated dependency/u);
+  } finally {
+    reload?.request.destroy();
+    await preview.close();
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("times out source modules that never finish", { timeout: 10_000 }, async () => {
+  const directory = await mkdtemp(join(tmpdir(), "html2vrc-source-timeout-"));
+  const sourceFile = join(directory, "blocked.ts");
+  await writeFile(sourceFile, "await new Promise(() => {});\nexport default {};\n", "utf8");
+
+  try {
+    await assert.rejects(
+      loadPreviewDocument(sourceFile, { sourceTimeoutMs: 100 }),
+      /evaluation exceeded 100ms/u
+    );
+  } finally {
     await rm(directory, { recursive: true, force: true });
   }
 });

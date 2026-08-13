@@ -1,19 +1,31 @@
+import { fork } from "node:child_process";
 import { watch, type FSWatcher } from "node:fs";
 import { readFile, realpath, stat } from "node:fs/promises";
 import { createServer, type ServerResponse } from "node:http";
 import { dirname, extname, isAbsolute, relative, resolve, sep } from "node:path";
 import type { AddressInfo } from "node:net";
+import { fileURLToPath } from "node:url";
 import { renderPreviewToHTML } from "./preview.js";
-import type { UdomDocument } from "./types.js";
+import type { UdomDocument, UdomResource } from "./types.js";
 
 const EVENTS_PATH = "/__html2vrc/events";
 const LOCAL_ASSET_ORIGIN = "http://html2vrc.local";
+const SOURCE_RUNNER = fileURLToPath(
+  new URL("../bin/render-preview-source.mjs", import.meta.url)
+);
+const TSX_LOADER = import.meta.resolve("tsx");
+const DEFAULT_SOURCE_TIMEOUT_MS = 10_000;
 
 export interface PreviewServerOptions {
   file: string;
   host?: string;
   port?: number;
+  sourceTimeoutMs?: number;
   title?: string;
+}
+
+export interface PreviewDocumentLoadOptions {
+  sourceTimeoutMs?: number;
 }
 
 export interface PreviewServer {
@@ -66,7 +78,7 @@ function errorDocument(error: unknown): string {
     error instanceof Error && "diagnostics" in error
       ? JSON.stringify(error.diagnostics, null, 2)
       : "";
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>HTML2VRC Preview Error</title><style>body{margin:0;padding:32px;background:#18181b;color:#fafafa;font:15px/1.55 ui-monospace,SFMono-Regular,Consolas,monospace}main{max-width:960px;margin:auto}h1{font:600 24px/1.2 system-ui,sans-serif;color:#fca5a5}pre{padding:16px;overflow:auto;border:1px solid #3f3f46;border-radius:8px;background:#09090b;white-space:pre-wrap}</style></head><body><main><h1>Preview could not be rendered</h1><pre>${escapeHtml(message)}${diagnostics === "" ? "" : `\n\n${escapeHtml(diagnostics)}`}</pre><p>Fix and save the UDOM file. This page will reload automatically.</p></main><script>new EventSource(${JSON.stringify(EVENTS_PATH)}).addEventListener("reload",()=>location.reload())</script></body></html>`;
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>HTML2VRC Preview Error</title><style>body{margin:0;padding:32px;background:#18181b;color:#fafafa;font:15px/1.55 ui-monospace,SFMono-Regular,Consolas,monospace}main{max-width:960px;margin:auto}h1{font:600 24px/1.2 system-ui,sans-serif;color:#fca5a5}pre{padding:16px;overflow:auto;border:1px solid #3f3f46;border-radius:8px;background:#09090b;white-space:pre-wrap}</style></head><body><main><h1>Preview could not be rendered</h1><pre>${escapeHtml(message)}${diagnostics === "" ? "" : `\n\n${escapeHtml(diagnostics)}`}</pre><p>Fix and save the preview source. This page will reload automatically.</p></main><script>new EventSource(${JSON.stringify(EVENTS_PATH)}).addEventListener("reload",()=>location.reload())</script></body></html>`;
 }
 
 function localPath(sourceDirectory: string, pathname: string): string | undefined {
@@ -93,8 +105,11 @@ function isWithin(directory: string, candidate: string): boolean {
   return pathFromDirectory !== ".." && !pathFromDirectory.startsWith(`..${sep}`) && !isAbsolute(pathFromDirectory);
 }
 
-function isDeclaredResource(document: UdomDocument, pathname: string): boolean {
-  return (document.resources ?? []).some((resource) => {
+function declaredResource(
+  document: UdomDocument,
+  pathname: string
+): UdomResource | undefined {
+  return (document.resources ?? []).find((resource) => {
     try {
       const resourceUrl = new URL(resource.uri, `${LOCAL_ASSET_ORIGIN}/`);
       return resourceUrl.origin === LOCAL_ASSET_ORIGIN && resourceUrl.pathname === pathname;
@@ -102,6 +117,118 @@ function isDeclaredResource(document: UdomDocument, pathname: string): boolean {
       return false;
     }
   });
+}
+
+interface SourceResultMessage {
+  type: "result";
+  document: UdomDocument;
+}
+
+interface SourceErrorMessage {
+  type: "error";
+  message: string;
+  stack?: string;
+}
+
+function sourceTimeout(value: number | undefined): number {
+  const result = value ?? DEFAULT_SOURCE_TIMEOUT_MS;
+  if (!Number.isInteger(result) || result <= 0) {
+    throw new Error(`Invalid preview source timeout: ${result}`);
+  }
+  return result;
+}
+
+function evaluateSourceModule(
+  sourceFile: string,
+  timeoutMs: number
+): Promise<UdomDocument> {
+  return new Promise((resolveDocument, reject) => {
+    const child = fork(SOURCE_RUNNER, [sourceFile], {
+      cwd: dirname(sourceFile),
+      execArgv: ["--import", TSX_LOADER],
+      silent: true
+    });
+    let settled = false;
+    let stderr = "";
+    let result: UdomDocument | undefined;
+    let sourceError: Error | undefined;
+    let timedOut = false;
+
+    child.stdout?.resume();
+    child.stderr?.setEncoding("utf8");
+    child.stderr?.on("data", (chunk: string) => {
+      stderr = `${stderr}${chunk}`.slice(-16_000);
+    });
+
+    const finish = (action: () => void): void => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      clearTimeout(timer);
+      action();
+    };
+    const timer = setTimeout(() => {
+      timedOut = true;
+      child.kill();
+    }, timeoutMs);
+
+    child.on("message", (message: unknown) => {
+      if (typeof message !== "object" || message === null || !("type" in message)) {
+        return;
+      }
+      if ((message as SourceResultMessage).type === "result") {
+        result = (message as SourceResultMessage).document;
+      } else if ((message as SourceErrorMessage).type === "error") {
+        const messageError = message as SourceErrorMessage;
+        sourceError = new Error(messageError.message);
+        if (messageError.stack !== undefined) {
+          sourceError.stack = messageError.stack;
+        }
+      }
+    });
+    child.once("error", (error) => finish(() => reject(error)));
+    child.once("close", (code, signal) => {
+      finish(() => {
+        if (timedOut) {
+          reject(new Error(
+            `Preview source evaluation exceeded ${timeoutMs}ms: ${sourceFile}`
+          ));
+        } else if (sourceError !== undefined) {
+          reject(sourceError);
+        } else if (result !== undefined) {
+          resolveDocument(result);
+        } else {
+          reject(new Error(
+            `Preview source process exited before producing UDOM (${signal ?? code ?? "unknown"}).${stderr === "" ? "" : `\n${stderr.trim()}`}`
+          ));
+        }
+      });
+    });
+  });
+}
+
+async function loadDocumentFile(
+  sourceFile: string,
+  timeoutMs: number
+): Promise<UdomDocument> {
+  if (extname(sourceFile).toLowerCase() === ".json") {
+    return JSON.parse(await readFile(sourceFile, "utf8")) as UdomDocument;
+  }
+  return evaluateSourceModule(sourceFile, timeoutMs);
+}
+
+/** Load either canonical UDOM JSON or a JS/TS module exporting UDOM. */
+export async function loadPreviewDocument(
+  file: string,
+  options: PreviewDocumentLoadOptions = {}
+): Promise<UdomDocument> {
+  const sourceFile = await realpath(resolve(file));
+  const sourceStats = await stat(sourceFile);
+  if (!sourceStats.isFile()) {
+    throw new Error(`Preview source is not a file: ${sourceFile}`);
+  }
+  return loadDocumentFile(sourceFile, sourceTimeout(options.sourceTimeoutMs));
 }
 
 function watchSource(directory: string, file: string, reload: () => void): FSWatcher {
@@ -112,14 +239,14 @@ function watchSource(directory: string, file: string, reload: () => void): FSWat
   }
 }
 
-/** Start a local UDOM preview server with asset serving and live reload. */
+/** Start a local UDOM/React source preview server with asset serving and live reload. */
 export async function startPreviewServer(
   options: PreviewServerOptions
 ): Promise<PreviewServer> {
   const sourceFile = await realpath(resolve(options.file));
   const sourceStats = await stat(sourceFile);
   if (!sourceStats.isFile()) {
-    throw new Error(`UDOM preview source is not a file: ${sourceFile}`);
+    throw new Error(`Preview source is not a file: ${sourceFile}`);
   }
 
   const sourceDirectory = dirname(sourceFile);
@@ -128,12 +255,28 @@ export async function startPreviewServer(
   if (!Number.isInteger(requestedPort) || requestedPort < 0 || requestedPort > 65_535) {
     throw new Error(`Invalid preview server port: ${requestedPort}`);
   }
+  const sourceTimeoutMs = sourceTimeout(options.sourceTimeoutMs);
   const clients = new Set<ServerResponse>();
+  let sourceRevision = 0;
+  let documentCache:
+    | { revision: number; promise: Promise<UdomDocument> }
+    | undefined;
   let watcher: FSWatcher | undefined;
   let reloadTimer: NodeJS.Timeout | undefined;
   let closed = false;
 
+  const loadDocument = (): Promise<UdomDocument> => {
+    if (documentCache?.revision === sourceRevision) {
+      return documentCache.promise;
+    }
+    const promise = loadDocumentFile(sourceFile, sourceTimeoutMs);
+    documentCache = { revision: sourceRevision, promise };
+    return promise;
+  };
+
   const notifyReload = (): void => {
+    sourceRevision += 1;
+    documentCache = undefined;
     if (reloadTimer !== undefined) {
       clearTimeout(reloadTimer);
     }
@@ -173,8 +316,7 @@ export async function startPreviewServer(
 
     if (requestUrl.pathname === "/" || requestUrl.pathname === "/index.html") {
       try {
-        const source = await readFile(sourceFile, "utf8");
-        const document = JSON.parse(source) as UdomDocument;
+        const document = await loadDocument();
         const html = renderPreviewToHTML(document, {
           liveReloadPath: EVENTS_PATH,
           ...(options.title === undefined ? {} : { title: options.title })
@@ -188,12 +330,13 @@ export async function startPreviewServer(
 
     let document: UdomDocument;
     try {
-      document = JSON.parse(await readFile(sourceFile, "utf8")) as UdomDocument;
+      document = await loadDocument();
     } catch {
       send(response, 403, "text/plain; charset=utf-8", "Forbidden\n", headOnly);
       return;
     }
-    if (!isDeclaredResource(document, requestUrl.pathname)) {
+    const resource = declaredResource(document, requestUrl.pathname);
+    if (resource === undefined) {
       send(response, 403, "text/plain; charset=utf-8", "Forbidden\n", headOnly);
       return;
     }
@@ -215,7 +358,7 @@ export async function startPreviewServer(
         return;
       }
       const body = await readFile(assetPath);
-      const contentType = MIME_TYPES[extname(assetPath).toLowerCase()] ?? "application/octet-stream";
+      const contentType = resource.mimeType ?? MIME_TYPES[extname(assetPath).toLowerCase()] ?? "application/octet-stream";
       send(response, 200, contentType, body, headOnly);
     } catch (error) {
       const code = error instanceof Error && "code" in error ? error.code : undefined;

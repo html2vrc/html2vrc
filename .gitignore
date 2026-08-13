@@ -3,5 +3,6 @@
 node_modules/
 dist/
 *.tgz
+packages/react/test/.preview-source-*/
 
 prototype2

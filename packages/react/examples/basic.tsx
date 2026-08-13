@@ -1,3 +1,4 @@
+import * as React from "react";
 import { Button, Image, Text, View, renderToUDOM } from "../src/index.js";
 
 const document = renderToUDOM(
@@ -36,4 +37,4 @@ const document = renderToUDOM(
   }
 );
 
-console.log(JSON.stringify(document, null, 2));
+export default document;

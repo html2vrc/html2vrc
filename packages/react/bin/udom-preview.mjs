@@ -3,9 +3,9 @@
 import { startPreviewServer } from "../dist/preview-server.js";
 
 function usage() {
-  return `Usage: udom-preview <document.udom.json> [--host <host>] [--port <port>] [--title <title>]
+  return `Usage: udom-preview <document.udom.json|source.tsx> [--host <host>] [--port <port>] [--source-timeout <ms>] [--title <title>]
 
-Serves a canonical UDOM document and its relative assets with live reload.
+Serves canonical UDOM JSON or a JS/TS module that exports UDOM, with live reload.
 Defaults: --host 127.0.0.1 --port 4173`;
 }
 
@@ -26,7 +26,12 @@ function parseArguments(arguments_) {
       file = argument;
       continue;
     }
-    if (argument !== "--host" && argument !== "--port" && argument !== "--title") {
+    if (
+      argument !== "--host" &&
+      argument !== "--port" &&
+      argument !== "--source-timeout" &&
+      argument !== "--title"
+    ) {
       throw new Error(`Unknown option: ${argument}`);
     }
     const value = arguments_[index + 1];
@@ -38,16 +43,22 @@ function parseArguments(arguments_) {
       options.host = value;
     } else if (argument === "--title") {
       options.title = value;
-    } else {
+    } else if (argument === "--port") {
       const port = Number(value);
       if (!Number.isInteger(port) || port < 0 || port > 65535) {
         throw new Error(`Invalid port: ${value}`);
       }
       options.port = port;
+    } else {
+      const sourceTimeoutMs = Number(value);
+      if (!Number.isInteger(sourceTimeoutMs) || sourceTimeoutMs <= 0) {
+        throw new Error(`Invalid source timeout: ${value}`);
+      }
+      options.sourceTimeoutMs = sourceTimeoutMs;
     }
   }
   if (file === undefined) {
-    throw new Error("A UDOM document path is required.");
+    throw new Error("A UDOM JSON or JS/TS source path is required.");
   }
   return { file, ...options };
 }
@@ -55,7 +66,7 @@ function parseArguments(arguments_) {
 try {
   const preview = await startPreviewServer(parseArguments(process.argv.slice(2)));
   console.log(`HTML2VRC preview: ${preview.url}`);
-  console.log("Watching the UDOM file and relative assets. Press Ctrl+C to stop.");
+  console.log("Watching the preview source and relative assets. Press Ctrl+C to stop.");
 
   const stop = async () => {
     await preview.close();

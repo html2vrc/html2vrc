@@ -1,3 +1,4 @@
+import * as React from "react";
 import {
   Embed,
   Scroll,
@@ -40,4 +41,4 @@ const document = renderToUDOM(
   }
 );
 
-console.log(JSON.stringify(document, null, 2));
+export default document;
